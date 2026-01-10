@@ -40,7 +40,7 @@ builder.add_conditional_edges("chatbot", tools_condition)
 builder.add_edge("tools", "chatbot")
 
 memory = MemorySaver()
-graph = builder.compile(checkpointer=memory, interrupt_before=["tools"])
+graph = builder.compile(interrupt_before=["tools"])
 
 class ChatRequest(BaseModel):
     question: str
