@@ -80,18 +80,6 @@ Key configuration values are defined at the top of `vector_search.py`:
 * Vector dimension
 * API keys and client configuration
 
-### Security Notice
-
-The Pinecone API key is currently hard-coded for demonstration purposes.
-
-**Do not do this in production.**
-
-Recommended alternatives:
-
-* Environment variables
-* `.env` file with Docker Compose
-* Secret managers (AWS, GCP, Vault, etc.)
-
 ## Output
 
 * Markdown results table per query
@@ -99,11 +87,3 @@ Recommended alternatives:
 
   * Bars: latency (ms)
   * Line: Recall@1 (%)
-
-## Limitations
-
-* Small dataset intended for demonstration, not load testing
-* Some backend calls are simplified or mocked
-* Not suitable for performance claims without further instrumentation
-
-
