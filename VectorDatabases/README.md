@@ -33,28 +33,28 @@ The system uses a unified **Embedding Model** (`all-MiniLM-L6-v2`) to transform 
 
 ---
 
-###Install dependencies:
+## Install dependencies:
 
 ```bash
 pip install -r requirements.txt```
 
-###Spin up Local Engines (Docker):
+## Spin up Local Engines (Docker):
 
 ```bash
 docker-compose up -d```
 
-### Run the Arena:
+## Run the Arena:
 
 ```bash
 python main.py```
 
-###📊 Performance Metrics
+## 📊 Performance Metrics
 
 The dashboard provides a dual-axis visualization:
 Blue Bars (Latency): Lower is better. Shows the speed of retrieval.
 Red Line (Recall): Higher is better. Shows the semantic accuracy of the approximate search.
 
-###📁 Project Structure
+## 📁 Project Structure
 
 vector_search.py: Core logic for engine connections and search.
 main.py: Gradio-based UI for the Battle Arena.
@@ -63,7 +63,7 @@ rag-app/: A specialized sub-application demonstrating an integrated Agentic RAG 
 
 ---
 
-### 💡 How to add this to your project:
+## 💡 How to add this to your project:
 1.  **Open Notepad** (or your code editor).
 2.  **Paste** the content above.
 3.  **Save as** `README.md` inside your `C:\Users\Sergiu\Desktop\Projects\Agentic-AI\VectorDatabases` folder.
