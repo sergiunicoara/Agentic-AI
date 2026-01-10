@@ -38,7 +38,6 @@ Results are displayed both as a markdown table and a dual-axis chart.
 ### Option 1: Local Python
 
 ```bash
-pip install -r requirements.txt
 python vector_search.py
 ```
 
