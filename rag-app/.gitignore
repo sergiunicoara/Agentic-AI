@@ -1,0 +1,18 @@
+# Environments
+.env
+venv/
+env/
+ENV/
+bin/
+lib/
+include/
+share/
+pyvenv.cfg
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Local Data/Storage
+storage/
+data/
