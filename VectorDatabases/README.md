@@ -1,75 +1,110 @@
-# 🏆 The Global Vector Arena 2026
-**A Multi-Engine Benchmarking Dashboard for Vector Databases**
+# Global Vector Arena 2026
 
-This project provides a real-time "Battle Arena" to compare the performance, latency, and accuracy of the world's leading vector databases. It simulates a production environment where semantic search queries are tested against multiple backends simultaneously.
+A benchmarking and visualization application for comparing vector database engines on semantic search latency and recall. The project embeds text using Sentence Transformers, runs similarity search across multiple vector backends, and presents results via an interactive Gradio UI.
 
----
+## Overview
 
-## 🚀 Supported Engines
-The arena benchmarks five distinct vector database technologies:
-* **Weaviate** (Cloud/Local Graph-based)
-* **Milvus** (High-scale Distributed)
-* **Pinecone** (Serverless Managed)
-* **ChromaDB** (Developer-first Persistent)
-* **FAISS** (The Gold Standard for Brute-force/Flat Indexing)
+The application evaluates several popular vector search engines against a shared dataset and query, measuring:
 
-## 🧠 Technical Architecture
-The system uses a unified **Embedding Model** (`all-MiniLM-L6-v2`) to transform text into 384-dimensional vectors. 
+* **Latency (ms)** for top-1 similarity search
+* **Recall@1 (%)** against an exact FAISS ground truth
 
-### Key Features:
-* **Ground Truth Calculation**: Uses a FAISS Flat Index to establish a mathematical "Gold Standard" for every query.
-* **Recall@1 Tracking**: Measures how often each engine successfully retrieves the "perfect" match compared to the brute-force truth.
-* **Metadata Filtering**: Implements category-based filtering (Science, Engineering, Finance) to test engine precision.
-* **Latency Benchmarking**: Visualizes query execution time (ms) across local and cloud-based instances.
+Results are displayed both as a markdown table and a dual-axis chart.
 
----
+## Supported Engines
 
-## 🛠️ Installation & Setup
+* FAISS (ground truth and benchmark)
+* ChromaDB
+* Pinecone
+* Weaviate
+* Milvus
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/sergiu123456789/Agentic-AI.git](https://github.com/sergiu123456789/Agentic-AI.git)
-   cd Agentic-AI/VectorDatabases```
+> Note: Some engines use simplified or simulated logic in the demo UI. Full production integrations can be added where indicated in the code.
 
----
+## Architecture
 
-## Install dependencies:
+* **Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions)
+* **Benchmark driver:** `vector_search.py`
+* **UI:** Gradio Blocks
+* **Visualization:** Matplotlib (latency bars + recall line)
 
-```bash
-pip install -r requirements.txt```
+## Prerequisites
 
-## Spin up Local Engines (Docker):
+* Python 3.9+
+* Docker and Docker Compose (optional, recommended)
+
+## Installation
+
+### Option 1: Local Python
 
 ```bash
-docker-compose up -d```
+pip install -r requirements.txt
+python vector_search.py
+```
 
-## Run the Arena:
+The application will launch a local Gradio server.
+
+### Option 2: Docker Compose
 
 ```bash
-python main.py```
+docker compose up --build
+```
 
-## 📊 Performance Metrics
+This will build and start the application using the provided `docker-compose.yml`.
 
-The dashboard provides a dual-axis visualization:
-Blue Bars (Latency): Lower is better. Shows the speed of retrieval.
-Red Line (Recall): Higher is better. Shows the semantic accuracy of the approximate search.
+## Usage
 
-## 📁 Project Structure
+1. Enter a **Battle Query** (natural language search string).
+2. Select a **Metadata Filter** (All, Engineering, Finance, Science).
+3. Click **Start Battle**.
+4. Review:
 
-vector_search.py: Core logic for engine connections and search.
-main.py: Gradio-based UI for the Battle Arena.
-docker-compose.yml: Configuration for Milvus, Weaviate, and ChromaDB containers.
-rag-app/: A specialized sub-application demonstrating an integrated Agentic RAG workflow.
+   * Returned document per engine
+   * Latency in milliseconds
+   * Recall@1 compared to the FAISS ground truth
 
----
+## Data
 
-## 💡 How to add this to your project:
-1.  **Open Notepad** (or your code editor).
-2.  **Paste** the content above.
-3.  **Save as** `README.md` inside your `C:\Users\Sergiu\Desktop\Projects\Agentic-AI\VectorDatabases` folder.
-4.  **Push to GitHub:**
-    ```cmd
-    git add README.md
-    git commit -m "Add professional README for Vector Arena"
-    git push origin main
-    ```
+The demo uses a small in-memory dataset with semantic categories:
+
+* Science
+* Engineering
+* Finance
+
+Embeddings are generated at startup and reused across engines.
+
+## Configuration
+
+Key configuration values are defined at the top of `vector_search.py`:
+
+* Embedding model
+* Vector dimension
+* API keys and client configuration
+
+### Security Notice
+
+The Pinecone API key is currently hard-coded for demonstration purposes.
+
+**Do not do this in production.**
+
+Recommended alternatives:
+
+* Environment variables
+* `.env` file with Docker Compose
+* Secret managers (AWS, GCP, Vault, etc.)
+
+## Output
+
+* Markdown results table per query
+* Dual-axis chart:
+
+  * Bars: latency (ms)
+  * Line: Recall@1 (%)
+
+## Limitations
+
+* Small dataset intended for demonstration, not load testing
+* Some backend calls are simplified or mocked
+* Not suitable for performance claims without further instrumentation
+
+
