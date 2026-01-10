@@ -31,6 +31,7 @@ The system uses a unified **Embedding Model** (`all-MiniLM-L6-v2`) to transform 
    git clone [https://github.com/sergiu123456789/Agentic-AI.git](https://github.com/sergiu123456789/Agentic-AI.git)
    cd Agentic-AI/VectorDatabases```
 
+---
 
 ###Install dependencies:
 
