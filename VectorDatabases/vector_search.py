@@ -15,7 +15,7 @@ import gradio as gr
 warnings.filterwarnings("ignore")
 model = SentenceTransformer('all-MiniLM-L6-v2')
 dim = 384
-PINECONE_API_KEY = "pcsk_6gRbm6_Nkz1QUEN2wC2zGxq4ZT6WRRReNmMsaUfH9frpeBWizuRHAXHiVcnyE4regWWjCq" # 🔑 Replace with your actual key
+PINECONE_API_KEY = "PINECONE_API_KEY" # 🔑 Replace with your actual key
 
 # Data with semantic categories for the "hard question" test
 documents = [
