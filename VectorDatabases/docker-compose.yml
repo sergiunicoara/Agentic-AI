@@ -51,3 +51,12 @@ services:
       CLUSTER_HOSTNAME: 'node1'
     volumes:
       - ./weaviate_data:/var/lib/weaviate
+
+  # Added ChromaDB as a service
+  chroma:
+    container_name: chroma-arena
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chroma_data:/chroma/chroma

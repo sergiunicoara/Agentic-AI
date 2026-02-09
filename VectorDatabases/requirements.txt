@@ -1,0 +1,10 @@
+gradio
+sentence-transformers
+numpy
+matplotlib
+faiss-cpu
+chromadb
+weaviate-client
+pymilvus
+pinecone-client
+torch --index-url https://download.pytorch.org/whl/cpu
