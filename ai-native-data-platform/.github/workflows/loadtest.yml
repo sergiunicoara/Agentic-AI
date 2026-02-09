@@ -1,0 +1,53 @@
+name: loadtest-k6
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL (e.g. http://localhost:8000)"
+        required: true
+      workspace_id:
+        description: "Workspace ID"
+        required: true
+      rate:
+        description: "Requests per second"
+        required: false
+        default: "50"
+      duration:
+        description: "Duration (e.g. 2m)"
+        required: false
+        default: "2m"
+      baseline:
+        description: "Baseline file (e.g. perf/baselines/retrieval.json)"
+        required: false
+        default: "perf/baselines/retrieval.json"
+
+jobs:
+  retrieval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run k6 retrieval test (export summary)
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: loadtest/k6/retrieval.js
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url }}
+          WORKSPACE_ID: ${{ github.event.inputs.workspace_id }}
+          API_KEY: ${{ secrets.WORKSPACE_API_KEY }}
+          RATE: ${{ github.event.inputs.rate }}
+          DURATION: ${{ github.event.inputs.duration }}
+          K6_ARGS: "--summary-export=reports/k6_retrieval_summary.json"
+
+      - name: Compare against baseline
+        run: |
+          python3 scripts/perf/compare_k6_baseline.py \
+            --current reports/k6_retrieval_summary.json \
+            --baseline "${{ github.event.inputs.baseline }}"
+
+      - name: Upload perf artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-retrieval-report
+          path: reports/

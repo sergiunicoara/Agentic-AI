@@ -1,0 +1,37 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      # Inside the compose network, the DB is reachable via service name "db"
+      DATABASE_URL: postgresql+psycopg2://app:app@db:5432/app
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: .
+    command: python -m app.worker_main
+    environment:
+      DATABASE_URL: postgresql+psycopg2://app:app@db:5432/app
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - db
+      - redis

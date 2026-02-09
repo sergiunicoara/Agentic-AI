@@ -1,0 +1,8 @@
+datasets:
+  - name: demo_cases
+    path: app/eval/datasets/cases.jsonl
+    version: v1
+    sha256: 0eb2b89e959b2354b8467d97e6a6fb63122135b13d1107767d09c50f7e4a2f28
+    notes: |
+      Small deterministic dataset used for CI gating.
+      For larger datasets, keep separate versioned entries and pin the experiment to a dataset version.

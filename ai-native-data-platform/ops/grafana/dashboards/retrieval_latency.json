@@ -1,0 +1,33 @@
+{
+  "title": "RAG Retrieval Overview",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "p95 /ask latency (ms)",
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_latency_seconds_bucket{route=\"/ask\"}[5m])) by (le)) * 1000",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Error rate /ask",
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{route=\"/ask\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{route=\"/ask\"}[5m]))",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
