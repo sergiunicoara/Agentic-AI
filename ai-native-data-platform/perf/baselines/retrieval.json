@@ -1,0 +1,10 @@
+{
+  "type": "k6-summary-export",
+  "generated_from": "loadtest/k6/retrieval.js",
+  "notes": "Placeholder baseline. Replace with your measured steady-state numbers from a controlled perf environment.",
+  "metrics": {
+    "http_req_duration": {"values": {"p(95)": 250, "p(99)": 450}},
+    "http_req_failed": {"values": {"rate": 0.01}},
+    "checks": {"values": {"rate": 0.99}}
+  }
+}

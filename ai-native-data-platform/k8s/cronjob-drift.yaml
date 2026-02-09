@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-monitor
+spec:
+  schedule: "*/30 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: drift
+              image: ai-native-data-platform:latest
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-platform-secrets
+                      key: database_url
+              command: ["python", "-c"]
+              args:
+                - "from app.drift.monitor import run_drift_monitor; import json; print(json.dumps(run_drift_monitor('demo'), indent=2))"

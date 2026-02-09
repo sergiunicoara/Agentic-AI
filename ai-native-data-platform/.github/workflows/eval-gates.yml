@@ -1,0 +1,94 @@
+name: eval-gates
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Use localhost because the DB is exposed via docker-compose port mapping.
+      DATABASE_URL: postgresql+psycopg2://app:app@localhost:5432/app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Start Postgres (pgvector)
+        run: |
+          docker compose up -d db
+
+      - name: Wait for DB
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          for i in {1..60}; do
+            if psql "postgresql://app:app@localhost:5432/app" -c "select 1" >/dev/null 2>&1; then
+              echo "DB is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "DB did not become ready in time" >&2
+          docker compose logs db || true
+          exit 1
+
+      - name: Initialize schema + seed demo workspace
+        run: |
+          psql "postgresql://app:app@localhost:5432/app" -f scripts/init_db.sql
+
+      - name: Run evaluation + quality/latency gates
+        run: |
+          python -m app.eval.run \
+            --experiment app/eval/experiments/baseline.yaml \
+            --cases app/eval/datasets/cases.jsonl \
+            --json_out artifacts/eval_summary.json
+
+      - name: Render results snapshot (Markdown)
+        if: always()
+        run: |
+          python -m app.eval.render_results \
+            --in_json artifacts/eval_summary.json \
+            --out_md artifacts/results_snapshot.md
+
+      - name: Upload evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-summary
+          path: artifacts/eval_summary.json
+
+      - name: Upload results snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-snapshot
+          path: artifacts/results_snapshot.md
+
+      - name: Show summary
+        if: always()
+        run: |
+          echo "--- artifacts/eval_summary.json ---"
+          cat artifacts/eval_summary.json || true
+          echo "--- artifacts/results_snapshot.md ---"
+          cat artifacts/results_snapshot.md || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v

@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ai-platform-eval
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: eval
+          image: ai-platform:latest
+          command: ["python", "-m", "app.eval.scheduler.run"]
+          args: ["--experiment", "app/eval/experiments/baseline.yaml", "--cases", "app/eval/datasets/cases.jsonl", "--num_shards", "8"]

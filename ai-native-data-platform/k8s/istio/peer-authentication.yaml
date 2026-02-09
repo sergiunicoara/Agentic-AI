@@ -1,0 +1,7 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: ai-platform-mtls
+spec:
+  mtls:
+    mode: STRICT

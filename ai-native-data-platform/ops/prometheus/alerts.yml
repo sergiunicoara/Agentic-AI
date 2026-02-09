@@ -1,0 +1,38 @@
+groups:
+  - name: ai_platform_alerts
+    rules:
+      - alert: HighRollingLatency
+        expr: slo_rolling_p95_latency_ms > 900
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: Rolling p95 latency is high
+          description: Rolling p95 latency exceeded 900ms for 5m.
+
+      - alert: HighErrorRate
+        expr: slo_rolling_error_rate > 0.02
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: Rolling error rate is high
+          description: Rolling error rate exceeded 2% for 5m.
+
+      - alert: HighUnknownRate
+        expr: slo_rolling_unknown_rate > 0.35
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Unknown-response rate is high
+          description: Unknown rate exceeded 35% for 10m (could indicate retrieval regressions or drift).
+
+      - alert: PlatformAnomalyDetected
+        expr: platform_anomaly_score > 8
+        for: 2m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Anomaly detector triggered
+          description: EWMA-based anomaly score exceeded threshold (check trace_log for anomaly_detected events).

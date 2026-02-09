@@ -1,0 +1,17 @@
+name: hybrid_rrf
+retrieval:
+  k: 10
+  rerank_candidates: 50
+metrics:
+  - recall_at_k
+  - mrr
+  - groundedness
+  - pass_rate
+gates:
+  pass_rate: 0.80
+  recall_mean: 0.50
+  mrr_mean: 0.25
+  rubric_pass_rate: 0.80
+  generation_failure_rate: 0.05
+  hard_negative_hit_rate: 0.20
+  latency_p95_ms: 900

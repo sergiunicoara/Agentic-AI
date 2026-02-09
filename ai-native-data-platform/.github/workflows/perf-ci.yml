@@ -1,0 +1,68 @@
+name: perf-regression
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  retrieval-perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start stack
+        run: |
+          docker compose up -d --build
+
+      - name: Init DB schema
+        run: |
+          # Apply init schema and index state table
+          docker exec -i $(docker compose ps -q db) psql -U app -d app < scripts/init_db.sql
+          docker exec -i $(docker compose ps -q db) psql -U app -d app < ops/sql/001_workspace_index_state.sql
+
+      - name: Seed corpus
+        env:
+          DATABASE_URL: postgresql+psycopg2://app:app@localhost:5432/app
+        run: |
+          python3 scripts/seed_corpus.py --workspace demo --docs 400
+
+      - name: Bulk index (mock embeddings)
+        env:
+          DATABASE_URL: postgresql+psycopg2://app:app@localhost:5432/app
+          EMBED_PROVIDER: mock
+        run: |
+          python3 scripts/run_bulk_index.py --workspace demo
+
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 1
+          done
+          exit 1
+
+      - name: Run k6 retrieval test (export summary)
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: loadtest/k6/retrieval.js
+        env:
+          BASE_URL: http://localhost:8000
+          WORKSPACE_ID: demo
+          API_KEY: demo
+          RATE: "40"
+          DURATION: "60s"
+          K6_ARGS: "--summary-export=reports/k6_retrieval_summary.json"
+
+      - name: Compare against baseline
+        run: |
+          python3 scripts/perf/compare_k6_baseline.py --current reports/k6_retrieval_summary.json --baseline perf/baselines/retrieval.json
+
+      - name: Upload perf artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-reports
+          path: reports/
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
