@@ -33,7 +33,7 @@ function CheckExit {
 # ==================================================
 
 # Defaults
-$PROJECT = "recruiter-agent-12345"
+$PROJECT = "recruiter-sergiu-260213"
 $REGION  = "europe-west1"
 $SERVICE = "recruiter-agent"
 $REPO_NAME  = "recruiter-agent"
