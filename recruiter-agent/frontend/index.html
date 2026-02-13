@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sergiu – AI Recruiter Agent</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+
+    <style>
+      body {
+        background: radial-gradient(circle at top, #0f172a, #020617 55%);
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: -400px 0;
+        }
+        100% {
+          background-position: 400px 0;
+        }
+      }
+
+      .animate-shimmer {
+        background-size: 800px 100%;
+        animation: shimmer 1.3s infinite linear;
+      }
+    </style>
+  </head>
+
+  <body class="h-full text-slate-100">
+    <div class="min-h-screen flex flex-col">
+
+      <!-- HEADER -->
+      <header class="w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="h-8 w-8 rounded-xl bg-sky-500/15 border border-sky-500/40 flex items-center justify-center">
+              <span class="text-sky-400 font-semibold text-xs">SR</span>
+            </div>
+            <span class="font-semibold tracking-tight">Sergiu’s AI Recruiter Agent</span>
+          </div>
+
+          <div class="flex items-center space-x-3 text-sm">
+            <a href="https://www.linkedin.com/in/sergiu-nicoara-31b27013/" target="_blank" class="text-slate-300 hover:text-sky-400">
+              LinkedIn
+            </a>
+            <a href="https://github.com/sergiu123456789" target="_blank" class="text-slate-300 hover:text-sky-400">
+              GitHub
+            </a>
+            <a href="https://github.com/sergiu123456789/recruiter-agent" target="_blank" class="hidden sm:inline text-slate-300 hover:text-sky-400">
+              Source
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <!-- MAIN -->
+      <main class="flex-1">
+        <div class="max-w-5xl mx-auto px-4 py-10 space-y-10">
+
+          <!-- HERO + SIDE CARDS -->
+          <div class="grid gap-10 lg:grid-cols-[1.3fr,1fr] items-start">
+            <!-- HERO -->
+            <section>
+              <div class="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 mb-4">
+                Live AI agent · Built with Gemini &amp; FastAPI
+              </div>
+
+              <h1 class="text-4xl md:text-5xl font-semibold tracking-tight text-slate-50">
+                An AI recruiter that explains how
+                <span class="text-sky-400">Sergiu</span> fits your role.
+              </h1>
+
+              <p class="mt-4 text-slate-300 text-lg max-w-xl">
+                Paste any job description. The agent extracts requirements, searches Sergiu’s portfolio,
+                and produces recruiter-friendly summaries with concrete impact.
+              </p>
+
+              <div class="mt-6 flex flex-wrap gap-3">
+                <a
+                  href="#live-chat"
+                  class="rounded-lg bg-sky-500 hover:bg-sky-400 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/30"
+                >
+                  Try the live agent
+                </a>
+
+                <a
+                  href="https://github.com/sergiu123456789/recruiter-agent"
+                  target="_blank"
+                  class="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-200 hover:border-slate-500"
+                >
+                  View repo &amp; architecture
+                </a>
+              </div>
+
+              <dl class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-slate-300">
+                <div>
+                  <dt class="text-slate-400">Stack</dt>
+                  <dd class="font-medium">FastAPI · Gemini · RAG</dd>
+                </div>
+                <div>
+                  <dt class="text-slate-400">Focus</dt>
+                  <dd class="font-medium">Production AI Agents</dd>
+                </div>
+                <div>
+                  <dt class="text-slate-400">Extras</dt>
+                  <dd class="font-medium">Sessions · Judge · SQLite</dd>
+                </div>
+              </dl>
+            </section>
+
+            <!-- SIDE CARDS -->
+            <section class="space-y-4">
+              <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm shadow-lg shadow-black/40">
+                <h2 class="font-semibold text-slate-50 mb-2">What this agent does</h2>
+                <ul class="list-disc list-inside space-y-1 text-slate-300">
+                  <li>Understands job descriptions &amp; titles</li>
+                  <li>Matches to Sergiu’s projects &amp; skills</li>
+                  <li>Explains recruiter relevance &amp; impact</li>
+                  <li>Provides ATS-style summaries + email drafts</li>
+                </ul>
+              </div>
+
+              <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm shadow-lg shadow-black/40">
+                <h2 class="font-semibold text-slate-50 mb-2">Why it’s interesting</h2>
+                <ul class="list-disc list-inside space-y-1 text-slate-300">
+                  <li>Deterministic agent loop for evals</li>
+                  <li>RAG over CV for recruiter Q&amp;A</li>
+                  <li>LLM-as-judge CI gate for quality</li>
+                  <li>Cloud Run deployment, ready for production</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+
+          <!-- FULL-PAGE CHAT PANEL -->
+          <section id="live-chat" class="grid gap-6 lg:grid-cols-[1.4fr,1fr] items-start">
+            <!-- Chat -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl shadow-black/40 backdrop-blur">
+              <div class="border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+                <div>
+                  <div class="text-xs uppercase tracking-wide text-slate-400">Live demo</div>
+                  <div class="text-sm font-medium text-slate-100">Recruiter Agent Chat</div>
+                </div>
+                <div class="flex items-center gap-1 text-xs text-slate-400">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>
+                  Ready
+                </div>
+              </div>
+
+              <div class="h-[420px] flex flex-col">
+                <div id="page-chat-msgs" class="flex-1 overflow-y-auto px-4 py-3 space-y-2 text-sm">
+                  <!-- messages injected here -->
+                </div>
+
+                <div class="border-t border-slate-800 px-3 py-2">
+                  <div class="flex items-end gap-2">
+                    <textarea
+                      id="page-chat-inp"
+                      rows="2"
+                      class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 resize-none"
+                      placeholder="Paste a job description or ask about fit, impact, CV…"
+                    ></textarea>
+                    <button
+                      id="page-chat-send"
+                      class="shrink-0 inline-flex items-center justify-center rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-sky-500/30"
+                    >
+                      Send
+                    </button>
+                  </div>
+                  <p class="mt-1 text-[11px] text-slate-500">
+                    Try: <span class="font-medium text-slate-300">“Senior ML Engineer”</span> or paste a real JD.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sample prompts / helper -->
+            <div class="space-y-4">
+              <div class="rounded-2xl border border-slate-800 bg-slate-950/80 p-5 text-sm">
+                <h3 class="font-semibold text-slate-50 mb-2">Quick prompts</h3>
+                <div class="flex flex-col gap-2">
+                  <button
+                    class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
+                    data-sample="I'm hiring a Senior ML Engineer to build and productionize LLM-powered features. We care about ownership, production RAG, and communication with product."
+                  >
+                    🔍 Senior ML Engineer · RAG · ownership · communication
+                  </button>
+                  <button
+                    class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
+                    data-sample="We are hiring an LLM Engineer to design and ship retrieval-augmented generation systems, with strong MLOps and observability."
+                  >
+                    📎 LLM Engineer · production RAG · MLOps
+                  </button>
+                  <button
+                    class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
+                    data-sample="Give me an ATS-style summary and recruiter email I can use to introduce Sergiu for a Data Scientist role focused on NLP and experimentation."
+                  >
+                    📝 ATS summary + recruiter email
+                  </button>
+                </div>
+              </div>
+
+              <div class="rounded-2xl border border-slate-800 bg-slate-950/80 p-5 text-xs text-slate-300">
+                <h3 class="font-semibold text-slate-50 mb-2">How it works</h3>
+                <p class="mb-2">
+                  The agent runs a deterministic loop:
+                </p>
+                <ol class="list-decimal list-inside space-y-1">
+                  <li>Understands the role &amp; criteria.</li>
+                  <li>Selects best-fit projects from my portfolio.</li>
+                  <li>Generates deep dives + ATS summaries.</li>
+                  <li>Answers CV questions via RAG.</li>
+                </ol>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- FOOTER -->
+      <footer class="border-t border-slate-800 bg-slate-950/90 text-xs text-slate-500 py-4 px-4">
+        <div class="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between gap-2">
+          <span>© Sergiu — AI/ML Engineer.</span>
+          <span>Demo: Gemini · FastAPI · Cloud Run.</span>
+        </div>
+      </footer>
+
+      <!-- FLOATING WIDGET -->
+      <button
+        id="widget-launch"
+        class="fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-40 border-0 px-3.5 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-semibold shadow-xl shadow-sky-500/40 flex items-center gap-2"
+      >
+        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-950/80 text-[11px] font-bold text-sky-400 border border-sky-400/60">
+          SR
+        </span>
+        <span>Chat with the AI tour</span>
+      </button>
+
+      <div
+        id="widget"
+        class="fixed right-4 bottom-20 sm:right-6 sm:bottom-24 z-40 w-[calc(100vw-2rem)] max-w-sm h-[480px] rounded-2xl border border-slate-800 bg-slate-950/95 shadow-2xl shadow-black/60 backdrop-blur hidden flex-col"
+      >
+        <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="text-xs uppercase tracking-wide text-slate-400">Assistant</div>
+            <div class="text-sm font-semibold text-slate-100">Recruiter Tour Agent</div>
+          </div>
+          <button
+            id="widget-close"
+            class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-md hover:bg-slate-800/80"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div id="widget-msgs" class="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-xs">
+          <!-- widget messages -->
+        </div>
+
+        <div class="border-t border-slate-800 px-3 py-2">
+          <div class="flex items-center gap-2">
+            <input
+              id="widget-inp"
+              class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+              placeholder="Paste a JD or ask about fit…"
+            />
+            <button
+              id="widget-send"
+              class="shrink-0 inline-flex items-center justify-center rounded-xl bg-sky-500 hover:bg-sky-400 px-3 py-1.5 text-[11px] font-semibold text-slate-950"
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHARED CHAT LOGIC -->
+   <script>
+document.addEventListener("DOMContentLoaded", function () {
+  // =====================================
+  // CONFIG
+  // =====================================
+  const BACKEND_URL =
+    "https://recruiter-agent-190861422358.europe-west1.run.app/chat";
+
+  let sessionId = localStorage.getItem("tourSessionId") || null;
+  let agentState = null;
+
+  function detectSource() {
+    const params = new URLSearchParams(location.search);
+    const src = params.get("src");
+    if (src === "github" || src === "linkedin") return src;
+
+    const ref = document.referrer.toLowerCase();
+    if (ref.includes("github.com")) return "github";
+    if (ref.includes("linkedin.com")) return "linkedin";
+
+    return "direct";
+  }
+
+  // =====================================
+  // SHARED MESSAGE COMPONENT
+  // =====================================
+  function createAddMsg(container) {
+    return function addMsg(sender, text) {
+      const wrap = document.createElement("div");
+      wrap.className = sender === "you" ? "flex justify-end" : "flex justify-start";
+
+      const bubble = document.createElement("div");
+      bubble.className =
+        "max-w-[80%] rounded-2xl px-3 py-2 text-xs leading-relaxed " +
+        (sender === "you"
+          ? "bg-slate-800/90 text-slate-50 border border-slate-700/80"
+          : "bg-sky-500/10 text-slate-100 border border-sky-500/40");
+
+      bubble.innerHTML = String(text).replace(/\n/g, "<br/>");
+      wrap.appendChild(bubble);
+      container.appendChild(wrap);
+      container.scrollTop = container.scrollHeight;
+    };
+  }
+
+  // =====================================
+  // SHARED BACKEND CALL
+  // =====================================
+  async function sendToBackend(message, ui) {
+    const source = detectSource();
+
+    const payload = {
+      session_id: sessionId,
+      message,
+      source,
+      state: agentState,
+    };
+
+    // thinking shimmer
+    const thinking = document.createElement("div");
+    thinking.className = "flex justify-start";
+    thinking.innerHTML =
+      '<div class="rounded-2xl px-3 py-2 text-xs bg-sky-500/5 border border-sky-500/20 text-sky-200/80 flex items-center gap-2">' +
+      '<span class="w-16 h-3 rounded-full bg-gradient-to-r from-slate-700/40 via-slate-500/70 to-slate-700/40 animate-shimmer"></span>' +
+      "<span class='hidden sm:inline'>Thinking…</span>" +
+      "</div>";
+
+    ui.msgs.appendChild(thinking);
+    ui.msgs.scrollTop = ui.msgs.scrollHeight;
+
+    try {
+      const res = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      thinking.remove();
+
+      if (!res.ok) {
+        ui.addAI("⚠️ Something went wrong. Please try again.");
+        return;
+      }
+
+      const data = await res.json();
+
+      // Persist session + state
+      if (data.session_id) {
+        sessionId = data.session_id;
+        localStorage.setItem("tourSessionId", sessionId);
+      }
+      if (data.state) {
+        agentState = data.state;
+      }
+
+      ui.addAI(data.reply || "No reply received.");
+    } catch (err) {
+      thinking.remove();
+      ui.addAI("⚠️ I couldn't reach the backend. Please try again.");
+    }
+  }
+
+  // =====================================
+  // FULL PAGE CHAT
+  // =====================================
+  (function initPageChat() {
+    const msgs = document.getElementById("page-chat-msgs");
+    const inp = document.getElementById("page-chat-inp");
+    const send = document.getElementById("page-chat-send");
+    if (!msgs || !inp || !send) return;
+
+    const addMsg = createAddMsg(msgs);
+    const addAI = (t) => addMsg("ai", t);
+    const addYou = (t) => addMsg("you", t);
+
+    // Initial welcome
+    addAI(
+      "👋 Hi! I’m Sergiu’s AI recruiter agent.<br><br>" +
+        "Tell me the role you’re hiring for (e.g. <b>Senior ML Engineer</b>, <b>LLM Engineer</b>, <b>Data Scientist</b>) " +
+        "or paste a full job description."
+    );
+
+    function handleSend(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      addYou(trimmed);
+      inp.value = "";
+      sendToBackend(trimmed, { msgs, addAI });
+    }
+
+    send.addEventListener("click", () => handleSend(inp.value));
+
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend(inp.value);
+      }
+    });
+
+    // sample prompt buttons
+    document.querySelectorAll("[data-sample]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const text = btn.getAttribute("data-sample") || "";
+        if (!text) return;
+        addYou(text);
+        sendToBackend(text, { msgs, addAI });
+      });
+    });
+  })();
+
+  // =====================================
+  // FLOATING WIDGET CHAT
+  // =====================================
+  (function initWidget() {
+    const widget = document.getElementById("widget");
+    const launch = document.getElementById("widget-launch");
+    const closeBtn = document.getElementById("widget-close");
+    const msgs = document.getElementById("widget-msgs");
+    const inp = document.getElementById("widget-inp");
+    const send = document.getElementById("widget-send");
+
+    if (!widget || !launch || !msgs || !inp || !send) return;
+
+    const addMsg = createAddMsg(msgs);
+    const addAI = (t) => addMsg("ai", t);
+    const addYou = (t) => addMsg("you", t);
+
+    function showIntroIfNeeded() {
+      if (!widget.dataset.opened) {
+        widget.dataset.opened = "1";
+        addAI(
+          "👋 Hi! I’m Sergiu’s AI recruiter tour agent.<br><br>" +
+            "Paste a job description or tell me the role you’re hiring for, " +
+            "and I’ll highlight the most relevant projects, skills, and impact."
+        );
+      }
+    }
+
+    function openWidget() {
+      widget.classList.remove("hidden");
+      showIntroIfNeeded();
+    }
+
+    function closeWidget() {
+      widget.classList.add("hidden");
+    }
+
+    launch.addEventListener("click", openWidget);
+    closeBtn.addEventListener("click", closeWidget);
+
+    function handleSend(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      addYou(trimmed);
+      inp.value = "";
+      sendToBackend(trimmed, { msgs, addAI });
+    }
+
+    send.addEventListener("click", () => handleSend(inp.value));
+
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && inp.value.trim()) {
+        e.preventDefault();
+        handleSend(inp.value);
+      }
+    });
+
+    // Auto-open for recruiters
+    (function autoOpen() {
+      const ref = document.referrer.toLowerCase();
+      const srcParam = new URLSearchParams(location.search).get("src")?.toLowerCase();
+      const isRecruiter =
+        ref.includes("github.com") ||
+        ref.includes("linkedin.com") ||
+        srcParam === "github" ||
+        srcParam === "linkedin";
+
+      if (isRecruiter) {
+        openWidget();
+        sendToBackend(
+          "I'm a recruiter visiting from GitHub/LinkedIn. Please show me the most relevant AI/ML projects and ATS summary.",
+          { msgs, addAI }
+        );
+      }
+    })();
+  })();
+});
+</script>
+
+  </body>
+</html>
