@@ -1,0 +1,63 @@
+name: CI and Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run tests
+        run: pytest -q
+
+      - name: Build Docker image
+        run: |
+          docker build -t recruiter-agent .
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Build and submit image
+        run: |
+          REGION=${{ secrets.GCP_REGION }}
+          SERVICE_NAME=recruiter-agent
+          REPO=containers
+          IMAGE_URI="${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${REPO}/${SERVICE_NAME}"
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          gcloud builds submit --tag "${IMAGE_URI}" .
+
+      - name: Deploy to Cloud Run
+        run: |
+          REGION=${{ secrets.GCP_REGION }}
+          SERVICE_NAME=recruiter-agent
+          REPO=containers
+          IMAGE_URI="${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${REPO}/${SERVICE_NAME}"
+          gcloud run deploy "${SERVICE_NAME}"             --image "${IMAGE_URI}"             --region "${REGION}"             --allow-unauthenticated             --set-env-vars "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},LOG_LEVEL=INFO"

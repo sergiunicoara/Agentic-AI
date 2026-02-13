@@ -1,0 +1,28 @@
+fastapi
+uvicorn[standard]
+
+# Pydantic v2 + settings
+pydantic>=2.12
+pydantic-settings>=2.3
+
+# Google Generative AI (Gemini)
+google-generativeai>=0.7.0
+
+# Core dependencies
+numpy
+requests
+python-dotenv
+
+# Observability / OpenTelemetry
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+opentelemetry-instrumentation
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-requests
+opentelemetry-instrumentation-asgi
+opentelemetry-instrumentation-logging
+opentelemetry-instrumentation-urllib
+opentelemetry-instrumentation-urllib3
+opentelemetry-instrumentation-grpc
+google-cloud-trace
