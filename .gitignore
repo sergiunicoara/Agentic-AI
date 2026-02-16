@@ -16,6 +16,11 @@ __pycache__/
 *$py.class
 *.so
 
+# ---- Python packaging ----
+*.egg-info/
+dist/
+build/
+
 # ---- Environment files ----
 .env
 .env.*
@@ -27,17 +32,20 @@ Thumbs.db
 # ---- Logs ----
 *.log
 
-# ---- Benchmark artifacts (optional) ----
+# ---- Benchmark artifacts / outputs ----
 results/
 *.csv
-
-**/.cache/
-**/build/
-**/*.log
-**/*.png
-**/*.csv
-
+*.png
 *.zip
 
-VectorDatabases/
+# Numpy / embedding artifacts (often large)
+*.npy
+*.npz
 
+# ---- Caches / generated dirs ----
+vector-arena/.cache/
+**/.cache/
+**/build/
+
+# ---- Project-specific excludes ----
+VectorDatabases/
