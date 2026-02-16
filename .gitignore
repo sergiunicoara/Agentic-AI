@@ -31,4 +31,13 @@ Thumbs.db
 results/
 *.csv
 
+**/.cache/
+**/build/
+**/*.log
+**/*.png
+**/*.csv
+
 *.zip
+
+VectorDatabases/
+
