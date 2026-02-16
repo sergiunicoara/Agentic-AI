@@ -1,0 +1,55 @@
+# Vector Arena Benchmark Results
+
+## Meta
+- **dim**: 128
+- **docs**: 250000
+- **queries**: 1000
+- **k**: 10
+- **seed**: 42
+- **dataset**: clustered
+- **clusters**: 256
+- **warmup**: 2
+- **timed_runs**: 10
+- **per_query_sample**: 25
+- **timestamp_utc**: 2026-02-16T16:02:11Z
+
+## Results
+### faiss_exact
+- **status**: ok
+- **build_ms**: 0.0
+- **qps_estimate**: 3824.229830696062
+- **recall@k**: 1.0
+- **batch_latency_ms**: {'mean_ms': 261.49056000067503, 'p50_ms': 261.38970000101835, 'p95_ms': 265.44018000095093, 'p99_ms': 265.95915600009903, 'min_ms': 257.2331999981543, 'max_ms': 266.08889999988605}
+
+### qdrant
+- **status**: ok
+- **build_ms**: 62761.59
+- **qps_estimate**: 50.0053
+- **recall@k**: 0.5286
+- **batch_latency_ms**: {'mean_ms': 19997.8739, 'p50_ms': 19842.1396, 'p95_ms': 21885.0152, 'p99_ms': 21914.4332, 'min_ms': 18039.0977, 'max_ms': 21921.7877}
+- **per_query_latency_ms_sample**: {'mean_ms': 16.3991, 'p50_ms': 8.1777, 'p95_ms': 31.086, 'p99_ms': 31.7531, 'min_ms': 6.528, 'max_ms': 31.9617}
+
+### weaviate
+- **status**: ok
+- **build_ms**: 100675.52
+- **qps_estimate**: 255.0119
+- **recall@k**: 0.432
+- **batch_latency_ms**: {'mean_ms': 3921.3853, 'p50_ms': 3941.9044, 'p95_ms': 3999.8824, 'p99_ms': 4016.9134, 'min_ms': 3804.4633, 'max_ms': 4021.1711}
+- **per_query_latency_ms_sample**: {'mean_ms': 3.8329, 'p50_ms': 3.8239, 'p95_ms': 4.2686, 'p99_ms': 4.3305, 'min_ms': 3.3491, 'max_ms': 4.3443}
+
+### redis
+- **status**: ok
+- **build_ms**: 94064.697
+- **qps_estimate**: 1497.966
+- **recall@k**: 0.0369
+- **batch_latency_ms**: {'mean_ms': 667.5719, 'p50_ms': 655.1737, 'p95_ms': 719.5054, 'p99_ms': 746.5148, 'min_ms': 648.6253, 'max_ms': 753.2671}
+- **per_query_latency_ms_sample**: {'mean_ms': 0.6879, 'p50_ms': 0.683, 'p95_ms': 0.8079, 'p99_ms': 0.8173, 'min_ms': 0.588, 'max_ms': 0.8192}
+
+### pgvector
+- **status**: ok
+- **build_ms**: 47921.393
+- **qps_estimate**: 725.9527
+- **recall@k**: 0.1382
+- **batch_latency_ms**: {'mean_ms': 1377.5002, 'p50_ms': 1357.7417, 'p95_ms': 1457.746, 'p99_ms': 1463.9773, 'min_ms': 1329.6369, 'max_ms': 1465.5351}
+- **per_query_latency_ms_sample**: {'mean_ms': 1.2705, 'p50_ms': 1.2409, 'p95_ms': 1.5116, 'p99_ms': 1.6064, 'min_ms': 1.0571, 'max_ms': 1.6357}
+

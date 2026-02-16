@@ -1,0 +1,37 @@
+schema vector_arena {
+
+    document vector_arena {
+
+        # Explicit numeric ID so the benchmark can compute recall reliably
+        field doc_id type int {
+            indexing: attribute | summary
+        }
+
+        field vector type tensor<float>(x[128]) {
+            indexing: attribute | index
+
+            attribute {
+                distance-metric: angular
+            }
+
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 200
+                }
+            }
+        }
+    }
+
+    # Required for nearestNeighbor(vector, qv)
+    rank-profile default {
+
+        inputs {
+            query(qv) tensor<float>(x[128])
+        }
+
+        first-phase {
+            expression: closeness(field, vector)
+        }
+    }
+}

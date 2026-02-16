@@ -1,0 +1,39 @@
+Metadata-Version: 2.4
+Name: vector-arena
+Version: 0.1.0
+Requires-Python: <3.13,>=3.10
+Requires-Dist: numpy>=1.24
+Requires-Dist: faiss-cpu>=1.7.4
+Requires-Dist: requests>=2.31
+Provides-Extra: pinecone
+Requires-Dist: pinecone; extra == "pinecone"
+Provides-Extra: chroma
+Requires-Dist: chromadb; extra == "chroma"
+Provides-Extra: qdrant
+Requires-Dist: qdrant-client; extra == "qdrant"
+Provides-Extra: weaviate
+Requires-Dist: weaviate-client; extra == "weaviate"
+Provides-Extra: milvus
+Requires-Dist: pymilvus; extra == "milvus"
+Provides-Extra: redis
+Requires-Dist: redis>=5.0; extra == "redis"
+Provides-Extra: pgvector
+Requires-Dist: psycopg[binary]>=3.1; extra == "pgvector"
+Provides-Extra: neo4j
+Requires-Dist: neo4j>=5.15; extra == "neo4j"
+Provides-Extra: clickhouse
+Requires-Dist: clickhouse-connect>=0.7; extra == "clickhouse"
+Provides-Extra: scann
+Requires-Dist: scann; extra == "scann"
+Provides-Extra: vertex
+Requires-Dist: google-cloud-aiplatform>=1.60; extra == "vertex"
+Provides-Extra: all
+Requires-Dist: pinecone; extra == "all"
+Requires-Dist: chromadb; extra == "all"
+Requires-Dist: qdrant-client; extra == "all"
+Requires-Dist: weaviate-client; extra == "all"
+Requires-Dist: pymilvus; extra == "all"
+Requires-Dist: redis>=5.0; extra == "all"
+Requires-Dist: psycopg[binary]>=3.1; extra == "all"
+Requires-Dist: neo4j>=5.15; extra == "all"
+Requires-Dist: clickhouse-connect>=0.7; extra == "all"

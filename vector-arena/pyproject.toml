@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vector-arena"
+version = "0.1.0"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "numpy>=1.24",
+  "faiss-cpu>=1.7.4",
+  "requests>=2.31",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["arena*"]
+exclude = ["artifacts*"]
+
+[project.optional-dependencies]
+pinecone = ["pinecone"]
+chroma = ["chromadb"]
+qdrant = ["qdrant-client"]
+weaviate = ["weaviate-client"]
+milvus = ["pymilvus"]
+redis = ["redis>=5.0"]
+pgvector = ["psycopg[binary]>=3.1"]
+neo4j = ["neo4j>=5.15"]
+clickhouse = ["clickhouse-connect>=0.7"]
+scann = ["scann"]
+vertex = ["google-cloud-aiplatform>=1.60"]
+
+# Convenience: install everything needed for all supported engines.
+all = [
+  "pinecone",
+  "chromadb",
+  "qdrant-client",
+  "weaviate-client",
+  "pymilvus",
+  "redis>=5.0",
+  "psycopg[binary]>=3.1",
+  "neo4j>=5.15",
+  "clickhouse-connect>=0.7",
+]

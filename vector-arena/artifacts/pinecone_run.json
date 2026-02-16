@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "dim": 128,
+    "docs": 2000,
+    "queries": 100,
+    "k": 10,
+    "seed": 42,
+    "warmup": 2,
+    "timed_runs": 5,
+    "per_query_sample": 25,
+    "timestamp_utc": "2026-02-14T10:47:00Z"
+  },
+  "results": {
+    "faiss_exact": {
+      "status": "ok",
+      "build_ms": 0.0,
+      "batch_latency_ms": {
+        "mean_ms": 0.5902399774640799,
+        "p50_ms": 0.5475999787449837,
+        "p95_ms": 0.7297599571757019,
+        "p99_ms": 0.7591519574634731,
+        "min_ms": 0.5150000215508044,
+        "max_ms": 0.7664999575354159
+      },
+      "qps_estimate": 169422.6142214938,
+      "recall@k": 1.0
+    },
+    "pinecone": {
+      "status": "ok",
+      "build_ms": 6409.391,
+      "batch_latency_ms": {
+        "mean_ms": 14193.1679,
+        "p50_ms": 14034.8485,
+        "p95_ms": 14751.0067,
+        "p99_ms": 14894.2225,
+        "min_ms": 13947.8857,
+        "max_ms": 14930.0264
+      },
+      "per_query_latency_ms_sample": {
+        "mean_ms": 140.4268,
+        "p50_ms": 139.795,
+        "p95_ms": 142.8482,
+        "p99_ms": 151.9893,
+        "min_ms": 136.4983,
+        "max_ms": 154.8602
+      },
+      "qps_estimate": 7.0456,
+      "recall@k": 0.984
+    }
+  }
+}
