@@ -78,12 +78,6 @@ conditions.
 
 ------------------------------------------------------------------------
 
-## Comparative Overview
-
-![Figure 1](Figure_1.png)
-
-------------------------------------------------------------------------
-
 # Key Findings
 
 -   \~25× throughput variance across ANN engines under identical
