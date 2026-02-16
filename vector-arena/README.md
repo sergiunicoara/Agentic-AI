@@ -1,38 +1,105 @@
-# Vector Arena --- Single-Node Vector Database Benchmark
+# Vector Arena --- Reproducible Vector Database Benchmark
 
-This repository contains a reproducible benchmark for comparing modern
-vector databases and ANN systems on a single machine.
+Vector Arena is a reproducible, single-node benchmark harness for
+evaluating modern vector databases and ANN (Approximate Nearest
+Neighbor) systems under identical workload conditions.
+
+In a 250k-vector benchmark (dim=128, k=10):
+
+-   ANN engines exhibited \~25× throughput variance\
+-   Index build time varied \~56×\
+-   Higher-recall configurations incurred substantial latency cost\
+-   Throughput-only evaluation proved misleading without recall
+    constraints
+
+Designed for empirical infrastructure selection in RAG and semantic
+retrieval systems.
 
 ------------------------------------------------------------------------
 
-## What This Benchmark Measures
+# What This Benchmark Measures
 
 -   Recall@k\
--   P50 / P95 / P99 latency\
+-   P50 / P95 / P99 batch latency\
 -   QPS (queries per second)\
--   Recall vs latency tradeoffs\
+-   Recall--latency tradeoffs\
 -   Index build time
 
-------------------------------------------------------------------------
-
-## Reference Hardware
-
--   Intel i5-1135G7 (4C / 8T)\
--   24GB RAM\
--   NVMe SSD\
--   Single-node benchmark
+The goal is not to declare a universal winner, but to expose measurable
+trade-offs under controlled conditions.
 
 ------------------------------------------------------------------------
 
-## Requirements
+# Reference Hardware
 
-### System
+All included results were generated on:
+
+-   CPU: Intel i5-1135G7 (4C / 8T)\
+-   Memory: 24GB RAM\
+-   Storage: NVMe SSD\
+-   Topology: Single-node
+
+------------------------------------------------------------------------
+
+# Benchmark Methodology
+
+Default workload parameters:
+
+-   Dataset: Synthetic clustered\
+-   Documents: 250,000 vectors\
+-   Queries: 1,000\
+-   Dimensionality: 128\
+-   Top-K: 10\
+-   Timed runs: 10\
+-   Default/light ANN tuning
+
+Engines are evaluated under identical ingestion and query pipelines
+using a unified adapter abstraction layer.
+
+------------------------------------------------------------------------
+
+# Key Findings
+
+-   \~25× throughput variance across ANN engines under identical
+    conditions\
+-   Exact FAISS baseline achieved 100% recall with \~3,824 QPS at
+    \~265ms P95\
+-   Elasticsearch delivered highest ANN recall (\~0.76) with \~19.5s P95
+    latency\
+-   Weaviate achieved \~5× higher throughput and \~4× lower P95 latency
+    than Elasticsearch with lower recall\
+-   \~56× index build-time variance (Vespa vs Qdrant under same dataset)
+
+------------------------------------------------------------------------
+
+# Operational Implications
+
+-   Infrastructure selection must be empirical\
+-   Recall must be treated as a first-class constraint in RAG systems\
+-   Index build time materially impacts CI/CD velocity and recovery
+    strategies\
+-   Single-node results do not generalize to distributed scaling
+
+------------------------------------------------------------------------
+
+# Scope & Non-Goals
+
+-   Not a distributed benchmark\
+-   Not cost-normalized (\$/QPS not measured)\
+-   Not vendor-maximized tuning\
+-   Intended for controlled comparison, not marketing claims
+
+------------------------------------------------------------------------
+
+# Requirements
+
+System:
 
 -   Python 3.9+\
 -   Docker + Docker Compose\
 -   24GB RAM recommended
 
-### Python dependencies
+Python dependencies:
 
 ``` bash
 pip install numpy pandas matplotlib scann faiss-cpu
@@ -40,90 +107,33 @@ pip install numpy pandas matplotlib scann faiss-cpu
 
 ------------------------------------------------------------------------
 
-## Running the Benchmark
+# Running the Benchmark
 
-### Wave 1 --- Vector-native systems
+Wave 1 --- Vector-native systems:
 
 ``` bash
 docker compose up -d qdrant weaviate redis postgres
-```
-
-``` bash
 python -m arena.bench   --engines faiss_exact,scann,qdrant,weaviate,redis,pgvector   --dataset clustered   --docs 250000   --queries 1000   --dim 128   --k 10   --timed-runs 10   --data-cache-dir .cache
 ```
 
-------------------------------------------------------------------------
-
-### Wave 2 --- Search engines (run separately)
+Wave 2 --- Search engines:
 
 ``` bash
 docker compose down
 docker compose up -d elasticsearch opensearch vespa
-```
-
-``` bash
 python -m arena.bench   --engines elasticsearch,opensearch,vespa   --dataset clustered   --docs 250000   --queries 1000   --dim 128   --k 10   --timed-runs 10   --data-cache-dir .cache
 ```
 
 ------------------------------------------------------------------------
 
-## Generate Plots
+# Generate Plots
 
 ``` bash
 python scripts/plot_results.py   --results artifacts/results.json   --out artifacts/plots
 ```
 
-------------------------------------------------------------------------
+Artifacts:
 
-# Key Findings
-
-### 1️⃣ Significant Throughput Variance Across ANN Engines
-
-Under identical workload conditions (250k vectors, dim=128, k=10, 10
-timed runs):
-
--   Throughput varied by \~25× across ANN engines
-    -   Redis: \~1,498 QPS\
-    -   Elasticsearch: \~59 QPS
-
-------------------------------------------------------------------------
-
-### 2️⃣ Deterministic Baseline with Exact Search
-
--   FAISS (exact) achieved:
-    -   100% recall@k
-    -   \~3,824 QPS
-    -   \~265 ms p95 latency
-
-------------------------------------------------------------------------
-
-### 3️⃣ Clear Recall--Latency Tradeoff
-
--   Elasticsearch achieved the highest ANN recall (0.76 recall@k)
-    -   \~59 QPS\
-    -   \~19.5s p95 latency
--   Weaviate delivered:
-    -   \~5× higher throughput than Elasticsearch\
-    -   \~4× lower p95 latency\
-    -   at the cost of \~33% recall reduction
-
-------------------------------------------------------------------------
-
-### 4️⃣ Index Build-Time Variance
-
-Index construction time ranged from:
-
--   Qdrant: \~63 seconds\
--   Vespa: \~59 minutes
-
-A \~56× build-time variance under identical dataset conditions.
-
-------------------------------------------------------------------------
-
-# Operational Implications
-
--   Infrastructure selection must be empirical.
--   Recall constraints must be explicit for RAG correctness.
--   Index build-time impacts CI/CD velocity and recovery strategies.
--   Single-node results do not generalize to distributed scaling.
--   Unified adapter architecture enables vendor-neutral evaluation.
+-   artifacts/results.json\
+-   artifacts/results.csv\
+-   artifacts/results.md
