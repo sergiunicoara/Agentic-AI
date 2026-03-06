@@ -32,7 +32,16 @@ def evaluate_agent_turn(
     agent_reply: str,
 ) -> Dict[str, Any]:
     """
-    Use Gemini as an LLM-judge to rate the agent's reply from 1–5 and surface issues.
+    Use Gemini as an LLM-judge to rate the agent's reply.
+
+    Returns a structured evaluation with:
+    - score: overall 1–5 rating
+    - faithfulness: 0.0–1.0 — is the reply grounded and not hallucinating?
+    - relevancy:    0.0–1.0 — does it address what the user actually asked?
+    - factuality:   0.0–1.0 — are specific claims (projects, skills) accurate?
+    - label: excellent | good | mixed | weak | poor
+    - issues: list of short issue labels
+    - reasoning: brief explanation
     """
     _ensure_client_configured()
 
@@ -49,18 +58,24 @@ User message:
 Agent reply:
 {agent_reply}
 
-Evaluate the reply on this 1–5 scale:
-- 5: Excellent and highly relevant
-- 4: Good, minor issues
-- 3: Mixed (some strengths, some weaknesses)
-- 2: Weak
-- 1: Off-topic, misleading, or problematic
+Score each dimension independently:
 
-Respond ONLY as JSON with this schema:
+1. overall score (1–5):
+   5 = Excellent  4 = Good  3 = Mixed  2 = Weak  1 = Off-topic or problematic
+
+2. faithfulness (0.0–1.0): Is the reply factually grounded? Does it avoid hallucination?
+3. relevancy    (0.0–1.0): Does it directly address what the user asked?
+4. factuality   (0.0–1.0): Are specific claims (project names, skills, timelines) accurate?
+
+Respond ONLY as JSON with this exact schema:
 {{
-  "score": <number 1-5>,
+  "score": <1–5>,
+  "faithfulness": <0.0–1.0>,
+  "relevancy": <0.0–1.0>,
+  "factuality": <0.0–1.0>,
+  "label": "excellent|good|mixed|weak|poor",
   "issues": ["short issue labels"],
-  "notes": "one or two sentences explaining your rating"
+  "reasoning": "one or two sentences explaining your rating"
 }}
 """.strip()
 
@@ -68,11 +83,14 @@ Respond ONLY as JSON with this schema:
         resp = _client.models.generate_content(model=GEN_MODEL, contents=prompt)  # type: ignore[union-attr]
         text = getattr(resp, "text", "") or str(resp)
     except Exception as e:
-        # if judge itself fails, propagate a soft error
         return {
             "score": 3,
+            "faithfulness": 0.5,
+            "relevancy": 0.5,
+            "factuality": 0.5,
+            "label": "mixed",
             "issues": ["judge_call_error"],
-            "notes": f"Judge failed with {type(e).__name__}: {e}",
+            "reasoning": f"Judge failed with {type(e).__name__}: {e}",
         }
 
     text = text.strip()
@@ -80,19 +98,29 @@ Respond ONLY as JSON with this schema:
     try:
         data = json.loads(text)
     except Exception:
-        # Fallback: keep something usable
         data = {
             "score": 3,
+            "faithfulness": 0.5,
+            "relevancy": 0.5,
+            "factuality": 0.5,
+            "label": "mixed",
             "issues": ["judge_parse_error"],
-            "notes": text[:200],
+            "reasoning": text[:200],
         }
 
-    # Ensure minimal schema
-    if "score" not in data:
-        data["score"] = 3
-    if "issues" not in data or not isinstance(data["issues"], list):
-        data["issues"] = ["unknown"]
-    if "notes" not in data:
-        data["notes"] = ""
+    # Ensure complete schema with safe defaults
+    data.setdefault("score", 3)
+    data.setdefault("faithfulness", 0.5)
+    data.setdefault("relevancy", 0.5)
+    data.setdefault("factuality", 0.5)
+    data.setdefault("label", "mixed")
+    data.setdefault("reasoning", data.pop("notes", ""))
+    if not isinstance(data.get("issues"), list):
+        data["issues"] = []
+
+    # Clamp numeric values to valid ranges
+    data["score"] = max(1, min(5, float(data["score"])))
+    for dim in ("faithfulness", "relevancy", "factuality"):
+        data[dim] = max(0.0, min(1.0, float(data[dim])))
 
     return data

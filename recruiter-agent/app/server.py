@@ -1,21 +1,27 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+from typing import Any, Dict, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from .agent import agent_turn
+from .mcp import call_mcp_tool, list_mcp_tools
 from .models import ChatRequest, ChatResponse, State
+from .quality import StepKind, Trajectory
 
+logger = logging.getLogger(__name__)
 
-app = FastAPI()
+app = FastAPI(title="Recruiter Agent API", version="1.0.0")
 
 # CORS so frontend (GitHub Pages, local dev, Cloud Run) can call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # you can restrict this later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,12 +48,11 @@ async def serve_frontend_assets(path: str):
     file_path = FRONTEND_DIR / path
     if file_path.exists() and file_path.is_file():
         return FileResponse(file_path)
-    index_path = FRONTEND_DIR / "index.html"
-    return FileResponse(index_path)
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 # ------------------------------------------------------------------
-# /chat endpoint – main recruiter agent entrypoint
+# /chat — main recruiter agent entrypoint (with trajectory logging)
 # ------------------------------------------------------------------
 
 @app.post("/chat", response_model=ChatResponse)
@@ -55,12 +60,12 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
     """
     Main chat endpoint used by the frontend.
 
-    - If req.state is present, we restore it into a State object.
-    - Otherwise we create a fresh State (first message of the session).
-    - We call agent_turn(state, message) and serialize the updated state.
+    Every turn is recorded into a Trajectory (user → agent steps)
+    and emitted to structured logs for observability.
     """
+    session_id = req.session_id or "default-session"
 
-    # Restore state safely, *only* from JSON-safe fields
+    # Restore state safely from JSON-safe fields
     if req.state:
         incoming = req.state if isinstance(req.state, dict) else dict(req.state)
         state = State(
@@ -73,8 +78,15 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
     else:
         state = State(source=req.source)
 
+    # --- Trajectory: log user turn ---
+    trajectory = Trajectory(session_id=session_id)
+    trajectory.add(
+        StepKind.user,
+        req.message,
+        meta={"source": req.source, "session_id": session_id},
+    )
+
     result = agent_turn(state, req.message)
-    # result must be a dict like: { "reply": "...", "state": State }
 
     if result is None:
         raise RuntimeError("agent_turn returned None")
@@ -85,7 +97,23 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
     if reply is None:
         raise RuntimeError("agent_turn returned dict without 'reply'")
 
-    # Only return JSON-safe fields back to the frontend
+    # --- Trajectory: log agent turn ---
+    trajectory.add(
+        StepKind.agent,
+        reply,
+        meta={
+            "role": new_state.role,
+            "criteria": new_state.criteria,
+            "memory_events": len(new_state.memory),
+        },
+    )
+
+    # Emit full trajectory to structured logs (Cloud Logging picks this up)
+    logger.info(
+        "agent_trajectory",
+        extra={"json_fields": trajectory.to_dict()},
+    )
+
     safe_state = {
         "source": new_state.source,
         "role": new_state.role,
@@ -94,10 +122,49 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
         "extra": new_state.extra,
     }
 
-    session_id = req.session_id or "default-session"
-
     return ChatResponse(
         reply=reply,
         state=safe_state,
         session_id=session_id,
     )
+
+
+# ------------------------------------------------------------------
+# /mcp/tools — list available MCP-style tools
+# ------------------------------------------------------------------
+
+@app.get("/mcp/tools")
+async def mcp_list_tools_endpoint() -> Dict[str, Any]:
+    """
+    Returns the registry of available MCP-style tools with their JSON schemas.
+    External agents can discover and call these tools programmatically.
+    """
+    return {"tools": list_mcp_tools()}
+
+
+# ------------------------------------------------------------------
+# /mcp/call — dispatch a named tool call (A2A interface)
+# ------------------------------------------------------------------
+
+class MCPCallRequest(BaseModel):
+    tool: str
+    arguments: Dict[str, Any] = {}
+
+
+@app.post("/mcp/call")
+async def mcp_call_endpoint(req: MCPCallRequest) -> Dict[str, Any]:
+    """
+    MCP-inspired Agent-to-Agent endpoint.
+
+    Accepts a named tool call with JSON arguments and returns a structured result.
+    Supported tools: cv_rag_query, best_projects_for_role,
+                     ats_summary_and_email, judge_recruiter_turn.
+    """
+    try:
+        result = call_mcp_tool(req.tool, req.arguments)
+        return {"tool": req.tool, "result": result}
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception("MCP tool call failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))

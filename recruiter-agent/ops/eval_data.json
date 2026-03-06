@@ -1,0 +1,107 @@
+[
+  {
+    "id": "role_senior_ml_rag",
+    "description": "Detect Senior ML Engineer role with RAG criteria from a plain hiring sentence",
+    "user_message": "I'm a hiring manager looking for a senior ML engineer who has shipped RAG systems to production.",
+    "expected_role": "Senior ML Engineer",
+    "expected_criteria": ["production_rag", "ownership"]
+  },
+  {
+    "id": "role_ai_engineer_leadership",
+    "description": "Detect AI Engineer role with leadership + agents criteria",
+    "user_message": "I need an AI engineer with leadership experience who can own LLM agent systems in production.",
+    "expected_role": "AI Engineer",
+    "expected_criteria": ["leadership", "ownership"]
+  },
+  {
+    "id": "role_data_scientist_nlp",
+    "description": "Detect Data Scientist role from NLP-focused message",
+    "user_message": "We're hiring a data scientist to build NLP pipelines for document classification.",
+    "expected_role": "Data Scientist",
+    "expected_criteria": ["production_rag"]
+  },
+  {
+    "id": "role_llm_engineer_startup",
+    "description": "Detect LLM Engineer role from startup context",
+    "user_message": "Looking for an LLM engineer to own our entire AI stack at a fast-paced startup.",
+    "expected_role": "LLM Engineer",
+    "expected_criteria": ["ownership"]
+  },
+  {
+    "id": "role_nlp_engineer_transformers",
+    "description": "Detect NLP Engineer role from transformers context",
+    "user_message": "We need an NLP engineer experienced with transformer architectures and fine-tuning.",
+    "expected_role": "NLP Engineer",
+    "expected_criteria": []
+  },
+  {
+    "id": "criteria_production_ownership",
+    "description": "Parse two canonical criteria from comma-separated input",
+    "user_message": "production RAG, ownership",
+    "expected_role": "Machine Learning Engineer",
+    "expected_criteria": ["production_rag", "ownership"]
+  },
+  {
+    "id": "criteria_leadership_communication",
+    "description": "Parse leadership and communication criteria",
+    "user_message": "leadership, communication",
+    "expected_role": "AI Engineer",
+    "expected_criteria": ["leadership", "communication"]
+  },
+  {
+    "id": "deep_dive_numeric",
+    "description": "Trigger project deep dive with numeric shortcut",
+    "user_message": "1",
+    "expected_role": "Senior ML Engineer",
+    "expected_criteria": ["production_rag", "ownership"]
+  },
+  {
+    "id": "deep_dive_keyword",
+    "description": "Trigger project deep dive with 'another' keyword",
+    "user_message": "another",
+    "expected_role": "ML Engineer",
+    "expected_criteria": ["production_rag"]
+  },
+  {
+    "id": "ats_summary_keyword",
+    "description": "Request ATS summary using keyword shortcut",
+    "user_message": "ats",
+    "expected_role": "ML Engineer",
+    "expected_criteria": ["production_rag", "leadership"]
+  },
+  {
+    "id": "cv_contact_question",
+    "description": "CV RAG: answer contact/phone question from CV",
+    "user_message": "What is his phone number or contact details?",
+    "expected_role": null,
+    "expected_criteria": null
+  },
+  {
+    "id": "cv_skills_question",
+    "description": "CV RAG: answer tech skills question from CV",
+    "user_message": "What are his main technical skills and tech stack?",
+    "expected_role": null,
+    "expected_criteria": null
+  },
+  {
+    "id": "cv_education_question",
+    "description": "CV RAG: answer education and university question from CV",
+    "user_message": "What is his educational background and which university did he attend?",
+    "expected_role": null,
+    "expected_criteria": null
+  },
+  {
+    "id": "reset_command",
+    "description": "Reset command should clear role and criteria and prompt for a new role",
+    "user_message": "reset",
+    "expected_role": null,
+    "expected_criteria": null
+  },
+  {
+    "id": "jd_full_paste",
+    "description": "Full JD paste: agent should extract role and derive criteria automatically",
+    "user_message": "We are hiring a Senior ML Engineer. Responsibilities: Design and ship production RAG systems. Requirements: 5+ years ML experience, strong ownership mindset, leadership skills. Nice to have: strong communication skills with stakeholders.",
+    "expected_role": "Senior ML Engineer",
+    "expected_criteria": ["production_rag", "ownership", "leadership", "communication"]
+  }
+]
