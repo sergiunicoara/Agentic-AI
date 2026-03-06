@@ -7,12 +7,13 @@ import os
 import re
 
 import numpy as np
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 EMBED_MODEL = "models/text-embedding-004"
 GEN_MODEL = "gemini-1.5-flash"
 
-_client_configured: bool = False
+_client: "genai.Client | None" = None
 _rag: Optional["CVRAG"] = None
 
 
@@ -21,10 +22,10 @@ _rag: Optional["CVRAG"] = None
 # ------------------------------------------------------------
 
 def _try_configure_client() -> bool:
-    """Configure Gemini client once; return True if successful, else False."""
-    global _client_configured
+    """Create Gemini client once; return True if successful, else False."""
+    global _client
 
-    if _client_configured:
+    if _client is not None:
         return True
 
     key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
@@ -32,8 +33,7 @@ def _try_configure_client() -> bool:
         return False
 
     try:
-        genai.configure(api_key=key)
-        _client_configured = True
+        _client = genai.Client(api_key=key)
         return True
     except Exception:
         return False
@@ -194,21 +194,15 @@ def _embed_texts(texts: List[str]) -> Optional[np.ndarray]:
         return None
 
     try:
-        response = genai.embed_content(
+        response = _client.models.embed_content(  # type: ignore[union-attr]
             model=EMBED_MODEL,
-            content=texts,
-            task_type="retrieval_document",
+            contents=texts,
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
         )
-        # Older / newer SDKs structure this slightly differently
-        if isinstance(response, dict) and "embeddings" in response:
-            embs = response["embeddings"]
-        else:
-            embs = getattr(response, "embeddings", None)
-
+        embs = response.embeddings
         if not embs:
             return None
-
-        arr = np.array([e["values"] for e in embs], dtype=float)
+        arr = np.array([e.values for e in embs], dtype=float)
         return arr
     except Exception:
         return None
@@ -220,15 +214,15 @@ def _embed_text(text: str, task_type: str = "retrieval_query") -> Optional[np.nd
         return None
 
     try:
-        response = genai.embed_content(
+        response = _client.models.embed_content(  # type: ignore[union-attr]
             model=EMBED_MODEL,
-            content=text,
-            task_type=task_type,
+            contents=text,
+            config=types.EmbedContentConfig(task_type=task_type.upper()),
         )
-        vec = getattr(response, "embedding", None) or response.get("embedding")
-        if not vec:
+        embs = response.embeddings
+        if not embs:
             return None
-        return np.array(vec["values"], dtype=float)
+        return np.array(embs[0].values, dtype=float)
     except Exception:
         return None
 
@@ -400,8 +394,7 @@ Instructions:
 """.strip()
 
         try:
-            model = genai.GenerativeModel(GEN_MODEL)
-            resp = model.generate_content(prompt)
+            resp = _client.models.generate_content(model=GEN_MODEL, contents=prompt)  # type: ignore[union-attr]
             text = getattr(resp, "text", None)
             if text:
                 return text.strip()

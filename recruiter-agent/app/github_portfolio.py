@@ -11,7 +11,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "sergiu123456789")
+GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "sergiunicoara")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # optional, for higher rate limits
 
 GITHUB_API_BASE = "https://api.github.com"

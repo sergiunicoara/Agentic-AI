@@ -132,7 +132,10 @@ gcloud run deploy $SERVICE `
     --allow-unauthenticated `
     --port $PORT `
     --memory $MEMORY `
-    --timeout $TIMEOUT
+    --timeout $TIMEOUT `
+    --min-instances 0 `
+    --cpu-throttling `
+    --set-secrets "GOOGLE_API_KEY=GOOGLE_API_KEY:latest"
 CheckExit "Cloud Run deployment"
 
 # ==================================================

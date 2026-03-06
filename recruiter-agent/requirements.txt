@@ -6,7 +6,7 @@ pydantic>=2.12
 pydantic-settings>=2.3
 
 # Google Generative AI (Gemini)
-google-generativeai>=0.7.0
+google-genai>=1.0.0
 
 # Core dependencies
 numpy

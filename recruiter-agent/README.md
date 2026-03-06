@@ -14,6 +14,7 @@ This project implements a production-grade AI Recruiter Tour Agent inspired by t
 * **✔️ ATS-Ready Outputs:** Generates polished summaries and recruiter email drafts.
 * **✔️ CV RAG (Gemini Embeddings):** High-precision retrieval using `text-embedding-004`.
 * **✔️ Observability:** Lightweight trajectory logging with LLM-judge evaluations (1–5 score).
+* **✔️ Voice Interface:** Browser-native speech-to-text (mic input) and text-to-speech (AI responses read aloud) via the Web Speech API — no extra API keys required.
 
 ---
 
@@ -22,7 +23,7 @@ This project implements a production-grade AI Recruiter Tour Agent inspired by t
 * **Backend:** FastAPI, Uvicorn
 * **LLM:** Gemini 1.5 Flash (`google-genai`)
 * **Embeddings:** `models/text-embedding-004`
-* **Frontend:** Lightweight JS widget
+* **Frontend:** Lightweight JS chat UI with voice (Web Speech API)
 * **Cloud:** Google Cloud Run (Containerized)
 
 ---
@@ -42,8 +43,23 @@ recruiter-agent/
 │   ├── server.py       <-- API Routes
 │   └── quality.py      <-- Trajectory Logging
 └── frontend/
-    └── index.html      <-- Recruiter Widget
+    └── index.html      <-- Chat UI with voice (STT + TTS)
 ```
+## 🎙️ Voice Interface
+
+The chat UI includes browser-native voice support — no extra API keys or backend changes required.
+
+| Feature | How to use |
+|---|---|
+| **Speech-to-text** | Click the mic icon next to the Send button → speak → transcript fills the input |
+| **Text-to-speech** | Click the small speaker icon on any AI message bubble to replay it |
+| **Auto-speak** | Toggle `🔇 Auto-speak` in the chat header → turns `🔊` → every new AI response is read aloud automatically |
+| **Stop** | A red `■ Stop` button appears in the header while speech is playing; click to cancel immediately |
+
+> Requires Chrome or Edge. Mic buttons are hidden automatically in browsers that don't support the Web Speech API (e.g. Firefox).
+
+---
+
 ## 🚀 Deployment (Zero-Cost Optimized)
 This project is configured to run on the Google Cloud Free Tier. The included deploy.ps1 script ensures the service "scales to zero" when not in use.
 

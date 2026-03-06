@@ -144,9 +144,17 @@
                   <div class="text-xs uppercase tracking-wide text-slate-400">Live demo</div>
                   <div class="text-sm font-medium text-slate-100">Recruiter Agent Chat</div>
                 </div>
-                <div class="flex items-center gap-1 text-xs text-slate-400">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>
-                  Ready
+                <div class="flex items-center gap-3">
+                  <button id="page-stop" title="Stop speaking" class="hidden text-red-400 hover:text-red-300 text-xs flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800/80 transition-colors">
+                    ■ <span class="hidden sm:inline text-[11px]">Stop</span>
+                  </button>
+                  <button id="page-autoSpeak" title="Toggle auto-read aloud" class="text-slate-400 hover:text-sky-400 text-xs flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800/80 transition-colors">
+                    🔇 <span class="hidden sm:inline text-[11px]">Auto-speak</span>
+                  </button>
+                  <div class="flex items-center gap-1 text-xs text-slate-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>
+                    Ready
+                  </div>
                 </div>
               </div>
 
@@ -163,6 +171,13 @@
                       class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 resize-none"
                       placeholder="Paste a job description or ask about fit, impact, CV…"
                     ></textarea>
+                    <button
+                      id="page-chat-mic"
+                      title="Speak"
+                      class="shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-700/80 px-3 py-2 text-slate-400 hover:text-sky-400 hover:border-sky-500/60 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    </button>
                     <button
                       id="page-chat-send"
                       class="shrink-0 inline-flex items-center justify-center rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-sky-500/30"
@@ -239,43 +254,6 @@
         <span>Chat with the AI tour</span>
       </button>
 
-      <div
-        id="widget"
-        class="fixed right-4 bottom-20 sm:right-6 sm:bottom-24 z-40 w-[calc(100vw-2rem)] max-w-sm h-[480px] rounded-2xl border border-slate-800 bg-slate-950/95 shadow-2xl shadow-black/60 backdrop-blur hidden flex-col"
-      >
-        <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-          <div>
-            <div class="text-xs uppercase tracking-wide text-slate-400">Assistant</div>
-            <div class="text-sm font-semibold text-slate-100">Recruiter Tour Agent</div>
-          </div>
-          <button
-            id="widget-close"
-            class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-md hover:bg-slate-800/80"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div id="widget-msgs" class="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-xs">
-          <!-- widget messages -->
-        </div>
-
-        <div class="border-t border-slate-800 px-3 py-2">
-          <div class="flex items-center gap-2">
-            <input
-              id="widget-inp"
-              class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-              placeholder="Paste a JD or ask about fit…"
-            />
-            <button
-              id="widget-send"
-              class="shrink-0 inline-flex items-center justify-center rounded-xl bg-sky-500 hover:bg-sky-400 px-3 py-1.5 text-[11px] font-semibold text-slate-950"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- SHARED CHAT LOGIC -->
@@ -308,7 +286,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function createAddMsg(container) {
     return function addMsg(sender, text) {
       const wrap = document.createElement("div");
-      wrap.className = sender === "you" ? "flex justify-end" : "flex justify-start";
+      wrap.className = sender === "you" ? "flex justify-end" : "flex justify-start items-start gap-1.5";
 
       const bubble = document.createElement("div");
       bubble.className =
@@ -319,6 +297,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
       bubble.innerHTML = String(text).replace(/\n/g, "<br/>");
       wrap.appendChild(bubble);
+
+      if (sender === "ai") {
+        const speakBtn = document.createElement("button");
+        speakBtn.title = "Read aloud";
+        speakBtn.className = "shrink-0 mt-1 text-slate-600 hover:text-sky-400 transition-colors";
+        speakBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3 h-3"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+        speakBtn.addEventListener("click", () => { if (window._voiceSpeak) window._voiceSpeak(text); });
+        wrap.appendChild(speakBtn);
+        setTimeout(() => { if (window._voiceAutoSpeak) window._voiceAutoSpeak(text); }, 0);
+      }
+
       container.appendChild(wrap);
       container.scrollTop = container.scrollHeight;
     };
@@ -430,64 +419,19 @@ document.addEventListener("DOMContentLoaded", function () {
   })();
 
   // =====================================
-  // FLOATING WIDGET CHAT
+  // FLOATING BUTTON → scroll to page chat
   // =====================================
-  (function initWidget() {
-    const widget = document.getElementById("widget");
+  (function initLaunchBtn() {
     const launch = document.getElementById("widget-launch");
-    const closeBtn = document.getElementById("widget-close");
-    const msgs = document.getElementById("widget-msgs");
-    const inp = document.getElementById("widget-inp");
-    const send = document.getElementById("widget-send");
+    if (!launch) return;
 
-    if (!widget || !launch || !msgs || !inp || !send) return;
-
-    const addMsg = createAddMsg(msgs);
-    const addAI = (t) => addMsg("ai", t);
-    const addYou = (t) => addMsg("you", t);
-
-    function showIntroIfNeeded() {
-      if (!widget.dataset.opened) {
-        widget.dataset.opened = "1";
-        addAI(
-          "👋 Hi! I’m Sergiu’s AI recruiter tour agent.<br><br>" +
-            "Paste a job description or tell me the role you’re hiring for, " +
-            "and I’ll highlight the most relevant projects, skills, and impact."
-        );
-      }
-    }
-
-    function openWidget() {
-      widget.classList.remove("hidden");
-      showIntroIfNeeded();
-    }
-
-    function closeWidget() {
-      widget.classList.add("hidden");
-    }
-
-    launch.addEventListener("click", openWidget);
-    closeBtn.addEventListener("click", closeWidget);
-
-    function handleSend(text) {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      addYou(trimmed);
-      inp.value = "";
-      sendToBackend(trimmed, { msgs, addAI });
-    }
-
-    send.addEventListener("click", () => handleSend(inp.value));
-
-    inp.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && inp.value.trim()) {
-        e.preventDefault();
-        handleSend(inp.value);
-      }
+    launch.addEventListener("click", function () {
+      document.getElementById("live-chat").scrollIntoView({ behavior: "smooth" });
+      document.getElementById("page-chat-inp").focus();
     });
 
-    // Auto-open for recruiters
-    (function autoOpen() {
+    // Auto-scroll + send intro for recruiters arriving from GitHub/LinkedIn
+    (function autoScroll() {
       const ref = document.referrer.toLowerCase();
       const srcParam = new URLSearchParams(location.search).get("src")?.toLowerCase();
       const isRecruiter =
@@ -497,13 +441,131 @@ document.addEventListener("DOMContentLoaded", function () {
         srcParam === "linkedin";
 
       if (isRecruiter) {
-        openWidget();
-        sendToBackend(
-          "I'm a recruiter visiting from GitHub/LinkedIn. Please show me the most relevant AI/ML projects and ATS summary.",
-          { msgs, addAI }
-        );
+        setTimeout(function () {
+          document.getElementById("live-chat").scrollIntoView({ behavior: "smooth" });
+        }, 600);
       }
     })();
+  })();
+
+  // =====================================
+  // VOICE MODULE (STT + TTS)
+  // =====================================
+  (function initVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = SR ? new SR() : null;
+    if (recognition) {
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+    }
+
+    let isRecording = false;
+    let activeMicBtn = null;
+    let activeInput = null;
+    let autoSpeak = false;
+
+    // --- TTS ---
+    function stripHtml(html) {
+      const el = document.createElement("div");
+      el.innerHTML = html;
+      return el.textContent || el.innerText || "";
+    }
+
+    function showStopBtns(show) {
+      ["page-stop", "widget-stop"].forEach(function (id) {
+        const b = document.getElementById(id);
+        if (b) b.classList.toggle("hidden", !show);
+      });
+    }
+
+    window._voiceSpeak = function (htmlText) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(stripHtml(htmlText));
+      utter.rate = 1.05;
+      utter.onstart = function () { showStopBtns(true); };
+      utter.onend = function () { showStopBtns(false); };
+      utter.onerror = function () { showStopBtns(false); };
+      window.speechSynthesis.speak(utter);
+    };
+
+    window._voiceAutoSpeak = function (htmlText) {
+      if (autoSpeak) window._voiceSpeak(htmlText);
+    };
+
+    // --- Stop buttons ---
+    ["page-stop", "widget-stop"].forEach(function (id) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener("click", function () {
+        window.speechSynthesis.cancel();
+        showStopBtns(false);
+      });
+    });
+
+    // --- Auto-speak toggles (both chats share one state) ---
+    function updateToggleUI() {
+      const icon = autoSpeak ? "🔊" : "🔇";
+      const pageBtn = document.getElementById("page-autoSpeak");
+      const widgetBtn = document.getElementById("widget-autoSpeak");
+      if (pageBtn) pageBtn.innerHTML = icon + ' <span class="hidden sm:inline text-[11px]">Auto-speak</span>';
+      if (widgetBtn) widgetBtn.textContent = icon;
+    }
+
+    ["page-autoSpeak", "widget-autoSpeak"].forEach(function (id) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener("click", function () {
+        autoSpeak = !autoSpeak;
+        updateToggleUI();
+        if (!autoSpeak && window.speechSynthesis) { window.speechSynthesis.cancel(); showStopBtns(false); }
+      });
+    });
+
+    // --- STT ---
+    if (!recognition) {
+      ["page-chat-mic", "widget-mic"].forEach(function (id) {
+        const b = document.getElementById(id);
+        if (b) b.style.display = "none";
+      });
+      return;
+    }
+
+    recognition.onstart = function () {
+      isRecording = true;
+      if (activeMicBtn) activeMicBtn.classList.add("text-red-400", "animate-pulse");
+    };
+
+    recognition.onresult = function (e) {
+      let transcript = "";
+      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      if (activeInput) activeInput.value = transcript;
+    };
+
+    recognition.onend = function () {
+      isRecording = false;
+      if (activeMicBtn) activeMicBtn.classList.remove("text-red-400", "animate-pulse");
+    };
+
+    recognition.onerror = function () {
+      isRecording = false;
+      if (activeMicBtn) activeMicBtn.classList.remove("text-red-400", "animate-pulse");
+    };
+
+    function wireMic(btnId, inputEl) {
+      const btn = document.getElementById(btnId);
+      if (!btn || !inputEl) return;
+      btn.addEventListener("click", function () {
+        if (isRecording) { recognition.stop(); return; }
+        activeMicBtn = btn;
+        activeInput = inputEl;
+        try { recognition.start(); } catch (e) {}
+      });
+    }
+
+    wireMic("page-chat-mic", document.getElementById("page-chat-inp"));
+    wireMic("widget-mic", document.getElementById("widget-inp"));
   })();
 });
 </script>

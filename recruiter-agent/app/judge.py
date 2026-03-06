@@ -5,26 +5,24 @@ from typing import Dict, Any, List, Optional
 import os
 import json
 
-import google.generativeai as genai
+from google import genai
 
 GEN_MODEL = "gemini-1.5-flash"
 
-# simple flag to avoid re-configuring on every call
-_client_configured: bool = False
+_client: "genai.Client | None" = None
 
 
 def _ensure_client_configured() -> None:
-    """Configure google.generativeai once per process."""
-    global _client_configured
-    if _client_configured:
+    """Create Gemini client once per process."""
+    global _client
+    if _client is not None:
         return
 
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         raise RuntimeError("GOOGLE_API_KEY is not set.")
 
-    genai.configure(api_key=api_key)
-    _client_configured = True
+    _client = genai.Client(api_key=api_key)
 
 
 def evaluate_agent_turn(
@@ -67,8 +65,7 @@ Respond ONLY as JSON with this schema:
 """.strip()
 
     try:
-        model = genai.GenerativeModel(GEN_MODEL)
-        resp = model.generate_content(prompt)
+        resp = _client.models.generate_content(model=GEN_MODEL, contents=prompt)  # type: ignore[union-attr]
         text = getattr(resp, "text", "") or str(resp)
     except Exception as e:
         # if judge itself fails, propagate a soft error

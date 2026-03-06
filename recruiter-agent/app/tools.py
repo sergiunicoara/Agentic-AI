@@ -30,7 +30,7 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "Covers prompt engineering, evaluation, and practical deployment patterns",
         ],
         "tags": ["llm", "rag", "genai", "portfolio"],
-        "link": "https://github.com/sergiu123456789/Generative-AI",
+        "link": "https://github.com/sergiunicoara/Generative-AI",
         "source_repo": "Generative-AI",
     },
     {
@@ -46,7 +46,7 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "Aligns directly with 'agentic AI' course and recruiter agent project",
         ],
         "tags": ["agents", "llm", "tools", "orchestration"],
-        "link": "https://github.com/sergiu123456789/Agentic-AI",
+        "link": "https://github.com/sergiunicoara/Agentic-AI",
         "source_repo": "Agentic-AI",
     },
     {
@@ -62,7 +62,7 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "Useful to signal depth for roles that mix classic NLP with LLM work",
         ],
         "tags": ["nlp", "ml", "text"],
-        "link": "https://github.com/sergiu123456789/Natural-language-processing-NLP",
+        "link": "https://github.com/sergiunicoara/Natural-language-processing-NLP",
         "source_repo": "Natural-language-processing-NLP",
     },
     {
@@ -78,7 +78,7 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "Good signal for roles that care about DL fundamentals",
         ],
         "tags": ["deep-learning", "pytorch", "ml"],
-        "link": "https://github.com/sergiu123456789/DeepLearning",
+        "link": "https://github.com/sergiunicoara/DeepLearning",
         "source_repo": "DeepLearning",
     },
     {
@@ -94,7 +94,7 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "Useful to prove fundamentals for ML Engineer roles",
         ],
         "tags": ["ml", "regression", "clustering", "dimensionality-reduction"],
-        "link": "https://github.com/sergiu123456789",
+        "link": "https://github.com/sergiunicoara",
         "source_repo": "multiple",
     },
 ]
@@ -282,7 +282,7 @@ def generate_ats_summary_and_email(
         f"Candidate: Sergiu\n\n"
         f"Summary:\n"
         f"- Strong hands-on experience across ML and Generative AI projects.\n"
-        f"- Portfolio hosted on GitHub under the user 'sergiu123456789', with projects "
+        f"- Portfolio hosted on GitHub under the user 'sergiunicoara', with projects "
         f"covering agents, RAG, NLP, and classic ML.\n"
         f"- Relevant projects:\n"
         f"{projects_list_text}\n"
@@ -294,7 +294,7 @@ def generate_ats_summary_and_email(
         f"He shows strong alignment with the role, especially in: {crit_text}.\n\n"
         f"Some relevant projects:\n"
         f"{projects_list_text}\n\n"
-        f"All projects are available on GitHub under the username 'sergiu123456789'.\n\n"
+        f"All projects are available on GitHub under the username 'sergiunicoara'.\n\n"
         f"I recommend moving him forward to the next interview stage.\n\n"
         f"Best,\n"
         f"Your AI recruiter agent"
