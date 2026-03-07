@@ -1,0 +1,95 @@
+name: agent-observability
+
+services:
+
+  # ── Postgres ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: obs
+      POSTGRES_PASSWORD: obs
+      POSTGRES_DB: observability
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U obs -d observability"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── OTel Collector ───────────────────────────────────────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel/otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    # No healthcheck — distroless image has no shell/wget; OTel SDK retries connections.
+
+  # ── Backend (FastAPI + gRPC in one process) ───────────────────────────────────
+  backend:
+    build:
+      context: .                      # repo root — needed so Dockerfile can reach proto/
+      dockerfile: backend/Dockerfile
+    env_file: .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://obs:obs@postgres:5432/observability
+      REDIS_URL: redis://redis:6379/0
+      OTEL_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8000:8000"   # REST (internal — Envoy handles public-facing)
+      - "50051:50051" # gRPC (internal — Envoy handles public-facing)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  # ── Envoy gRPC-Web proxy ─────────────────────────────────────────────────────
+  envoy:
+    image: envoyproxy/envoy:v1.32-latest
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"]
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "8080:8080"   # Public entry-point (REST + gRPC-Web)
+      - "9901:9901"   # Envoy admin
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ── Frontend (production build served by nginx) ───────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - envoy
+
+volumes:
+  pg_data:

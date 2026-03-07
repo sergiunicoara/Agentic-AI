@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# Generated proto stubs (regenerated at build time)
+backend/app/generated/agent_events_pb2.py
+backend/app/generated/agent_events_pb2_grpc.py
+frontend/src/proto/
+
+# Environment
+.env
+
+# Node
+node_modules/
+frontend/dist/
+
+# Docker
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
