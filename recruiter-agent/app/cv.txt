@@ -85,8 +85,7 @@ Recent Certifications (2025)
 - PCAP - Certified Associate Python Programmer
 - PCPP1 - Certified Professional Python Programmer Level 1
 Previous Trainings & Certifications
-- 2012: Brainbench certifications for Software Analysis, Java Programming, QA, Project
-Management
+- 2012: Brainbench certifications for Software Analysis, Java Programming, QA, Project Management
 - 2005-2010: Amdocs OSS, Comptel Fulfillment, Java, J2EE, Design Patterns
 - 2001-2005: Educational Psychology for Teachers in Computer Science, Sales School
 Languages
