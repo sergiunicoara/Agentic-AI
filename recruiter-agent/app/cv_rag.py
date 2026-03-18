@@ -151,13 +151,21 @@ def _extract_certifications(text: str) -> List[str]:
         "education", "experience", "employment", "work history",
         "languages", "skills", "interests", "additional", "projects",
         "summary", "profile", "objective", "references",
-        "management", "technical", "programming", "tools",
     }
-    _DATE_RANGE = re.compile(r"\b(19|20)\d{2}\s*[-–]\s*((19|20)\d{2}|present)", re.I)
+    # Date range at START of line = training entry label (e.g. "2005-2010: ...")
+    # Date range in middle = job title (e.g. "Homeschooling Teacher (2016 - 2024)")
+    _DATE_RANGE_MIDDLE = re.compile(r"\(?(19|20)\d{2}\s*[-–]\s*((19|20)\d{2}|present)\)?", re.I)
+
+    # Bare sub-header lines that should be skipped (not added as items)
+    _SKIP_EXACT = {
+        "certifications", "recent certifications", "recent certifications (2025)",
+        "previous trainings & certifications", "certifications & professional development",
+    }
 
     def _is_section_boundary(line: str) -> bool:
-        low = line.lower()
-        if _DATE_RANGE.search(line):
+        low = line.lower().strip()
+        # Job/education entry: date range in the middle of the line
+        if _DATE_RANGE_MIDDLE.search(line):
             return True
         if any(h in low for h in _SECTION_HEADERS):
             return True
@@ -179,8 +187,11 @@ def _extract_certifications(text: str) -> List[str]:
                 item = lines[i].strip().lstrip("-• ").strip()
                 if _is_section_boundary(item):
                     break
-                if item and "certification" not in item.lower() \
-                        and "trainings" not in item.lower():
+                # Skip bare sub-header lines
+                if item.lower().strip() in _SKIP_EXACT:
+                    i += 1
+                    continue
+                if item:
                     certs.append(item)
                 i += 1
             continue

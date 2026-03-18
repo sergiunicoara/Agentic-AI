@@ -101,6 +101,8 @@ CV_QUERY_KEYWORDS = [
     "address",
     "years of experience",
     "how many years",
+    "trainings",
+    "previous trainings",
     "skillset",
     "technologies",
     "tech stack",
