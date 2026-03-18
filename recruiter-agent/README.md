@@ -23,6 +23,75 @@ This project implements a production-grade AI Recruiter Tour Agent inspired by t
 
 ---
 
+## 🗺️ System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        FRONTEND                              │
+│   index.html — JS chat UI + Web Speech API (STT / TTS)      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ POST /chat
+┌──────────────────────────▼──────────────────────────────────┐
+│                      ORCHESTRATOR                            │
+│   agent.py — deterministic pipeline, no LLM in loop         │
+│                                                              │
+│   Stage 1 → extract_role()       regex heuristics           │
+│   Stage 2 → criteria parsing     normalize_criteria()       │
+│   Stage 3 → project ranking      keyword scoring            │
+│   Stage 4 → CV Q&A               routes to RAG              │
+└──────┬───────────────────┬────────────────┬─────────────────┘
+       │                   │                │
+┌──────▼──────┐   ┌────────▼───────┐   ┌───▼─────────────────┐
+│  cv_rag.py  │   │   tools.py     │   │ github_portfolio.py  │
+│             │   │                │   │                      │
+│  Gemini     │   │ Keyword score  │   │ GitHub API           │
+│  embeddings │   │ over tags +    │   │ + TTL cache (6h)     │
+│  text-004   │   │ summary        │   │ + static fallback    │
+│             │   │                │   │                      │
+│  Chunk CV   │   │ ATS summary    │   │ Markdown → project   │
+│  Cosine sim │   │ Email draft    │   │ dict parser          │
+│  Gemini gen │   │                │   │                      │
+└─────────────┘   └────────────────┘   └──────────────────────┘
+       │
+┌──────▼──────────────────────────────────────────────────────┐
+│                    EVALUATION LAYER                          │
+│                                                              │
+│   judge.py          faithfulness / relevancy / factuality    │
+│                     0.0–1.0 each + overall score 1–5        │
+│                                                              │
+│   critic_agent.py   A2A call → judge via MCP tool interface  │
+│                     PASS / FAIL + recommended_actions        │
+│                     per-session aggregate metrics            │
+│                                                              │
+│   eval_runner.py    15 golden cases → /chat + /mcp/call     │
+│                     pass_rate, avg_faithfulness, ...         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────┐
+│                     MCP / A2A LAYER                          │
+│                                                              │
+│   /mcp/tools      tool discovery (JSON schemas)             │
+│   /mcp/call       tool dispatch                             │
+│   /a2a/validate   critic agent endpoint                     │
+│   /a2a/summary    session aggregate metrics                 │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────┐
+│                    OBSERVABILITY                             │
+│   OTel spans on every endpoint → Cloud Trace                │
+│   Trajectory logs: session_id + timestamps → Cloud Logging  │
+│   Critic logs: verdict + all 3 metric dimensions            │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────┐
+│                    DEPLOYMENT                                │
+│   Google Cloud Run  --min-instances 0  --cpu-throttling     │
+│   GOOGLE_API_KEY injected from Secret Manager               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 🏗️ Tech Stack
 
 | Layer | Technology |
