@@ -140,7 +140,28 @@ def _extract_certifications(text: str) -> List[str]:
     """
     Look for lines under "Certifications" or bullet-like lists that mention
     certificates or trainings.
+
+    Stops collecting when it hits:
+    - a blank line
+    - a line with a date range (job/education entry)
+    - a known section header keyword
+    - more than 20 items (safety cap)
     """
+    _SECTION_HEADERS = {
+        "education", "experience", "employment", "work history",
+        "languages", "skills", "interests", "additional", "projects",
+        "summary", "profile", "objective", "references",
+    }
+    _DATE_RANGE = re.compile(r"\b(19|20)\d{2}\s*[-–]\s*((19|20)\d{2}|present)", re.I)
+
+    def _is_section_boundary(line: str) -> bool:
+        low = line.lower()
+        if _DATE_RANGE.search(line):
+            return True
+        if any(h in low for h in _SECTION_HEADERS):
+            return True
+        return False
+
     lines = text.splitlines()
     certs: List[str] = []
     n = len(lines)
@@ -150,23 +171,15 @@ def _extract_certifications(text: str) -> List[str]:
         line = lines[i].strip()
         lower = line.lower()
 
-        # "Certifications" header
-        if "certification" in lower or "certifications" in lower:
+        if "certification" in lower or "certifications" in lower or \
+                "previous trainings" in lower:
             i += 1
-            # Gather consecutive bullets or lines
-            while i < n and lines[i].strip():
+            while i < n and lines[i].strip() and len(certs) < 20:
                 item = lines[i].strip().lstrip("-• ").strip()
-                if item:
-                    certs.append(item)
-                i += 1
-            continue
-
-        # "Previous Trainings & Certifications"
-        if "previous trainings & certifications" in lower:
-            i += 1
-            while i < n and lines[i].strip().startswith("-"):
-                item = lines[i].strip().lstrip("-• ").strip()
-                if item:
+                if _is_section_boundary(item):
+                    break
+                if item and "certification" not in item.lower() \
+                        and "trainings" not in item.lower():
                     certs.append(item)
                 i += 1
             continue
@@ -174,7 +187,7 @@ def _extract_certifications(text: str) -> List[str]:
         i += 1
 
     # Deduplicate while preserving order
-    seen = set()
+    seen: set = set()
     result: List[str] = []
     for c in certs:
         if c not in seen:
