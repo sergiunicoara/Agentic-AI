@@ -86,7 +86,6 @@ def remember(state: State, kind: str, payload: Dict[str, Any]) -> None:
 CV_QUERY_KEYWORDS = [
     "phone",
     "phone number",
-    "number",
     "contact",
     "email",
     "certification",
@@ -100,15 +99,35 @@ CV_QUERY_KEYWORDS = [
     "country",
     "based",
     "address",
-    "experience",
     "years of experience",
-    "skills",
+    "how many years",
     "skillset",
     "technologies",
     "tech stack",
-    "stack",
+    "his skills",
+    "his experience",
+    "his background",
     "cv",
     "resume",
+]
+
+# If the message contains any of these it is a hiring request,
+# not a CV question — even if it also contains a CV keyword.
+_HIRING_MARKERS = [
+    "i'm hiring",
+    "im hiring",
+    "we're hiring",
+    "we are hiring",
+    "looking for a",
+    "looking for an",
+    "i need a",
+    "i need an",
+    "hiring a",
+    "hiring an",
+    "searching for a",
+    "i want a",
+    "we want a",
+    "we need a",
 ]
 
 
@@ -116,8 +135,16 @@ def _looks_like_cv_question(msg: str) -> bool:
     """
     Heuristic to decide if the recruiter is asking something
     that should be answered from the CV (via RAG).
+
+    Hiring requests like "I'm hiring a Senior ML Engineer with RAG experience"
+    are explicitly excluded even if they contain CV keywords like "experience".
     """
     low = msg.lower()
+
+    # Hiring requests take priority — never route these to CV RAG
+    if any(m in low for m in _HIRING_MARKERS):
+        return False
+
     return any(k in low for k in CV_QUERY_KEYWORDS)
 
 
