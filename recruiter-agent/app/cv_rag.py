@@ -151,6 +151,7 @@ def _extract_certifications(text: str) -> List[str]:
         "education", "experience", "employment", "work history",
         "languages", "skills", "interests", "additional", "projects",
         "summary", "profile", "objective", "references",
+        "management", "technical", "programming", "tools",
     }
     _DATE_RANGE = re.compile(r"\b(19|20)\d{2}\s*[-–]\s*((19|20)\d{2}|present)", re.I)
 
