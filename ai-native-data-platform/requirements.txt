@@ -15,3 +15,4 @@ watchdog
 PyYAML
 
 redis
+pydantic-ai[openai]

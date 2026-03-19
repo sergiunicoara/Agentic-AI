@@ -32,7 +32,8 @@ from app.generation.groundedness import evidence_minimum, verify_citation_snippe
 from app.generation.service import run_rag_safe
 from app.providers.embeddings import embed
 from app.retrieval.factory import build_pipeline
-from app.schemas import AskIn, AskOut, Citation, TranscriptIn
+from app.schemas import AskIn, AskOut, Citation, NLQueryIn, NLQueryOut, TranscriptIn
+from app.nl_query.service import NLQueryError, run_nl_query
 from app.ingestion.pipeline import enqueue, start_worker
 
 
@@ -60,7 +61,7 @@ async def metrics_middleware(request, call_next):
     async with _semaphore:
         # Rate-limit per workspace if header is present.
         ws = request.headers.get("X-Workspace-Id", "")
-        if ws and route in ("/ask", "/ingest/transcript"):
+        if ws and route in ("/ask", "/ingest/transcript", "/query/natural-language"):
             if not rate_limiter.allow(ws):
                 HTTP_REQUESTS.labels(route=route, method=method, status="429").inc()
                 return Response(content="Rate limit exceeded", status_code=429)
@@ -240,3 +241,23 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
         emit_event("anomaly_detected", {"scores": scores, "snapshot": snap, "workspace_id": payload.workspace_id})
 
     return AskOut(answer=answer, citations=citations, unknown=unknown)
+
+
+@app.post("/query/natural-language", response_model=NLQueryOut)
+def natural_language_query(payload: NLQueryIn, workspace_id: str = Depends(require_workspace_key)):
+    """NLP → JSON → SQL pipeline.
+
+    Accepts a plain-English question, extracts a structured QueryIntent via
+    PydanticAI, builds a validated parameterized SQL query, executes it on
+    PostgreSQL (workspace-scoped), and returns results with the generated SQL
+    for transparency. Every query is written to nl_query_audit_log.
+    """
+    if payload.workspace_id != workspace_id:
+        raise HTTPException(403, "Workspace mismatch")
+
+    try:
+        result = run_nl_query(payload.query, workspace_id)
+    except NLQueryError as e:
+        raise HTTPException(e.status_code, e.message)
+
+    return NLQueryOut(**result)

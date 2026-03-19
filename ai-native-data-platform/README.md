@@ -6,6 +6,7 @@ It is intentionally opinionated around the hiring signals you care about:
 - **Retrieval architectures**: multi-stage retrieval (dense + lexical), fusion (RRF), reranking (MMR), embedding lifecycle/versioning.
 - **Evaluation**: dataset-driven offline evaluation with experiment configs, CI-friendly quality/latency gates.
 - **ML reliability**: explicit runtime contracts (SLO-inspired guardrails), groundedness checks, and structured observability/tracing.
+- **Natural language query layer**: NLP → JSON → SQL pipeline so analysts can query the platform's data in plain English, without writing SQL.
 
 ## Architecture (high level)
 
@@ -37,6 +38,14 @@ It is intentionally opinionated around the hiring signals you care about:
   - Empty-retrieval guardrails
   - Safe degradation to `unknown=true` responses on violations
 
+- **Natural language query layer** (`app/nl_query/`)
+  - `POST /query/natural-language` — plain English → SQL → results
+  - PydanticAI extracts a structured `QueryIntent` (table, filters, aggregation, order, limit)
+  - SQL builder produces parameterized queries; workspace scoping is always injected
+  - Table/column whitelist + injection guard before any SQL reaches the DB
+  - Hard `statement_timeout` per query; results capped at 1 000 rows
+  - Every query written to `nl_query_audit_log` (generated SQL, params, latency, errors)
+
 ## Quickstart
 
 ```bash
@@ -53,6 +62,34 @@ uvicorn app.main:app --reload
 Seeded demo credentials:
 - `X-Workspace-Id: demo`
 - `X-API-Key: demo`
+
+## Natural language queries
+
+Ask questions about the platform's own data in plain English:
+
+```bash
+curl -X POST http://localhost:8000/query/natural-language \
+  -H "X-Workspace-Id: demo" \
+  -H "X-API-Key: demo" \
+  -H "Content-Type: application/json" \
+  -d '{"workspace_id": "demo", "query": "Show me the 10 most recent failed ingestion runs"}'
+```
+
+Response includes the generated SQL for transparency:
+
+```json
+{
+  "sql": "SELECT id, document_id, status, error, created_at FROM ingestion_run WHERE workspace_id = :_workspace_id AND status = :_v0 ORDER BY created_at DESC LIMIT 10",
+  "results": [...],
+  "row_count": 3
+}
+```
+
+Queryable tables: `document`, `document_chunk`, `ingestion_run`, `trace_log`.
+Sensitive tables (`workspace_api_key`) and write operations are not exposed.
+
+Switch to real LLM intent extraction by setting `LLM_PROVIDER=openai` — falls back to a
+deterministic mock when unset (safe for CI and local dev without an API key).
 
 ## Retrieval configuration
 
@@ -108,16 +145,18 @@ python -m app.eval.render_results \
 This scaffold models the design patterns you’d use in a real AI-native platform:
 
 - **Multi-stage retrieval**: cheap candidate generation + bounded expensive reranking
-- **Separation of concerns**: ingestion, retrieval, generation, and evaluation as explicit subsystems
+- **Separation of concerns**: ingestion, retrieval, generation, evaluation, and NL query as explicit subsystems
 - **Lifecycle controls**: embedding versioning for safe migrations
 - **Operational signals**: structured traces (`trace_log`) and Prometheus metrics (`/metrics`)
 - **Quality gates**: evaluation is treated as a deploy-time constraint, not an ad-hoc notebook
+- **Text-to-SQL in production**: NL query layer inherits auth, rate limiting, audit logging, and workspace scoping from the existing platform — no separate infrastructure required
 
 ## Architecture diagram
 
 ```mermaid
 flowchart LR
   Client -->|/ask| API[FastAPI API]
+  Client -->|/query/natural-language| API
   API -->|Auth+Rate limits| Router[A/B Experiment Router]
   Router --> R[Retrieval Pipeline]
   R -->|Dense ANN| PG[(Postgres + pgvector)]
@@ -130,6 +169,10 @@ flowchart LR
   API -->|/ingest| Worker[Ingestion Worker]
   Worker -->|Embed chunks| Embed[(Embeddings)]
   Worker --> PG
+  API -->|NL query| NLQ[NL Query Layer]
+  NLQ -->|PydanticAI intent| LLM
+  NLQ -->|Parameterized SQL| PG
+  NLQ -->|Audit log| Audit[(nl_query_audit_log)]
   API -->|metrics| Prom[Prometheus]
   Prom --> Alert[Alertmanager]
   API -->|online signals| Trace

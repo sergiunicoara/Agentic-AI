@@ -47,3 +47,14 @@ class GenOut(BaseModel):
     unknown: bool
     citations: list[Citation]
     followups: list[str] = []
+
+
+class NLQueryIn(BaseModel):
+    workspace_id: str
+    query: str = Field(min_length=5)
+
+
+class NLQueryOut(BaseModel):
+    sql: str
+    results: list[dict[str, Any]]
+    row_count: int

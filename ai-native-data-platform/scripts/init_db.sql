@@ -97,6 +97,23 @@ ON CONFLICT (id) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_trace_type_created
 ON trace_log (trace_type, created_at DESC);
 
+-- Audit log for natural-language queries (NLP → SQL layer).
+-- Captures every query regardless of success/failure for compliance + debugging.
+CREATE TABLE IF NOT EXISTS nl_query_audit_log (
+  id UUID PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  nl_query TEXT NOT NULL,
+  generated_sql TEXT NOT NULL,
+  params JSONB NOT NULL DEFAULT '{}',
+  row_count INT NOT NULL DEFAULT 0,
+  latency_ms INT NOT NULL,
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_nl_audit_workspace_created
+ON nl_query_audit_log (workspace_id, created_at DESC);
+
 -- Seed helper workspace.
 INSERT INTO workspace (id, name)
 VALUES ('demo', 'Demo')
