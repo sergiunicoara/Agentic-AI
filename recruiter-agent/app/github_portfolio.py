@@ -40,26 +40,33 @@ def _fetch_repos() -> List[Dict[str, Any]]:
     return repos
 
 
-def _fetch_markdown_files(owner: str, repo: str) -> List[Dict[str, Any]]:
+def _fetch_markdown_files(owner: str, repo: str, default_branch: str = "main") -> List[Dict[str, Any]]:
     """
-    Fetch top-level markdown files from a repo using the Contents API.
-    We only look at root level to keep things cheap.
+    Fetch all markdown files from a repo recursively using the Git Tree API.
+    A single API call returns the full file tree — no per-directory requests needed.
     """
     try:
-        contents = _github_get(f"/repos/{owner}/{repo}/contents")
+        tree_data = _github_get(
+            f"/repos/{owner}/{repo}/git/trees/{default_branch}",
+            params={"recursive": "1"},
+        )
     except requests.HTTPError as e:
-        logger.debug("No contents for repo %s: %s", repo, e)
+        logger.debug("No tree for repo %s @ %s: %s", repo, default_branch, e)
         return []
 
-    if not isinstance(contents, list):
+    tree = tree_data.get("tree", [])
+    if not isinstance(tree, list):
         return []
 
     md_files: List[Dict[str, Any]] = []
-    for item in contents:
-        if item.get("type") == "file":
-            name = (item.get("name") or "").lower()
-            if name.endswith(".md"):
-                md_files.append(item)
+    for item in tree:
+        if item.get("type") != "blob":
+            continue
+        path = item.get("path") or ""
+        if not path.lower().endswith(".md"):
+            continue
+        name = os.path.basename(path)
+        md_files.append({"name": name, "path": path})
 
     return md_files
 
@@ -96,6 +103,7 @@ def _parse_markdown_to_project(
     md_name: str,
     md_text: str,
     default_branch: str,
+    md_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Turn a Markdown file into a structured "project" dict used by the agent.
@@ -188,10 +196,11 @@ def _parse_markdown_to_project(
     if not tags:
         tags.append("ml")
 
-    link = f"https://github.com/{owner}/{repo}/blob/{default_branch}/{md_name}"
+    file_path = md_path or md_name
+    link = f"https://github.com/{owner}/{repo}/blob/{default_branch}/{file_path}"
 
     return {
-        "id": f"{repo}:{md_name}",
+        "id": f"{repo}:{file_path}",
         "title": title,
         "summary": summary,
         "impact": impacts,
@@ -233,7 +242,7 @@ def load_github_projects() -> List[Dict[str, Any]]:
         default_branch = repo_info.get("default_branch") or "main"
 
         try:
-            md_files = _fetch_markdown_files(owner_login, repo_name)
+            md_files = _fetch_markdown_files(owner_login, repo_name, default_branch)
         except Exception as e:
             logger.debug("Skipping repo %s: cannot list contents (%s)", repo_name, e)
             continue
@@ -259,6 +268,7 @@ def load_github_projects() -> List[Dict[str, Any]]:
                 md_name=name,
                 md_text=text,
                 default_branch=default_branch,
+                md_path=path,
             )
             projects.append(project)
 
