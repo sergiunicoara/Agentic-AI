@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types
 
 EMBED_MODEL = "models/text-embedding-004"
-GEN_MODEL = "gemini-1.5-flash"
+GEN_MODEL = "gemini-2.0-flash"
 
 _client: "genai.Client | None" = None
 _rag: Optional["CVRAG"] = None

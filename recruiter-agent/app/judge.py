@@ -7,7 +7,7 @@ import json
 
 from google import genai
 
-GEN_MODEL = "gemini-1.5-flash"
+GEN_MODEL = "gemini-2.0-flash"
 
 _client: "genai.Client | None" = None
 
