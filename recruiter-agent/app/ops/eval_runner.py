@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -146,6 +147,9 @@ def run_eval_suite(
                 raw={"chat": data, "judge": judge_data},
             )
         )
+
+        # Respect free-tier rate limit: 15 RPM = 1 request every 4s
+        time.sleep(5)
 
     return results
 
