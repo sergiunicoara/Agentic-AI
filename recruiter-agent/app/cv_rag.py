@@ -50,7 +50,7 @@ def _load_cv_text() -> str:
     if not os.path.exists(cv_path):
         raise FileNotFoundError(f"cv.txt not found at {cv_path}")
 
-    with open(cv_path, "r", encoding="utf-8") as f:
+    with open(cv_path, "r", encoding="utf-8-sig") as f:
         return f.read()
 
 
