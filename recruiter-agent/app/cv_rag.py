@@ -28,7 +28,7 @@ def _try_configure_client() -> bool:
     if _client is not None:
         return True
 
-    key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    key = (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or "").lstrip("\ufeff").strip() or None
     if not key:
         return False
 

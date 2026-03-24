@@ -18,7 +18,7 @@ def _ensure_client_configured() -> None:
     if _client is not None:
         return
 
-    api_key = os.environ.get("GOOGLE_API_KEY")
+    api_key = (os.environ.get("GOOGLE_API_KEY") or "").lstrip("\ufeff").strip()
     if not api_key:
         raise RuntimeError("GOOGLE_API_KEY is not set.")
 
