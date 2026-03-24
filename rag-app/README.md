@@ -56,6 +56,10 @@ explicit user approval.
   Frontend                Streamlit                       Client-side
                                                           interface and HITL
                                                           approvals
+
+  Observability           LangSmith                       Trace logging,
+                                                          run inspection,
+                                                          and LLM debugging
   --------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
@@ -96,6 +100,7 @@ The agent operates on a cyclic graph with a conditional **safety gate**:
 -   Python 3.10+
 -   OpenAI API Key
 -   Tavily API Key
+-   LangSmith API Key (optional, for tracing)
 
 ### 2. Environment Configuration
 
@@ -104,6 +109,9 @@ Create a `.env` file in the project root:
 ``` env
 OPENAI_API_KEY=your_key_here
 TAVILY_API_KEY=your_key_here
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langsmith_key_here
+LANGCHAIN_PROJECT=My-Agent-V1
 ```
 
 ### 3. Local Execution
