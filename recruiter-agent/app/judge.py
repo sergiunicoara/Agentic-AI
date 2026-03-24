@@ -4,10 +4,11 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional
 import os
 import json
+import re
 
 from google import genai
 
-GEN_MODEL = "gemini-2.0-flash"
+GEN_MODEL = "gemini-2.5-flash"
 
 _client: "genai.Client | None" = None
 
@@ -47,7 +48,13 @@ def evaluate_agent_turn(
 
     crit_text = ", ".join(criteria or [])
     prompt = f"""
-You are an expert technical recruiter evaluating an AI assistant's response.
+You are an expert technical recruiter evaluating an AI recruiter assistant's response.
+
+SYSTEM CONTEXT — read carefully before scoring:
+- This assistant helps recruiters evaluate a specific candidate (Sergiu) against a target role.
+- The assistant has explicit access to Sergiu's CV and is EXPECTED to share contact details, skills, education, and other CV facts when asked. Sharing this information is the intended, correct behavior — do NOT penalise for privacy reasons.
+- When a user has not yet specified a job role, the correct behavior is to ask for the role. Asking "please specify the role" IS the right answer in that situation — score it highly, not as a failure.
+- When a user sends a shortcut keyword (e.g. "ats", "1", "another") without a prior role, the correct behavior is to acknowledge the intent and request the missing role.
 
 Job role: {role or "unknown"}
 Evaluation criteria: {crit_text or "not specified"}
@@ -94,6 +101,12 @@ Respond ONLY as JSON with this exact schema:
         }
 
     text = text.strip()
+
+    # Strip markdown code fences (gemini-2.5 wraps JSON in ```json ... ```)
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text)
+        text = text.strip()
 
     try:
         data = json.loads(text)

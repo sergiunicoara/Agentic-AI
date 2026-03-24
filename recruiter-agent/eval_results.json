@@ -1,0 +1,675 @@
+{
+  "aggregate": {
+    "n_cases": 15.0,
+    "pass_rate": 1.0,
+    "avg_score": 5.0,
+    "avg_faithfulness": 1.0,
+    "avg_relevancy": 1.0,
+    "avg_factuality": 1.0
+  },
+  "results": [
+    {
+      "case_id": "role_senior_ml_rag",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent perfectly understood and confirmed the job role and evaluation criteria from the user's input. It then provided relevant and helpful next steps, which is excellent for an initial interaction.",
+      "raw": {
+        "chat": {
+          "reply": "Perfect — I’ll evaluate Sergiu’s fit for **Senior Ml Engineer** based on:\n\n- **Production Rag**\n- **Ownership**\n\nFrom here you can:\n1) Ask for a project deep dive (`1`, `another`)\n2) Get an ATS-style summary + recruiter email (`2`, `ats`)\n\nYou can also paste a job description for additional context.",
+          "state": {
+            "source": null,
+            "role": "Senior Ml Engineer",
+            "criteria": [
+              "production_rag",
+              "ownership"
+            ],
+            "memory": [
+              {
+                "kind": "set_role",
+                "payload": {
+                  "role": "Senior Ml Engineer"
+                }
+              },
+              {
+                "kind": "set_criteria",
+                "payload": {
+                  "criteria": [
+                    "production_rag",
+                    "ownership"
+                  ],
+                  "raw": [
+                    "production_rag",
+                    "ownership"
+                  ],
+                  "extra_context": []
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent perfectly understood and confirmed the job role and evaluation criteria from the user's input. It then provided relevant and helpful next steps, which is excellent for an initial interaction."
+        }
+      }
+    },
+    {
+      "case_id": "role_ai_engineer_leadership",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly identifies the job role and the two evaluation criteria from the user's prompt. It then provides clear and relevant next steps, demonstrating excellent understanding and setup for the task.",
+      "raw": {
+        "chat": {
+          "reply": "Perfect — I’ll evaluate Sergiu’s fit for **Ai Engineer** based on:\n\n- **Leadership**\n- **Ownership**\n\nFrom here you can:\n1) Ask for a project deep dive (`1`, `another`)\n2) Get an ATS-style summary + recruiter email (`2`, `ats`)\n\nYou can also paste a job description for additional context.",
+          "state": {
+            "source": null,
+            "role": "Ai Engineer",
+            "criteria": [
+              "leadership",
+              "ownership"
+            ],
+            "memory": [
+              {
+                "kind": "set_role",
+                "payload": {
+                  "role": "Ai Engineer"
+                }
+              },
+              {
+                "kind": "set_criteria",
+                "payload": {
+                  "criteria": [
+                    "leadership",
+                    "ownership"
+                  ],
+                  "raw": [
+                    "leadership",
+                    "ownership"
+                  ],
+                  "extra_context": []
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly identifies the job role and the two evaluation criteria from the user's prompt. It then provides clear and relevant next steps, demonstrating excellent understanding and setup for the task."
+        }
+      }
+    },
+    {
+      "case_id": "role_data_scientist_nlp",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly identified the job role provided by the user and then appropriately asked for the evaluation criteria, which is the necessary next step in the process. It also provided helpful examples for the criteria.",
+      "raw": {
+        "chat": {
+          "reply": "Great — targeting a **Data Scientist** role.\n\nWhat are your top 1–3 evaluation criteria?\nExamples: **production RAG, ownership, leadership, communication**.\n\nYou can list them comma-separated.",
+          "state": {
+            "source": null,
+            "role": "Data Scientist",
+            "criteria": [],
+            "memory": [
+              {
+                "kind": "set_role",
+                "payload": {
+                  "role": "Data Scientist"
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly identified the job role provided by the user and then appropriately asked for the evaluation criteria, which is the necessary next step in the process. It also provided helpful examples for the criteria."
+        }
+      }
+    },
+    {
+      "case_id": "role_llm_engineer_startup",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly identified the target role and the evaluation criteria. It provided clear next steps to continue the evaluation process, which is exactly what a good assistant should do at this stage.",
+      "raw": {
+        "chat": {
+          "reply": "Perfect — I’ll evaluate Sergiu’s fit for **Llm Engineer** based on:\n\n- **Ownership**\n\nFrom here you can:\n1) Ask for a project deep dive (`1`, `another`)\n2) Get an ATS-style summary + recruiter email (`2`, `ats`)\n\nYou can also paste a job description for additional context.",
+          "state": {
+            "source": null,
+            "role": "Llm Engineer",
+            "criteria": [
+              "ownership"
+            ],
+            "memory": [
+              {
+                "kind": "set_role",
+                "payload": {
+                  "role": "Llm Engineer"
+                }
+              },
+              {
+                "kind": "set_criteria",
+                "payload": {
+                  "criteria": [
+                    "ownership"
+                  ],
+                  "raw": [
+                    "ownership"
+                  ],
+                  "extra_context": []
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly identified the target role and the evaluation criteria. It provided clear next steps to continue the evaluation process, which is exactly what a good assistant should do at this stage."
+        }
+      }
+    },
+    {
+      "case_id": "role_nlp_engineer_transformers",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly identified the job role and the relevant evaluation criteria. It set up clear and helpful next steps for the recruiter, which is excellent for an initial interaction.",
+      "raw": {
+        "chat": {
+          "reply": "Perfect — I’ll evaluate Sergiu’s fit for **Nlp Engineer** based on:\n\n- **Deep Learning**\n\nFrom here you can:\n1) Ask for a project deep dive (`1`, `another`)\n2) Get an ATS-style summary + recruiter email (`2`, `ats`)\n\nYou can also paste a job description for additional context.",
+          "state": {
+            "source": null,
+            "role": "Nlp Engineer",
+            "criteria": [
+              "deep_learning"
+            ],
+            "memory": [
+              {
+                "kind": "set_role",
+                "payload": {
+                  "role": "Nlp Engineer"
+                }
+              },
+              {
+                "kind": "set_criteria",
+                "payload": {
+                  "criteria": [
+                    "deep_learning"
+                  ],
+                  "raw": [
+                    "deep_learning"
+                  ],
+                  "extra_context": []
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly identified the job role and the relevant evaluation criteria. It set up clear and helpful next steps for the recruiter, which is excellent for an initial interaction."
+        }
+      }
+    },
+    {
+      "case_id": "criteria_production_ownership",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The user provided evaluation criteria ('production RAG, ownership') but not a job role in their message. According to the system context, when a user has not specified a job role, the correct behavior is to ask for it. The agent accurately identified the missing job role and correctly prompted the user to specify it, making this an excellent response.",
+      "raw": {
+        "chat": {
+          "reply": "I didn’t quite catch the job role.\n\nPlease specify it explicitly (e.g. **Senior ML Engineer**, **AI Engineer**, **Data Scientist**).",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The user provided evaluation criteria ('production RAG, ownership') but not a job role in their message. According to the system context, when a user has not specified a job role, the correct behavior is to ask for it. The agent accurately identified the missing job role and correctly prompted the user to specify it, making this an excellent response."
+        }
+      }
+    },
+    {
+      "case_id": "criteria_leadership_communication",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent perfectly understood the user's input, confirmed the job role and evaluation criteria, and provided clear, helpful next steps to continue the evaluation process. This is an excellent initial response.",
+      "raw": {
+        "chat": {
+          "reply": "Perfect — I’ll evaluate Sergiu’s fit for **Ai Engineer** based on:\n\n- **Leadership**\n- **Communication**\n\nFrom here you can:\n1) Ask for a project deep dive (`1`, `another`)\n2) Get an ATS-style summary + recruiter email (`2`, `ats`)\n\nYou can also paste a job description for additional context.",
+          "state": {
+            "source": null,
+            "role": "Ai Engineer",
+            "criteria": [
+              "leadership",
+              "communication"
+            ],
+            "memory": [
+              {
+                "kind": "set_role",
+                "payload": {
+                  "role": "Ai Engineer"
+                }
+              },
+              {
+                "kind": "set_criteria",
+                "payload": {
+                  "criteria": [
+                    "leadership",
+                    "communication"
+                  ],
+                  "raw": [
+                    "leadership",
+                    "communication"
+                  ],
+                  "extra_context": []
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent perfectly understood the user's input, confirmed the job role and evaluation criteria, and provided clear, helpful next steps to continue the evaluation process. This is an excellent initial response."
+        }
+      }
+    },
+    {
+      "case_id": "deep_dive_numeric",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly interpreted the shortcut '1' as a request requiring a target role and promptly asked for the necessary information, which is the expected and correct behavior per the system context.",
+      "raw": {
+        "chat": {
+          "reply": "To generate the **project deep dive** I need to know the target role first.\n\nPlease specify it (e.g. **Senior ML Engineer**, **AI Engineer**, **Data Scientist**).",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly interpreted the shortcut '1' as a request requiring a target role and promptly asked for the necessary information, which is the expected and correct behavior per the system context."
+        }
+      }
+    },
+    {
+      "case_id": "deep_dive_keyword",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly identified that a shortcut keyword ('another') was used without a specified role and appropriately requested the necessary information, which aligns with the expected behavior described in the system context.",
+      "raw": {
+        "chat": {
+          "reply": "To generate the **project deep dive** I need to know the target role first.\n\nPlease specify it (e.g. **Senior ML Engineer**, **AI Engineer**, **Data Scientist**).",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly identified that a shortcut keyword ('another') was used without a specified role and appropriately requested the necessary information, which aligns with the expected behavior described in the system context."
+        }
+      }
+    },
+    {
+      "case_id": "ats_summary_keyword",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly interpreted the 'ats' shortcut keyword and, as instructed by the system context for this scenario, requested the target job role before proceeding with the ATS summary generation.",
+      "raw": {
+        "chat": {
+          "reply": "To generate the **ATS summary** I need to know the target role first.\n\nPlease specify it (e.g. **Senior ML Engineer**, **AI Engineer**, **Data Scientist**).",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly interpreted the 'ats' shortcut keyword and, as instructed by the system context for this scenario, requested the target job role before proceeding with the ATS summary generation."
+        }
+      }
+    },
+    {
+      "case_id": "cv_contact_question",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent directly and accurately provides the requested contact information (phone number) from Sergiu's CV, which is the expected and correct behavior according to the system context.",
+      "raw": {
+        "chat": {
+          "reply": "Here’s what I found in Sergiu’s CV:\n\nSergiu’s phone number is +40 774 458 273.",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [
+              {
+                "kind": "cv_rag_query",
+                "payload": {
+                  "question": "What is his phone number or contact details?",
+                  "answer": "Sergiu’s phone number is +40 774 458 273."
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent directly and accurately provides the requested contact information (phone number) from Sergiu's CV, which is the expected and correct behavior according to the system context."
+        }
+      }
+    },
+    {
+      "case_id": "cv_skills_question",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent perfectly answers the user's question by extracting and listing Sergiu's main technical skills and tech stack directly from the CV, categorized for clarity.",
+      "raw": {
+        "chat": {
+          "reply": "Here’s what I found in Sergiu’s CV:\n\nHere are Sergiu’s technical skills:\n\n- Programming Languages Python\n- ML/NLP Expertise Model development, evaluation, deployment\n- Frameworks & Tools AWS SageMaker, TensorFlow, PyTorch, Scikit-learn, NLTK, Pandas, NumPy\n- Chat APIs ChatGPT, Gemini, Claude, Llama\n- Cloud computing platforms AWS",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [
+              {
+                "kind": "cv_rag_query",
+                "payload": {
+                  "question": "What are his main technical skills and tech stack?",
+                  "answer": "Here are Sergiu’s technical skills:\n\n- Programming Languages Python\n- ML/NLP Expertise Model development, evaluation, deployment\n- Frameworks & Tools AWS SageMaker, TensorFlow, PyTorch, Scikit-learn, NLTK, Pandas, NumPy\n- Chat APIs ChatGPT, Gemini, Claude, Llama\n- Cloud computing platforms AWS"
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent perfectly answers the user's question by extracting and listing Sergiu's main technical skills and tech stack directly from the CV, categorized for clarity."
+        }
+      }
+    },
+    {
+      "case_id": "cv_education_question",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The assistant perfectly answers the user's question about Sergiu's educational background and universities, providing a clear and concise list directly from the CV.",
+      "raw": {
+        "chat": {
+          "reply": "Here’s what I found in Sergiu’s CV:\n\nHere is what I found about Sergiu’s education:\n\n- Master's Degree - Advanced Mathematical Algorithms Applied in Engineering\n- Polytechnical University of Timisoara | 2005-2006\n- Bachelor's Degree - Computer Science\n- Babes Bolyai University of Cluj Napoca | 2001-2005",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [
+              {
+                "kind": "cv_rag_query",
+                "payload": {
+                  "question": "What is his educational background and which university did he attend?",
+                  "answer": "Here is what I found about Sergiu’s education:\n\n- Master's Degree - Advanced Mathematical Algorithms Applied in Engineering\n- Polytechnical University of Timisoara | 2005-2006\n- Bachelor's Degree - Computer Science\n- Babes Bolyai University of Cluj Napoca | 2001-2005"
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The assistant perfectly answers the user's question about Sergiu's educational background and universities, providing a clear and concise list directly from the CV."
+        }
+      }
+    },
+    {
+      "case_id": "reset_command",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent correctly interpreted the 'reset' command and, as no role was previously specified, appropriately asked for the target job role, providing helpful examples. This aligns perfectly with the expected behavior described in the system context.",
+      "raw": {
+        "chat": {
+          "reply": "✅ Resetting the recruiter tour.\n\nWhat role are you hiring for?\nExamples: **Senior ML Engineer, AI Engineer, Data Scientist**.",
+          "state": {
+            "source": null,
+            "role": null,
+            "criteria": [],
+            "memory": [
+              {
+                "kind": "session_reset",
+                "payload": {
+                  "previous_role": null,
+                  "previous_criteria": []
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent correctly interpreted the 'reset' command and, as no role was previously specified, appropriately asked for the target job role, providing helpful examples. This aligns perfectly with the expected behavior described in the system context."
+        }
+      }
+    },
+    {
+      "case_id": "jd_full_paste",
+      "passed": true,
+      "score": 5.0,
+      "faithfulness": 1.0,
+      "relevancy": 1.0,
+      "factuality": 1.0,
+      "label": "excellent",
+      "reasoning": "The agent perfectly identified the job role and extracted all the specified evaluation criteria from the user's prompt. It also offered relevant and useful next steps for the recruiter.",
+      "raw": {
+        "chat": {
+          "reply": "Perfect — I’ll evaluate Sergiu’s fit for **Senior Ml Engineer** based on:\n\n- **Production Rag**\n- **Leadership**\n- **Ownership**\n- **Communication**\n\nFrom here you can:\n1) Ask for a project deep dive (`1`, `another`)\n2) Get an ATS-style summary + recruiter email (`2`, `ats`)\n\nYou can also paste a job description for additional context.",
+          "state": {
+            "source": null,
+            "role": "Senior Ml Engineer",
+            "criteria": [
+              "production_rag",
+              "leadership",
+              "ownership",
+              "communication"
+            ],
+            "memory": [
+              {
+                "kind": "set_role",
+                "payload": {
+                  "role": "Senior Ml Engineer"
+                }
+              },
+              {
+                "kind": "set_criteria",
+                "payload": {
+                  "criteria": [
+                    "production_rag",
+                    "leadership",
+                    "ownership",
+                    "communication"
+                  ],
+                  "raw": [
+                    "production_rag",
+                    "leadership",
+                    "ownership",
+                    "communication"
+                  ],
+                  "extra_context": []
+                }
+              }
+            ],
+            "extra": {}
+          },
+          "session_id": "eval-run-001"
+        },
+        "judge": {
+          "score": 5,
+          "faithfulness": 1.0,
+          "relevancy": 1.0,
+          "factuality": 1.0,
+          "label": "excellent",
+          "issues": [],
+          "reasoning": "The agent perfectly identified the job role and extracted all the specified evaluation criteria from the user's prompt. It also offered relevant and useful next steps for the recruiter."
+        }
+      }
+    }
+  ]
+}

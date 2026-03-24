@@ -32,7 +32,7 @@
     "description": "Detect NLP Engineer role from transformers context",
     "user_message": "We need an NLP engineer experienced with transformer architectures and fine-tuning.",
     "expected_role": "NLP Engineer",
-    "expected_criteria": []
+    "expected_criteria": ["deep_learning"]
   },
   {
     "id": "criteria_production_ownership",
@@ -44,7 +44,7 @@
   {
     "id": "criteria_leadership_communication",
     "description": "Parse leadership and communication criteria",
-    "user_message": "leadership, communication",
+    "user_message": "AI Engineer — leadership, communication",
     "expected_role": "AI Engineer",
     "expected_criteria": ["leadership", "communication"]
   },

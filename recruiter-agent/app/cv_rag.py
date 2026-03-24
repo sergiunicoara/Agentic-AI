@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types
 
 EMBED_MODEL = "models/text-embedding-004"
-GEN_MODEL = "gemini-2.0-flash"
+GEN_MODEL = "gemini-2.5-flash"
 
 _client: "genai.Client | None" = None
 _rag: Optional["CVRAG"] = None
@@ -114,26 +114,90 @@ def _extract_years_experience(text: str) -> Optional[str]:
     return None
 
 
+_SECTION_HEADERS = {
+    "professional objective", "technical skills", "professional experience",
+    "education", "certifications & professional development", "certifications",
+    "languages", "additional information", "summary", "profile",
+}
+
+
+def _is_section_header(line: str) -> bool:
+    """Return True if line is a standalone CV section header (not a phrase containing a keyword)."""
+    stripped = line.strip().lower()
+    return stripped in _SECTION_HEADERS
+
+
 def _extract_education(text: str) -> List[str]:
     """
-    Look for an 'Education' section and collect bullet points or lines until
-    the next blank line or header-like text.
+    Look for a standalone 'Education' section header and collect degree lines
+    until the next section header.
     """
     lines = text.splitlines()
     edu: List[str] = []
     n = len(lines)
     i = 0
 
+    # Find the standalone "Education" header
     while i < n:
-        if "education" in lines[i].strip().lower():
+        if lines[i].strip().lower() == "education":
             i += 1
-            while i < n and lines[i].strip():
-                edu.append(lines[i].strip())
-                i += 1
             break
         i += 1
 
+    # Collect until next section header
+    while i < n:
+        line = lines[i].strip()
+        if _is_section_header(line):
+            break
+        if line:
+            edu.append(line)
+        i += 1
+
     return edu
+
+
+def _extract_skills(text: str) -> List[str]:
+    """
+    Extract the Technical Skills section (table rows or key-value lines)
+    until the next section header.
+    """
+    lines = text.splitlines()
+    skills: List[str] = []
+    n = len(lines)
+    i = 0
+
+    # Find "Technical Skills" header
+    while i < n:
+        stripped = lines[i].strip().lower()
+        if "technical skills" in stripped or stripped == "skills":
+            i += 1
+            break
+        i += 1
+
+    # Collect raw lines until next section header
+    raw: List[str] = []
+    while i < n:
+        line = lines[i].strip()
+        if _is_section_header(line):
+            break
+        if line and line.lower() not in ("category technologies", "category", "technologies"):
+            raw.append(line)
+        i += 1
+
+    # Merge wrapped lines:
+    # 1. If a line ends with ',' the next line is a continuation (e.g. "Pandas,\nNumPy")
+    # 2. If a line is 1 word and the previous line is ≤3 words it's a wrapped fragment
+    #    (e.g. "Cloud computing\nplatforms\nAWS")
+    merged: List[str] = []
+    for line in raw:
+        if merged and merged[-1].endswith(","):
+            merged[-1] = merged[-1] + " " + line
+        elif merged and len(line.split()) == 1 and len(merged[-1].split()) <= 3:
+            merged[-1] = merged[-1] + " " + line
+        else:
+            merged.append(line)
+
+    return merged
 
 
 def _extract_certifications(text: str) -> List[str]:
@@ -374,13 +438,21 @@ class CVRAG:
                 return "Here is what I found about Sergiu’s education:\n\n" + bullets
             return "I couldn't find detailed education information in Sergiu’s CV."
 
+        # Skills / tech stack
+        if any(w in q for w in ["skill", "skills", "tech stack", "technologies", "technical"]):
+            skills = _extract_skills(self.cv_text)
+            if skills:
+                bullets = "\n".join(f"- {s}" for s in skills)
+                return "Here are Sergiu’s technical skills:\n\n" + bullets
+            return "I couldn’t find technical skills information in Sergiu’s CV."
+
         # Certifications
         if "certification" in q or "certifications" in q or "certificate" in q:
             certs = _extract_certifications(self.cv_text)
             if certs:
                 bullets = "\n".join(f"- {c}" for c in certs)
                 return "Sergiu holds the following certifications:\n\n" + bullets
-            return "I couldn't find certifications in Sergiu’s CV."
+            return "I couldn’t find certifications in Sergiu’s CV."
 
         return None
 

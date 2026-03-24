@@ -8,6 +8,7 @@ VALID_CRITERIA = {
     "communication": ["communication", "comms", "communication skills"],
     "ownership": ["ownership", "owner", "takes ownership"],
     "production_rag": ["production rag", "rag", "retrieval", "prod rag"],
+    "deep_learning": ["deep learning", "transformer", "transformers", "fine-tuning", "fine-tune", "finetuning", "bert", "llm fine-tuning"],
 }
 
 def slugify(text: str) -> str:
@@ -51,5 +52,5 @@ def normalize_criteria(raw_list: List[str] | None) -> List[str]:
             seen.add(c)
             result.append(c)
 
-    # Keep max 3, consistent with agent flow
-    return result[:3]
+    # Keep max 4 (JD pastes can legitimately have 4 criteria)
+    return result[:4]

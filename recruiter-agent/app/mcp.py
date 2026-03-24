@@ -141,7 +141,11 @@ def call_mcp_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         )
         return {
             "score": judge.get("score"),
+            "faithfulness": judge.get("faithfulness"),
+            "relevancy": judge.get("relevancy"),
+            "factuality": judge.get("factuality"),
             "label": judge.get("label"),
+            "issues": judge.get("issues", []),
             "reasoning": judge.get("reasoning"),
         }
 

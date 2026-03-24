@@ -15,7 +15,7 @@ print(f"Loaded {len(cases)} golden cases\n")
 
 results = run_eval_suite(base_url, session_id="eval-run-001", cases=cases)
 output = results_to_json(results)
-print(output)
+print(output.encode("utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8", errors="replace"))
 
 # Save to file
 with open("eval_results.json", "w", encoding="utf-8") as f:

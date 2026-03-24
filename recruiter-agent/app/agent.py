@@ -20,9 +20,16 @@ from .cv_rag import get_cv_rag  # <-- CV RAG integration
 # ------------------------------------------------------------
 
 VALID_ROLES = [
+    # Longer/more specific variants must come BEFORE shorter ones
+    "senior machine learning engineer",
+    "senior ml engineer",
+    "senior ai engineer",
+    "senior llm engineer",
+    "senior nlp engineer",
+    "senior data scientist",
+    "senior software engineer",
     "machine learning engineer",
     "ml engineer",
-    "senior ml engineer",
     "ai engineer",
     "llm engineer",
     "nlp engineer",
@@ -322,6 +329,29 @@ def _is_job_description(msg: str) -> bool:
     jd_markers = ["responsibilities", "requirements", "nice to have", "about the role"]
     low = msg.lower()
     return any(m in low for m in jd_markers) or len(words) > 40
+
+
+def _extract_implicit_criteria(msg: str) -> List[str]:
+    """
+    Scan a single message for implicit criteria keywords.
+    Returns only what was actually mentioned — no fallback defaults.
+    Used when role + criteria arrive together in one message.
+    """
+    low = msg.lower()
+    raw: List[str] = []
+
+    if "rag" in low or "retrieval" in low:
+        raw.append("production rag")
+    if "leadership" in low or "lead" in low or "mentor" in low:
+        raw.append("leadership")
+    if any(w in low for w in ["ownership", "end-to-end", "end to end", "own", "shipped", "ship "]):
+        raw.append("ownership")
+    if "communication" in low or "stakeholder" in low:
+        raw.append("communication")
+    if any(w in low for w in ["transformer", "transformers", "fine-tuning", "fine-tune", "finetuning", "deep learning"]):
+        raw.append("deep learning")
+
+    return normalize_criteria(raw)
 
 
 def _derive_criteria_from_jd(msg: str) -> List[str]:
@@ -687,17 +717,42 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
 
         if role:
             state.role = role
-            remember(
-                state,
-                "set_role",
-                {"role": role},
-            )
+            remember(state, "set_role", {"role": role})
+
+            # Check if criteria were embedded in the same message
+            implicit_criteria = _extract_implicit_criteria(msg)
+            if implicit_criteria:
+                state.criteria = implicit_criteria
+                remember(
+                    state,
+                    "set_criteria",
+                    {"criteria": implicit_criteria, "raw": implicit_criteria, "extra_context": []},
+                )
+                reply = _format_criteria_confirmation(
+                    role=role,
+                    recognized=implicit_criteria,
+                    unrecognized=[],
+                )
+                return {"reply": reply, "state": state}
+
             return {
                 "reply": (
                     f"Great — targeting a **{role}** role.\n\n"
                     "What are your top 1–3 evaluation criteria?\n"
                     "Examples: **production RAG, ownership, leadership, communication**.\n\n"
                     "You can list them comma-separated."
+                ),
+                "state": state,
+            }
+
+        # Detect shortcut intents sent before a role is established
+        _SHORTCUT_INTENTS = {"ats", "2", "two", "summary", "ats summary", "1", "one", "another", "next", "more"}
+        if low.strip() in _SHORTCUT_INTENTS:
+            intent_label = "ATS summary" if low.strip() in {"ats", "2", "two", "summary", "ats summary"} else "project deep dive"
+            return {
+                "reply": (
+                    f"To generate the **{intent_label}** I need to know the target role first.\n\n"
+                    "Please specify it (e.g. **Senior ML Engineer**, **AI Engineer**, **Data Scientist**)."
                 ),
                 "state": state,
             }
