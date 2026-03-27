@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.retrieval.pipeline import RetrievalPipeline
 from app.retrieval.retrievers.dense import DenseRetriever
 from app.retrieval.retrievers.lexical import LexicalRetriever
+from app.retrieval.retrievers.multimodal import MultimodalDenseRetriever
 from app.retrieval.rerankers.mmr import MMRReranker
 from app.retrieval.rerankers.cross_encoder_stub import CrossEncoderStubReranker
 
@@ -57,12 +58,17 @@ def build_pipeline(experiment: str | None = None) -> RetrievalPipeline:
     )
 
     retrievers = []
-    if mode == "dense":
+    if mode == "multimodal":
+        # Unified dense retrieval across text + image chunks.
+        retrievers = [MultimodalDenseRetriever()]
+    elif mode == "dense":
         retrievers = [DenseRetriever()]
     elif mode == "lexical":
         retrievers = [LexicalRetriever()]
     else:
-        retrievers = [DenseRetriever(), LexicalRetriever()]
+        # hybrid: use multimodal dense when MULTIMODAL_RETRIEVAL=true, else standard dense.
+        dense = MultimodalDenseRetriever() if settings.multimodal_retrieval else DenseRetriever()
+        retrievers = [dense, LexicalRetriever()]
 
     reranker = None
     if rerank_mode == "mmr":

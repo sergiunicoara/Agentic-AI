@@ -39,6 +39,8 @@ class RetrievedChunk(BaseModel):
     chunk_index: int | None = None
     text: str
     score: float = 0.0
+    modality: str = "text"      # text | image
+    caption: str | None = None  # populated for image chunks; used as retrieval text
     meta: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -58,3 +60,8 @@ class NLQueryOut(BaseModel):
     sql: str
     results: list[dict[str, Any]]
     row_count: int
+
+
+class ImageIngestOut(BaseModel):
+    status: str
+    page_count: int

@@ -16,3 +16,13 @@ PyYAML
 
 redis
 pydantic-ai[openai]
+
+# Multimodal ingestion
+openai                  # GPT-4o Vision captioning
+google-generativeai     # Gemini Vision captioning
+Pillow                  # image handling
+pdf2image               # PDF page → image conversion (requires poppler system dep)
+
+# Evaluation
+ragas                   # RAGAS metrics: faithfulness, answer_relevancy, context_precision, context_recall
+datasets                # required by ragas

@@ -4,7 +4,7 @@ import time
 import uuid
 import asyncio
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -32,9 +32,10 @@ from app.generation.groundedness import evidence_minimum, verify_citation_snippe
 from app.generation.service import run_rag_safe
 from app.providers.embeddings import embed
 from app.retrieval.factory import build_pipeline
-from app.schemas import AskIn, AskOut, Citation, NLQueryIn, NLQueryOut, TranscriptIn
+from app.schemas import AskIn, AskOut, Citation, ImageIngestOut, NLQueryIn, NLQueryOut, TranscriptIn
 from app.nl_query.service import NLQueryError, run_nl_query
 from app.ingestion.pipeline import enqueue, start_worker
+from app.ingestion.multimodal import enqueue_images, pdf_to_images, start_multimodal_worker
 
 
 configure_logging()
@@ -48,6 +49,7 @@ contract = default_contract()
 @app.on_event("startup")
 def _startup():
     start_worker()
+    start_multimodal_worker()
     # Leader-elected automated remediation controller (portfolio feature).
     # Only one API replica becomes leader and applies mitigation.
     start_remediation_controller()
@@ -122,6 +124,37 @@ def ingest_transcript(payload: TranscriptIn, workspace_id: str = Depends(require
     enqueue(doc_id)
     emit_event("ingest_enqueued", {"document_id": doc_id, "workspace_id": payload.workspace_id})
     return {"status": "queued", "document_id": doc_id}
+
+
+@app.post("/ingest/image", response_model=ImageIngestOut)
+async def ingest_image(
+    file: UploadFile = File(...),
+    workspace_id: str = Depends(require_workspace_key),
+    source: str = Form(default="upload"),
+    external_id: str | None = Form(default=None),
+):
+    """Multimodal ingestion: accepts an image (PNG/JPG) or PDF file.
+
+    PDF pages are converted to images; each page/image is captioned by the
+    configured vision model (GPT-4o / Gemini Vision / mock), embedded, and
+    stored in image_chunk for unified retrieval alongside text chunks.
+    """
+    content = await file.read()
+    mime = file.content_type or "image/png"
+
+    if mime == "application/pdf" or (file.filename or "").lower().endswith(".pdf"):
+        images = pdf_to_images(content)
+    else:
+        images = [(content, mime)]
+
+    enqueue_images(
+        workspace_id,
+        source or file.filename or "upload",
+        images,
+        external_id=external_id,
+    )
+    emit_event("multimodal_ingest_enqueued", {"workspace_id": workspace_id, "page_count": len(images)})
+    return ImageIngestOut(status="queued", page_count=len(images))
 
 
 @app.post("/ask", response_model=AskOut)

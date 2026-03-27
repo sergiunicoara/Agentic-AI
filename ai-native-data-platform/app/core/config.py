@@ -145,6 +145,16 @@ class Settings(BaseSettings):
     min_groundedness_mean: float = Field(default=0.70)
 
 
+    # --- Multimodal ingestion
+    vision_provider: str = Field(
+        default="mock",
+        description="Vision provider for image captioning: openai | gemini | mock.",
+    )
+    multimodal_retrieval: bool = Field(
+        default=False,
+        description="When true, dense retrieval queries both document_chunk and image_chunk tables.",
+    )
+
     # --- Admin / ops
     admin_token: str = Field(default="", description="Shared secret for privileged operational endpoints.")
     allow_embedding_override: bool = Field(default=False, description="If true, allow admin canary reads with an explicit embedding_version override.")
