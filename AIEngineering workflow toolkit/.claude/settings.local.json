@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Sergiu/Desktop/Projects/Agentic-AI -maxdepth 2 -type f \\\\\\(-name pyproject.toml -o -name package.json -o -name *.json \\\\\\))",
+      "Bash(py -3.11 -m pip install -e \".[dev]\")",
+      "Bash(py -3.11 main.py eval --case GC-001 --verbose)",
+      "Bash(py -3.11 -c \"import json; d=json.load\\(open\\(''eval/golden_dataset.json''\\)\\); [print\\(json.dumps\\(c, indent=2\\)\\) for c in d if c[''id'']==''GC-006'']\")",
+      "Bash(py -3.11 -m ruff check --extend-select ANN --output-format=json - 2)",
+      "Bash(1:*)",
+      "Bash(py -3.11 main.py eval --verbose)",
+      "Bash(py -3.11 -c \":*)",
+      "Bash(py -3.11 -c \"import eval.harness; print\\(''harness OK''\\)\")",
+      "Read(//c/Users/Sergiu/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/530431a5-76c3-4034-8f08-be3759ca73b1/ff00199f-0c93-4bb1-825c-a53eca483061/skills/docx/**)",
+      "Bash(node -e \"require\\(''docx''\\); console.log\\(''docx ok''\\)\")",
+      "Bash(npm install:*)",
+      "Bash(node -e \"require\\(''''docx''''\\); console.log\\(''''ok''''\\)\")",
+      "Bash(SKILL_DIR=\"C:\\\\Users\\\\Sergiu\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\530431a5-76c3-4034-8f08-be3759ca73b1\\\\ff00199f-0c93-4bb1-825c-a53eca483061\\\\skills\\\\docx\")",
+      "Read(//c/Users/Sergiu/Desktop/Projects/Agentic-AI/AIEngineering workflow toolkit/**)",
+      "Bash(node -e \"process.chdir\\(''$SKILL_DIR''\\); require\\(''docx''\\); console.log\\(''ok''\\)\")",
+      "Bash(node -e \"require\\(''docx''\\); console.log\\(''ok''\\)\")",
+      "Bash(node \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\build_cv.js\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''no secrets''''\\)\")"
+    ]
+  }
+}

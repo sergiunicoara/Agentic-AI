@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "skills": [
+    {
+      "id": "security_review_v1",
+      "version": "v1",
+      "path": "skills/v1/security_review.md",
+      "applies_to": {
+        "extensions": [".py", ".js", ".ts", ".go", ".java", ".rb", ".php", ".rs"],
+        "change_types": ["add", "modify"],
+        "patterns": ["auth", "password", "token", "secret", "key", "sql", "query", "request", "http"]
+      }
+    },
+    {
+      "id": "architecture_review_v1",
+      "version": "v1",
+      "path": "skills/v1/architecture_review.md",
+      "applies_to": {
+        "extensions": [".py", ".js", ".ts", ".go", ".java"],
+        "change_types": ["add", "modify"],
+        "patterns": ["class", "def ", "function", "import", "from ", "module", "interface", "abstract"]
+      }
+    },
+    {
+      "id": "style_review_v1",
+      "version": "v1",
+      "path": "skills/v1/style_review.md",
+      "applies_to": {
+        "extensions": [".py", ".js", ".ts", ".go", ".java", ".rb", ".rs", ".css", ".html"],
+        "change_types": ["add", "modify"],
+        "patterns": []
+      }
+    }
+  ]
+}
