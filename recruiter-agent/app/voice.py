@@ -80,9 +80,10 @@ _DG_WS_BASE = (
     "&encoding=opus"
     "&container=webm"
     "&sample_rate=48000"
-    "&endpointing=300"
+    "&endpointing=500"
     "&punctuate=true"
-    "&interim_results=false"
+    "&interim_results=true"
+    "&vad_events=true"
 )
 
 
@@ -123,17 +124,30 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 
     try:
         async with websockets.connect(_DG_WS_BASE, additional_headers=dg_headers) as dg_ws:
+            logger.info("Deepgram WS established session=%s", session_id)
             await ws.send_text(json.dumps({"type": "ready"}))
 
             async def recv_dg() -> None:
                 async for raw in dg_ws:
                     try:
                         data = json.loads(raw)
-                        if data.get("type") == "Results":
+                        msg_type = data.get("type")
+                        if msg_type == "Metadata":
+                            logger.info("Deepgram connected: session=%s req_id=%s",
+                                        session_id, data.get("request_id", ""))
+                        elif msg_type == "Results":
+                            is_final = data.get("is_final", False)
+                            speech_final = data.get("speech_final", False)
                             alt = data.get("channel", {}).get("alternatives", [{}])[0]
                             transcript = alt.get("transcript", "").strip()
-                            if data.get("speech_final") and transcript:
+                            logger.debug("DG result: is_final=%s speech_final=%s text=%r",
+                                         is_final, speech_final, transcript)
+                            if speech_final and transcript:
                                 await transcript_queue.put(transcript)
+                        elif msg_type == "SpeechStarted":
+                            logger.debug("Deepgram: speech started")
+                        elif msg_type == "UtteranceEnd":
+                            logger.debug("Deepgram: utterance end")
                     except Exception:
                         pass
 
@@ -173,15 +187,19 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
             proc_task = asyncio.create_task(process())
             ka_task = asyncio.create_task(keepalive())
 
+            chunk_count = 0
             try:
                 async for chunk in ws.iter_bytes():
+                    chunk_count += 1
+                    if chunk_count <= 3 or chunk_count % 20 == 0:
+                        logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(chunk), session_id)
                     try:
                         await dg_ws.send(chunk)
                     except websockets.exceptions.ConnectionClosed as exc:
-                        logger.warning("Deepgram WS closed mid-stream: %s", exc)
+                        logger.warning("Deepgram WS closed mid-stream after %d chunks: %s", chunk_count, exc)
                         break
             except WebSocketDisconnect:
-                pass
+                logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
             finally:
                 ka_task.cancel()
                 dg_task.cancel()
