@@ -17,7 +17,7 @@ from .session_store import load_session, save_session
 
 logger = logging.getLogger(__name__)
 
-DEEPGRAM_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
+DEEPGRAM_KEY = os.environ.get("DEEPGRAM_API_KEY", "").strip()
 _tts_client = texttospeech.TextToSpeechClient()
 
 _MD_STRIP = re.compile(r"\*{1,2}([^*]+)\*{1,2}|`([^`]+)`|#{1,6}\s*")
@@ -119,11 +119,10 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     ctx = {"state": load_session(session_id) or State()}
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
 
-    # Query-param auth — compatible with all websockets versions (no additional_headers quirks)
-    dg_url = _DG_WS_BASE + f"&token={DEEPGRAM_KEY}"
+    dg_headers = {"Authorization": f"Token {DEEPGRAM_KEY}"}
 
     try:
-        async with websockets.connect(dg_url) as dg_ws:
+        async with websockets.connect(_DG_WS_BASE, additional_headers=dg_headers) as dg_ws:
             await ws.send_text(json.dumps({"type": "ready"}))
 
             async def recv_dg() -> None:
@@ -161,8 +160,18 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                     with tracer.start_as_current_span("voice.tts"):
                         await _tts_stream(reply, ws)
 
+            async def keepalive() -> None:
+                """Send Deepgram KeepAlive every 8s to prevent idle close."""
+                try:
+                    while True:
+                        await asyncio.sleep(8)
+                        await dg_ws.send(json.dumps({"type": "KeepAlive"}))
+                except Exception:
+                    pass
+
             dg_task = asyncio.create_task(recv_dg())
             proc_task = asyncio.create_task(process())
+            ka_task = asyncio.create_task(keepalive())
 
             try:
                 async for chunk in ws.iter_bytes():
@@ -174,6 +183,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
             except WebSocketDisconnect:
                 pass
             finally:
+                ka_task.cancel()
                 dg_task.cancel()
                 proc_task.cancel()
                 try:
