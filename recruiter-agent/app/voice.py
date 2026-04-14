@@ -148,7 +148,9 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                                 transcript = alt.get("transcript", "").strip()
                                 logger.info("DG result: is_final=%s speech_final=%s text=%r",
                                              is_final, speech_final, transcript)
-                                if speech_final and transcript:
+                                # Use is_final (not speech_final) — fires without requiring
+                                # a silence pause; speech_final needs endpointing gap
+                                if is_final and transcript:
                                     await transcript_queue.put(transcript)
                             elif msg_type == "SpeechStarted":
                                 logger.info("Deepgram: speech started session=%s", session_id)
@@ -234,6 +236,13 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
             if "HTTP 401" in message:
                 message = "Deepgram rejected DEEPGRAM_API_KEY (HTTP 401). Check the active Cloud Run revision env/secret value."
             await ws.send_text(json.dumps({"type": "error", "message": message}))
+        except Exception:
+            pass
+    finally:
+        # Always close the browser WebSocket with a clean code so the client
+        # sees 1000 instead of 1005 (no-status) when voice_handler exits
+        try:
+            await ws.close(code=1000)
         except Exception:
             pass
 
