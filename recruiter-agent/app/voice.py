@@ -6,6 +6,7 @@ import logging
 import os
 import re
 
+import aiohttp
 import websockets
 from fastapi import WebSocket, WebSocketDisconnect
 from google.cloud import texttospeech
@@ -128,107 +129,95 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     dg_headers = {"Authorization": f"Token {deepgram_key}"}
 
     try:
-        async with websockets.connect(_DG_WS_URL, additional_headers=dg_headers) as dg_ws:
-            logger.info("Deepgram WS established session=%s", session_id)
-            await ws.send_text(json.dumps({"type": "ready"}))
+        async with aiohttp.ClientSession() as session:
+            async with session.ws_connect(_DG_WS_URL, headers=dg_headers) as dg_ws:
+                logger.info("Deepgram WS established session=%s", session_id)
+                await ws.send_text(json.dumps({"type": "ready"}))
 
-            async def recv_dg() -> None:
-                try:
-                    async for raw in dg_ws:
-                        try:
-                            data = json.loads(raw)
-                            msg_type = data.get("type")
-                            if msg_type == "Metadata":
-                                logger.info("Deepgram connected: session=%s req_id=%s",
-                                            session_id, data.get("request_id", ""))
-                            elif msg_type == "Results":
-                                is_final = data.get("is_final", False)
-                                speech_final = data.get("speech_final", False)
-                                alt = data.get("channel", {}).get("alternatives", [{}])[0]
-                                transcript = alt.get("transcript", "").strip()
-                                logger.info("DG result: is_final=%s speech_final=%s text=%r",
-                                             is_final, speech_final, transcript)
-                                # Use is_final (not speech_final) — fires without requiring
-                                # a silence pause; speech_final needs endpointing gap
-                                if is_final and transcript:
-                                    await transcript_queue.put(transcript)
-                            elif msg_type == "SpeechStarted":
-                                logger.info("Deepgram: speech started session=%s", session_id)
-                            elif msg_type == "UtteranceEnd":
-                                logger.info("Deepgram: utterance end session=%s", session_id)
-                        except Exception:
-                            pass
-                except Exception as exc:
-                    logger.error("recv_dg failed: %s", exc)
-
-            async def process() -> None:
-                tracer = trace.get_tracer("recruiter-agent")
-                while True:
-                    transcript = await transcript_queue.get()
-                    logger.info("voice transcript session=%s text=%s", session_id, transcript)
-                    await ws.send_text(json.dumps({"type": "transcript", "text": transcript}))
-
-                    with tracer.start_as_current_span("voice.turn") as span:
-                        span.set_attribute("session_id", session_id)
-                        span.set_attribute("transcript_len", len(transcript))
-
-                        with tracer.start_as_current_span("voice.agent_turn"):
-                            result = agent_turn(ctx["state"], transcript)
-                        reply = result.get("reply", "")
-                        ctx["state"] = result.get("state", ctx["state"])
-                        save_session(session_id, ctx["state"])
-                        span.set_attribute("reply_len", len(reply))
-
-                    await ws.send_text(json.dumps({"type": "reply", "text": reply}))
-
-                    with tracer.start_as_current_span("voice.tts"):
-                        await _tts_stream(reply, ws)
-
-            async def keepalive() -> None:
-                """Send Deepgram KeepAlive every 8s to prevent idle close."""
-                try:
-                    while True:
-                        await asyncio.sleep(8)
-                        await dg_ws.send(json.dumps({"type": "KeepAlive"}))
-                except Exception:
-                    pass
-
-            dg_task = asyncio.create_task(recv_dg())
-            proc_task = asyncio.create_task(process())
-            ka_task = asyncio.create_task(keepalive())
-
-            chunk_count = 0
-            try:
-                async for chunk in ws.iter_bytes():
-                    chunk_count += 1
-                    if chunk_count <= 3 or chunk_count % 20 == 0:
-                        logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(chunk), session_id)
+                async def recv_dg() -> None:
                     try:
-                        await dg_ws.send(chunk)
-                    except websockets.exceptions.ConnectionClosed as exc:
-                        logger.warning("Deepgram WS closed mid-stream after %d chunks: %s", chunk_count, exc)
-                        break
-            except WebSocketDisconnect:
-                logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
-            finally:
-                ka_task.cancel()
-                dg_task.cancel()
-                proc_task.cancel()
-                try:
-                    await dg_ws.send(json.dumps({"type": "CloseStream"}))
-                except Exception:
-                    pass
+                        async for msg in dg_ws:
+                            try:
+                                data = json.loads(msg.data)
+                                msg_type = data.get("type")
+                                if msg_type == "Metadata":
+                                    logger.info("Deepgram connected: session=%s req_id=%s",
+                                                session_id, data.get("request_id", ""))
+                                elif msg_type == "Results":
+                                    is_final = data.get("is_final", False)
+                                    speech_final = data.get("speech_final", False)
+                                    alt = data.get("channel", {}).get("alternatives", [{}])[0]
+                                    transcript = alt.get("transcript", "").strip()
+                                    logger.info("DG result: is_final=%s speech_final=%s text=%r",
+                                                is_final, speech_final, transcript)
+                                    if is_final and transcript:
+                                        await transcript_queue.put(transcript)
+                                elif msg_type == "SpeechStarted":
+                                    logger.info("Deepgram: speech started session=%s", session_id)
+                                elif msg_type == "UtteranceEnd":
+                                    logger.info("Deepgram: utterance end session=%s", session_id)
+                                else:
+                                    logger.info("Deepgram msg type=%s session=%s", msg_type, session_id)
+                            except Exception as e:
+                                logger.warning("recv_dg parse error: %s", e)
+                    except Exception as exc:
+                        logger.error("recv_dg failed: %s", exc)
 
-    except websockets.exceptions.ConnectionClosed as exc:
-        close_code = exc.rcvd.code if exc.rcvd else None
-        if close_code and close_code != 1000:
-            logger.error("Deepgram closed with code %s: %s", close_code, exc)
-            try:
-                await ws.send_text(json.dumps({"type": "error", "message": f"Voice service error (code {close_code})"}))
-            except Exception:
-                pass
-        else:
-            logger.info("Deepgram connection closed normally")
+                async def process() -> None:
+                    tracer = trace.get_tracer("recruiter-agent")
+                    while True:
+                        transcript = await transcript_queue.get()
+                        logger.info("voice transcript session=%s text=%s", session_id, transcript)
+                        await ws.send_text(json.dumps({"type": "transcript", "text": transcript}))
+
+                        with tracer.start_as_current_span("voice.turn") as span:
+                            span.set_attribute("session_id", session_id)
+                            span.set_attribute("transcript_len", len(transcript))
+
+                            with tracer.start_as_current_span("voice.agent_turn"):
+                                result = agent_turn(ctx["state"], transcript)
+                            reply = result.get("reply", "")
+                            ctx["state"] = result.get("state", ctx["state"])
+                            save_session(session_id, ctx["state"])
+                            span.set_attribute("reply_len", len(reply))
+
+                        await ws.send_text(json.dumps({"type": "reply", "text": reply}))
+
+                        with tracer.start_as_current_span("voice.tts"):
+                            await _tts_stream(reply, ws)
+
+                async def keepalive() -> None:
+                    try:
+                        while True:
+                            await asyncio.sleep(8)
+                            await dg_ws.send_str(json.dumps({"type": "KeepAlive"}))
+                    except Exception:
+                        pass
+
+                dg_task = asyncio.create_task(recv_dg())
+                proc_task = asyncio.create_task(process())
+                ka_task = asyncio.create_task(keepalive())
+
+                chunk_count = 0
+                try:
+                    async for chunk in ws.iter_bytes():
+                        chunk_count += 1
+                        if chunk_count <= 3 or chunk_count % 20 == 0:
+                            logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(chunk), session_id)
+                        await dg_ws.send_bytes(chunk)
+                except WebSocketDisconnect:
+                    logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
+                except Exception as exc:
+                    logger.warning("relay error after %d chunks: %s", chunk_count, exc)
+                finally:
+                    ka_task.cancel()
+                    dg_task.cancel()
+                    proc_task.cancel()
+                    try:
+                        await dg_ws.send_str(json.dumps({"type": "CloseStream"}))
+                    except Exception:
+                        pass
+
     except Exception as exc:
         logger.exception("voice_handler error: %s", exc)
         try:

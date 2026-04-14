@@ -28,5 +28,6 @@ opentelemetry-instrumentation-grpc
 google-cloud-trace
 
 # Voice pipeline
-websockets>=10.0,<15  # v15 silently drops additional_headers; Deepgram WS needs Authorization header
+websockets>=10.0,<15  # used for /voice/bench only; Deepgram connection moved to aiohttp
+aiohttp  # reliable WS header support for Deepgram connection
 google-cloud-texttospeech
