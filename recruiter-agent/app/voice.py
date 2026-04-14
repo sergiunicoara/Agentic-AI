@@ -8,6 +8,7 @@ import re
 
 import aiohttp
 import websockets
+from aiohttp import WSMsgType
 from fastapi import WebSocket, WebSocketDisconnect
 from google.cloud import texttospeech
 from opentelemetry import trace
@@ -125,6 +126,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 
     ctx = {"state": load_session(session_id) or State()}
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
+    dg_closed: asyncio.Event = asyncio.Event()
 
     dg_headers = {"Authorization": f"Token {deepgram_key}"}
 
@@ -137,6 +139,22 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                 async def recv_dg() -> None:
                     try:
                         async for msg in dg_ws:
+                            # aiohttp yields CLOSE/ERROR frames as msg objects — check type first
+                            if msg.type == WSMsgType.CLOSE:
+                                logger.warning(
+                                    "Deepgram closed WS: code=%s reason=%r session=%s",
+                                    msg.data, msg.extra, session_id,
+                                )
+                                break
+                            if msg.type == WSMsgType.ERROR:
+                                logger.error(
+                                    "Deepgram WS error: %s session=%s",
+                                    dg_ws.exception(), session_id,
+                                )
+                                break
+                            if msg.type not in (WSMsgType.TEXT, WSMsgType.BINARY):
+                                logger.debug("Deepgram WS msg type=%s session=%s", msg.type, session_id)
+                                continue
                             try:
                                 data = json.loads(msg.data)
                                 msg_type = data.get("type")
@@ -162,6 +180,8 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                                 logger.warning("recv_dg parse error: %s", e)
                     except Exception as exc:
                         logger.error("recv_dg failed: %s", exc)
+                    finally:
+                        dg_closed.set()
 
                 async def process() -> None:
                     tracer = trace.get_tracer("recruiter-agent")
@@ -201,6 +221,9 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                 chunk_count = 0
                 try:
                     async for chunk in ws.iter_bytes():
+                        if dg_closed.is_set():
+                            logger.warning("Deepgram closed — stopping audio relay session=%s", session_id)
+                            break
                         chunk_count += 1
                         if chunk_count <= 3 or chunk_count % 20 == 0:
                             logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(chunk), session_id)
