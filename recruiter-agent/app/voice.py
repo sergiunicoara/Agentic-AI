@@ -137,8 +137,11 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                 await ws.send_text(json.dumps({"type": "ready"}))
 
                 async def recv_dg() -> None:
+                    logger.info("recv_dg started session=%s", session_id)
                     try:
                         async for msg in dg_ws:
+                            logger.info("recv_dg raw: type=%s data_type=%s session=%s",
+                                        msg.type, type(msg.data).__name__, session_id)
                             # aiohttp yields CLOSE/ERROR frames as msg objects — check type first
                             if msg.type == WSMsgType.CLOSE:
                                 logger.warning(
@@ -181,6 +184,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                     except Exception as exc:
                         logger.error("recv_dg failed: %s", exc)
                     finally:
+                        logger.info("recv_dg exited session=%s", session_id)
                         dg_closed.set()
 
                 async def process() -> None:
