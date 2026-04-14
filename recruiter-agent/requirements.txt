@@ -28,5 +28,5 @@ opentelemetry-instrumentation-grpc
 google-cloud-trace
 
 # Voice pipeline
-deepgram-sdk>=3.0.0  # official SDK handles auth, reconnect, event routing
+deepgram-sdk==3.10.0  # v3 API: DeepgramClient + LiveOptions + LiveTranscriptionEvents
 google-cloud-texttospeech
