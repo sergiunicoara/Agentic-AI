@@ -6,7 +6,7 @@ import logging
 import os
 import re
 
-from deepgram import DeepgramClient, LiveOptions, LiveTranscriptionEvents
+from deepgram import DeepgramClient, LiveTranscriptionEvents
 from fastapi import WebSocket, WebSocketDisconnect
 from google.cloud import texttospeech
 from opentelemetry import trace
@@ -108,7 +108,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 
     # --- Deepgram SDK setup ---
     deepgram = DeepgramClient(deepgram_key)
-    dg_connection = deepgram.listen.asynclive.v("1")
+    dg_connection = deepgram.listen.asyncwebsocket.v("1")
 
     async def on_transcript(self, result, **kwargs) -> None:
         try:
@@ -145,17 +145,18 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     dg_connection.on(LiveTranscriptionEvents.Close, on_close)
     dg_connection.on(LiveTranscriptionEvents.Error, on_error)
 
-    options = LiveOptions(
-        model="nova-2",
-        language="en-US",
-        encoding="opus",
-        container="webm",
-        sample_rate=48000,
-        endpointing=500,
-        punctuate=True,
-        interim_results=True,
-        vad_events=True,
-    )
+    # Pass as dict so 'container' (not in LiveOptions dataclass) reaches the URL
+    options = {
+        "model": "nova-2",
+        "language": "en-US",
+        "encoding": "opus",
+        "container": "webm",
+        "sample_rate": 48000,
+        "endpointing": 500,
+        "punctuate": True,
+        "interim_results": True,
+        "vad_events": True,
+    }
 
     try:
         started = await dg_connection.start(options)
