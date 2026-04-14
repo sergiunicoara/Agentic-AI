@@ -145,13 +145,12 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     dg_connection.on(LiveTranscriptionEvents.Close, on_close)
     dg_connection.on(LiveTranscriptionEvents.Error, on_error)
 
-    # Pass as dict so 'container' (not in LiveOptions dataclass) reaches the URL
+    # linear16 raw PCM — each WebSocket chunk is self-contained, no container needed
     options = {
         "model": "nova-2",
         "language": "en-US",
-        "encoding": "opus",
-        "container": "webm",
-        "sample_rate": 48000,
+        "encoding": "linear16",
+        "sample_rate": 16000,
         "endpointing": 500,
         "punctuate": True,
         "interim_results": True,

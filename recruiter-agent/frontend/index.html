@@ -262,8 +262,26 @@ document.addEventListener("DOMContentLoaded", function () {
   // =====================================
   // CONFIG
   // =====================================
-  const BACKEND_URL =
-    "https://recruiter-agent-969006882005.europe-west1.run.app/chat";
+  function resolveBackendUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const override =
+      params.get("backend") ||
+      window.localStorage.getItem("backendUrl") ||
+      window.BACKEND_URL;
+    const defaultBackend = "https://recruiter-agent-969006882005.europe-west1.run.app/chat";
+
+    if (override) {
+      return new URL(override, window.location.href).toString();
+    }
+
+    if (/\.run\.app$/i.test(window.location.hostname)) {
+      return new URL("/chat", window.location.origin).toString();
+    }
+
+    return defaultBackend;
+  }
+
+  const BACKEND_URL = resolveBackendUrl();
 
   let sessionId = localStorage.getItem("tourSessionId") || null;
   let agentState = null;
@@ -453,11 +471,20 @@ document.addEventListener("DOMContentLoaded", function () {
   // VOICE MODULE — Deepgram STT + ElevenLabs TTS
   // =====================================
   (function initVoice() {
-    const VOICE_WS_URL = BACKEND_URL.replace(/^http/, "ws").replace("/chat", "/voice");
+    function resolveVoiceWsUrl() {
+      const voiceUrl = new URL(BACKEND_URL);
+      voiceUrl.protocol = voiceUrl.protocol === "https:" ? "wss:" : "ws:";
+      voiceUrl.pathname = voiceUrl.pathname.replace(/\/chat\/?$/, "/voice");
+      return voiceUrl.toString();
+    }
+
+    const VOICE_WS_URL = resolveVoiceWsUrl();
 
     let isRecording = false;
     let voiceWs = null;
-    let mediaRecorder = null;
+    let audioContext = null;
+    let audioProcessor = null;
+    let micStream = null;
     let audioChunks = [];
     let currentAudio = null;
     let autoSpeak = false;
@@ -552,13 +579,24 @@ document.addEventListener("DOMContentLoaded", function () {
           try {
             const msg = JSON.parse(e.data);
             if (msg.type === "ready") {
-              mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
-              mediaRecorder.ondataavailable = function (ev) {
-                if (ev.data && ev.data.size > 0 && voiceWs && voiceWs.readyState === WebSocket.OPEN) {
-                  voiceWs.send(ev.data);
+              // Raw PCM linear16 at 16kHz — each chunk is self-contained, no container issues
+              audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+              const source = audioContext.createMediaStreamSource(stream);
+              // 4096 samples @ 16kHz = 256ms per chunk
+              audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+              source.connect(audioProcessor);
+              audioProcessor.connect(audioContext.destination);
+              audioProcessor.onaudioprocess = function (ev) {
+                if (!voiceWs || voiceWs.readyState !== WebSocket.OPEN) return;
+                const float32 = ev.inputBuffer.getChannelData(0);
+                const int16 = new Int16Array(float32.length);
+                for (let i = 0; i < float32.length; i++) {
+                  const s = Math.max(-1, Math.min(1, float32[i]));
+                  int16[i] = s < 0 ? s * 32768 : s * 32767;
                 }
+                voiceWs.send(int16.buffer);
               };
-              mediaRecorder.start(250);
+              micStream = stream;
               isRecording = true;
               setMicActive(true);
             } else if (msg.type === "transcript") {
@@ -574,7 +612,13 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch (_) {}
         };
 
-        voiceWs.onclose = function () { stopVoiceSession(); };
+        voiceWs.onclose = function (event) {
+          if (event.code && event.code !== 1000) {
+            const reason = event.reason ? ": " + event.reason : "";
+            addAI("Voice connection closed (code " + event.code + ")" + reason);
+          }
+          stopVoiceSession();
+        };
         voiceWs.onerror = function () { addAI("⚠️ Voice connection failed."); stopVoiceSession(); };
       }).catch(function () {
         alert("Microphone access denied.");
@@ -584,8 +628,9 @@ document.addEventListener("DOMContentLoaded", function () {
     function stopVoiceSession() {
       isRecording = false;
       setMicActive(false);
-      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      mediaRecorder = null;
+      if (audioProcessor) { audioProcessor.disconnect(); audioProcessor = null; }
+      if (audioContext) { audioContext.close(); audioContext = null; }
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
       if (voiceWs) { voiceWs.close(); voiceWs = null; }
     }
 
