@@ -382,6 +382,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const addMsg = createAddMsg(msgs);
     const addAI = (t) => addMsg("ai", t);
     const addYou = (t) => addMsg("you", t);
+    window._pageChat = { addAI, addYou };
 
     // Initial welcome
     addAI(
@@ -449,23 +450,19 @@ document.addEventListener("DOMContentLoaded", function () {
   })();
 
   // =====================================
-  // VOICE MODULE (STT + TTS)
+  // VOICE MODULE — Deepgram STT + ElevenLabs TTS
   // =====================================
   (function initVoice() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = SR ? new SR() : null;
-    if (recognition) {
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-    }
+    const VOICE_WS_URL = BACKEND_URL.replace(/^http/, "ws").replace("/chat", "/voice");
 
     let isRecording = false;
-    let activeMicBtn = null;
-    let activeInput = null;
+    let voiceWs = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let currentAudio = null;
     let autoSpeak = false;
 
-    // --- TTS ---
+    // --- Fallback browser TTS (for per-message speak buttons) ---
     function stripHtml(html) {
       const el = document.createElement("div");
       el.innerHTML = html;
@@ -490,21 +487,20 @@ document.addEventListener("DOMContentLoaded", function () {
       window.speechSynthesis.speak(utter);
     };
 
-    window._voiceAutoSpeak = function (htmlText) {
-      if (autoSpeak) window._voiceSpeak(htmlText);
-    };
+    window._voiceAutoSpeak = function () {};  // ElevenLabs audio handles auto-speak in voice mode
 
     // --- Stop buttons ---
     ["page-stop", "widget-stop"].forEach(function (id) {
       const btn = document.getElementById(id);
       if (!btn) return;
       btn.addEventListener("click", function () {
-        window.speechSynthesis.cancel();
+        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
         showStopBtns(false);
       });
     });
 
-    // --- Auto-speak toggles (both chats share one state) ---
+    // --- Auto-speak toggle ---
     function updateToggleUI() {
       const icon = autoSpeak ? "🔊" : "🔇";
       const pageBtn = document.getElementById("page-autoSpeak");
@@ -519,53 +515,101 @@ document.addEventListener("DOMContentLoaded", function () {
       btn.addEventListener("click", function () {
         autoSpeak = !autoSpeak;
         updateToggleUI();
-        if (!autoSpeak && window.speechSynthesis) { window.speechSynthesis.cancel(); showStopBtns(false); }
       });
     });
 
-    // --- STT ---
-    if (!recognition) {
-      ["page-chat-mic", "widget-mic"].forEach(function (id) {
-        const b = document.getElementById(id);
-        if (b) b.style.display = "none";
-      });
-      return;
+    // --- Play accumulated MP3 bytes ---
+    function playAudioChunks() {
+      if (!audioChunks.length) return;
+      const blob = new Blob(audioChunks, { type: "audio/mpeg" });
+      audioChunks = [];
+      const url = URL.createObjectURL(blob);
+      currentAudio = new Audio(url);
+      currentAudio.onplay = function () { showStopBtns(true); };
+      currentAudio.onended = function () { showStopBtns(false); URL.revokeObjectURL(url); currentAudio = null; };
+      currentAudio.onerror = function () { showStopBtns(false); URL.revokeObjectURL(url); currentAudio = null; };
+      currentAudio.play().catch(function () {});
     }
 
-    recognition.onstart = function () {
-      isRecording = true;
-      if (activeMicBtn) activeMicBtn.classList.add("text-red-400", "animate-pulse");
-    };
+    // --- Voice session ---
+    function startVoiceSession(addYou, addAI) {
+      if (isRecording) { stopVoiceSession(); return; }
 
-    recognition.onresult = function (e) {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      if (activeInput) activeInput.value = transcript;
-    };
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        const sid = sessionId || "voice-session";
+        voiceWs = new WebSocket(VOICE_WS_URL + "?session_id=" + encodeURIComponent(sid));
+        voiceWs.binaryType = "arraybuffer";
 
-    recognition.onend = function () {
-      isRecording = false;
-      if (activeMicBtn) activeMicBtn.classList.remove("text-red-400", "animate-pulse");
-    };
+        voiceWs.onopen = function () {
+          // wait for "ready" before starting recorder
+        };
 
-    recognition.onerror = function () {
-      isRecording = false;
-      if (activeMicBtn) activeMicBtn.classList.remove("text-red-400", "animate-pulse");
-    };
+        voiceWs.onmessage = function (e) {
+          if (e.data instanceof ArrayBuffer) {
+            audioChunks.push(new Blob([e.data], { type: "audio/mpeg" }));
+            return;
+          }
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === "ready") {
+              mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+              mediaRecorder.ondataavailable = function (ev) {
+                if (ev.data && ev.data.size > 0 && voiceWs && voiceWs.readyState === WebSocket.OPEN) {
+                  voiceWs.send(ev.data);
+                }
+              };
+              mediaRecorder.start(250);
+              isRecording = true;
+              setMicActive(true);
+            } else if (msg.type === "transcript") {
+              addYou(msg.text);
+            } else if (msg.type === "reply") {
+              addAI(msg.text);
+            } else if (msg.type === "audio_end") {
+              playAudioChunks();
+            } else if (msg.type === "error") {
+              addAI("⚠️ Voice error: " + msg.message);
+              stopVoiceSession();
+            }
+          } catch (_) {}
+        };
 
-    function wireMic(btnId, inputEl) {
-      const btn = document.getElementById(btnId);
-      if (!btn || !inputEl) return;
-      btn.addEventListener("click", function () {
-        if (isRecording) { recognition.stop(); return; }
-        activeMicBtn = btn;
-        activeInput = inputEl;
-        try { recognition.start(); } catch (e) {}
+        voiceWs.onclose = function () { stopVoiceSession(); };
+        voiceWs.onerror = function () { addAI("⚠️ Voice connection failed."); stopVoiceSession(); };
+      }).catch(function () {
+        alert("Microphone access denied.");
       });
     }
 
-    wireMic("page-chat-mic", document.getElementById("page-chat-inp"));
-    wireMic("widget-mic", document.getElementById("widget-inp"));
+    function stopVoiceSession() {
+      isRecording = false;
+      setMicActive(false);
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      mediaRecorder = null;
+      if (voiceWs) { voiceWs.close(); voiceWs = null; }
+    }
+
+    function setMicActive(active) {
+      const btn = document.getElementById("page-chat-mic");
+      if (!btn) return;
+      if (active) {
+        btn.classList.add("text-red-400", "animate-pulse");
+        btn.title = "Stop recording";
+      } else {
+        btn.classList.remove("text-red-400", "animate-pulse");
+        btn.title = "Speak";
+      }
+    }
+
+    // Wire mic button — needs access to page chat addYou/addAI
+    // These are set by initPageChat via window._pageChat
+    const micBtn = document.getElementById("page-chat-mic");
+    if (micBtn) {
+      micBtn.addEventListener("click", function () {
+        const chat = window._pageChat || {};
+        startVoiceSession(chat.addYou || function () {}, chat.addAI || function () {});
+      });
+    }
   })();
 });
 </script>

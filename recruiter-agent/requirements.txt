@@ -26,3 +26,7 @@ opentelemetry-instrumentation-urllib
 opentelemetry-instrumentation-urllib3
 opentelemetry-instrumentation-grpc
 google-cloud-trace
+
+# Voice pipeline
+websockets
+google-cloud-texttospeech

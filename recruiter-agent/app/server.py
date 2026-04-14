@@ -5,13 +5,14 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from opentelemetry import trace
 from pydantic import BaseModel
 
 from .agent import agent_turn
+from .voice import voice_bench_handler, voice_handler
 from .critic_agent import get_critic_session_summary, validate_turn
 from .mcp import call_mcp_tool, list_mcp_tools
 from .models import ChatRequest, ChatResponse, State
@@ -253,6 +254,16 @@ async def a2a_validate_endpoint(req: A2AValidateRequest) -> Dict[str, Any]:
 # ------------------------------------------------------------------
 # /a2a/summary — Critic session aggregate metrics
 # ------------------------------------------------------------------
+
+@app.websocket("/voice")
+async def voice_endpoint(ws: WebSocket, session_id: str = "default"):
+    await voice_handler(ws, session_id)
+
+
+@app.websocket("/voice/bench")
+async def voice_bench_endpoint(ws: WebSocket, session_id: str = "bench"):
+    await voice_bench_handler(ws, session_id)
+
 
 @app.get("/a2a/summary/{session_id}")
 async def a2a_summary_endpoint(session_id: str) -> Dict[str, Any]:
