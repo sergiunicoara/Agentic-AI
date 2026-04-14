@@ -76,8 +76,9 @@ async def _tts_bytes(text: str) -> bytes | None:
         logger.error("TTS sentence error: %s", exc)
         return None
 
-_DG_WS_PARAMS = (
-    "model=nova-2"
+_DG_WS_URL = (
+    "wss://api.deepgram.com/v1/listen"
+    "?model=nova-2"
     "&language=en-US"
     "&encoding=opus"
     "&container=webm"
@@ -124,11 +125,10 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     ctx = {"state": load_session(session_id) or State()}
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
 
-    # Token as first query param — websockets 15 silently drops additional_headers
-    dg_url = f"wss://api.deepgram.com/v1/listen?token={deepgram_key}&{_DG_WS_PARAMS}"
+    dg_headers = {"Authorization": f"Token {deepgram_key}"}
 
     try:
-        async with websockets.connect(dg_url) as dg_ws:
+        async with websockets.connect(_DG_WS_URL, additional_headers=dg_headers) as dg_ws:
             logger.info("Deepgram WS established session=%s", session_id)
             await ws.send_text(json.dumps({"type": "ready"}))
 
