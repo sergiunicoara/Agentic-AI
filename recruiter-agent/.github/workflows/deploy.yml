@@ -45,19 +45,30 @@ jobs:
           service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
 
-      - name: Build and submit image
+      - name: Build and push image
         run: |
           REGION=${{ secrets.GCP_REGION }}
+          PROJECT=${{ secrets.GCP_PROJECT_ID }}
           SERVICE_NAME=recruiter-agent
-          REPO=containers
-          IMAGE_URI="${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${REPO}/${SERVICE_NAME}"
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT}/${SERVICE_NAME}/${SERVICE_NAME}:latest"
           gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-          gcloud builds submit --tag "${IMAGE_URI}" .
+          docker build -t "${IMAGE_URI}" .
+          docker push "${IMAGE_URI}"
 
       - name: Deploy to Cloud Run
         run: |
           REGION=${{ secrets.GCP_REGION }}
+          PROJECT=${{ secrets.GCP_PROJECT_ID }}
           SERVICE_NAME=recruiter-agent
-          REPO=containers
-          IMAGE_URI="${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${REPO}/${SERVICE_NAME}"
-          gcloud run deploy "${SERVICE_NAME}"             --image "${IMAGE_URI}"             --region "${REGION}"             --allow-unauthenticated             --set-env-vars "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},LOG_LEVEL=INFO"
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT}/${SERVICE_NAME}/${SERVICE_NAME}:latest"
+          gcloud run deploy "${SERVICE_NAME}" \
+            --image "${IMAGE_URI}" \
+            --region "${REGION}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 1Gi \
+            --timeout 300 \
+            --min-instances 0 \
+            --cpu-throttling \
+            --set-secrets "GOOGLE_API_KEY=GOOGLE_API_KEY:latest,DEEPGRAM_API_KEY=DEEPGRAM_API_KEY:latest,ELEVENLABS_API_KEY=ELEVENLABS_API_KEY:latest"
