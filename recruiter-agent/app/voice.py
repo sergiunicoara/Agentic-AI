@@ -17,7 +17,6 @@ from .session_store import load_session, save_session
 
 logger = logging.getLogger(__name__)
 
-DEEPGRAM_KEY = os.environ.get("DEEPGRAM_API_KEY", "").strip()
 _tts_client = texttospeech.TextToSpeechClient()
 
 _MD_STRIP = re.compile(r"\*{1,2}([^*]+)\*{1,2}|`([^`]+)`|#{1,6}\s*")
@@ -52,6 +51,10 @@ def _split_sentences(text: str) -> list[str]:
     if buf:
         chunks.append(buf)
     return chunks
+
+
+def _get_deepgram_key() -> str:
+    return os.environ.get("DEEPGRAM_API_KEY", "").strip()
 
 
 async def _tts_bytes(text: str) -> bytes | None:
@@ -111,7 +114,9 @@ async def _tts_stream(text: str, ws: WebSocket) -> None:
 async def voice_handler(ws: WebSocket, session_id: str) -> None:
     await ws.accept()
 
-    if not DEEPGRAM_KEY:
+    deepgram_key = _get_deepgram_key()
+
+    if not deepgram_key:
         await ws.send_text(json.dumps({"type": "error", "message": "DEEPGRAM_API_KEY not configured"}))
         await ws.close()
         return
@@ -120,7 +125,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
 
     # Token as first query param — websockets 15 silently drops additional_headers
-    dg_url = f"wss://api.deepgram.com/v1/listen?token={DEEPGRAM_KEY}&{_DG_WS_PARAMS}"
+    dg_url = f"wss://api.deepgram.com/v1/listen?token={deepgram_key}&{_DG_WS_PARAMS}"
 
     try:
         async with websockets.connect(dg_url) as dg_ws:
@@ -225,7 +230,10 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     except Exception as exc:
         logger.exception("voice_handler error: %s", exc)
         try:
-            await ws.send_text(json.dumps({"type": "error", "message": str(exc)}))
+            message = str(exc)
+            if "HTTP 401" in message:
+                message = "Deepgram rejected DEEPGRAM_API_KEY (HTTP 401). Check the active Cloud Run revision env/secret value."
+            await ws.send_text(json.dumps({"type": "error", "message": message}))
         except Exception:
             pass
 
