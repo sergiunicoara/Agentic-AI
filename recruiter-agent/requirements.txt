@@ -28,6 +28,5 @@ opentelemetry-instrumentation-grpc
 google-cloud-trace
 
 # Voice pipeline
-websockets>=10.0,<15  # used for /voice/bench only; Deepgram connection moved to aiohttp
-aiohttp  # reliable WS header support for Deepgram connection
+deepgram-sdk>=3.0.0  # official SDK handles auth, reconnect, event routing
 google-cloud-texttospeech

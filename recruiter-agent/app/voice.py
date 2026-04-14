@@ -6,9 +6,7 @@ import logging
 import os
 import re
 
-import aiohttp
-import websockets
-from aiohttp import WSMsgType
+from deepgram import DeepgramClient, LiveOptions, LiveTranscriptionEvents
 from fastapi import WebSocket, WebSocketDisconnect
 from google.cloud import texttospeech
 from opentelemetry import trace
@@ -37,7 +35,6 @@ def _strip_markdown(text: str) -> str:
 
 def _split_sentences(text: str) -> list[str]:
     """Split reply into TTS-sized chunks at sentence/line boundaries."""
-    # Split at sentence-ending punctuation or markdown bullet/newlines
     parts = re.split(r"(?<=[.!?])\s+|\n+", text)
     chunks: list[str] = []
     buf = ""
@@ -46,7 +43,6 @@ def _split_sentences(text: str) -> list[str]:
         if not clean:
             continue
         buf += (" " if buf else "") + clean
-        # Flush when sentence is complete or buffer is long enough
         if re.search(r"[.!?]$", buf) or len(buf) > 120:
             chunks.append(buf)
             buf = ""
@@ -78,33 +74,16 @@ async def _tts_bytes(text: str) -> bytes | None:
         logger.error("TTS sentence error: %s", exc)
         return None
 
-_DG_WS_URL = (
-    "wss://api.deepgram.com/v1/listen"
-    "?model=nova-2"
-    "&language=en-US"
-    "&encoding=opus"
-    "&container=webm"
-    "&sample_rate=48000"
-    "&endpointing=500"
-    "&punctuate=true"
-    "&interim_results=true"
-    "&vad_events=true"
-)
-
 
 async def _tts_stream(text: str, ws: WebSocket) -> None:
     """
-    Split reply into sentences, TTS each one in parallel with the next,
-    and stream MP3 bytes to the client as they arrive.
-    First audio reaches the client after the first sentence is synthesised
-    (~80ms) rather than after the full reply (~230ms).
+    Split reply into sentences, TTS each in parallel, stream MP3 bytes to client.
     """
     sentences = _split_sentences(text)
     if not sentences:
         await ws.send_text(json.dumps({"type": "audio_end"}))
         return
 
-    # Kick off first sentence immediately; pipeline the rest
     tasks = [asyncio.create_task(_tts_bytes(s)) for s in sentences]
     for task in tasks:
         audio = await task
@@ -118,7 +97,6 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     await ws.accept()
 
     deepgram_key = _get_deepgram_key()
-
     if not deepgram_key:
         await ws.send_text(json.dumps({"type": "error", "message": "DEEPGRAM_API_KEY not configured"}))
         await ws.close()
@@ -126,137 +104,116 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 
     ctx = {"state": load_session(session_id) or State()}
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
-    dg_closed: asyncio.Event = asyncio.Event()
+    loop = asyncio.get_event_loop()
 
-    dg_headers = {"Authorization": f"Token {deepgram_key}"}
+    # --- Deepgram SDK setup ---
+    deepgram = DeepgramClient(deepgram_key)
+    dg_connection = deepgram.listen.asynclive.v("1")
+
+    async def on_transcript(self, result, **kwargs) -> None:
+        try:
+            alt = result.channel.alternatives[0]
+            transcript = alt.transcript.strip()
+            is_final = result.is_final
+            speech_final = result.speech_final
+            logger.info("DG result: is_final=%s speech_final=%s text=%r session=%s",
+                        is_final, speech_final, transcript, session_id)
+            if is_final and transcript:
+                await transcript_queue.put(transcript)
+        except Exception as exc:
+            logger.warning("on_transcript error: %s", exc)
+
+    async def on_metadata(self, metadata, **kwargs) -> None:
+        logger.info("Deepgram connected: session=%s metadata=%s", session_id, metadata)
+
+    async def on_speech_started(self, speech_started, **kwargs) -> None:
+        logger.info("Deepgram: speech started session=%s", session_id)
+
+    async def on_utterance_end(self, utterance_end, **kwargs) -> None:
+        logger.info("Deepgram: utterance end session=%s", session_id)
+
+    async def on_close(self, close, **kwargs) -> None:
+        logger.info("Deepgram connection closed session=%s close=%s", session_id, close)
+
+    async def on_error(self, error, **kwargs) -> None:
+        logger.error("Deepgram error: %s session=%s", error, session_id)
+
+    dg_connection.on(LiveTranscriptionEvents.Transcript, on_transcript)
+    dg_connection.on(LiveTranscriptionEvents.Metadata, on_metadata)
+    dg_connection.on(LiveTranscriptionEvents.SpeechStarted, on_speech_started)
+    dg_connection.on(LiveTranscriptionEvents.UtteranceEnd, on_utterance_end)
+    dg_connection.on(LiveTranscriptionEvents.Close, on_close)
+    dg_connection.on(LiveTranscriptionEvents.Error, on_error)
+
+    options = LiveOptions(
+        model="nova-2",
+        language="en-US",
+        encoding="opus",
+        container="webm",
+        sample_rate=48000,
+        endpointing=500,
+        punctuate=True,
+        interim_results=True,
+        vad_events=True,
+    )
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(_DG_WS_URL, headers=dg_headers) as dg_ws:
-                logger.info("Deepgram WS established session=%s", session_id)
-                await ws.send_text(json.dumps({"type": "ready"}))
+        started = await dg_connection.start(options)
+        if not started:
+            await ws.send_text(json.dumps({"type": "error", "message": "Deepgram connection failed to start"}))
+            await ws.close()
+            return
 
-                async def recv_dg() -> None:
-                    logger.info("recv_dg started session=%s", session_id)
-                    try:
-                        async for msg in dg_ws:
-                            logger.info("recv_dg raw: type=%s data_type=%s session=%s",
-                                        msg.type, type(msg.data).__name__, session_id)
-                            # aiohttp yields CLOSE/ERROR frames as msg objects — check type first
-                            if msg.type == WSMsgType.CLOSE:
-                                logger.warning(
-                                    "Deepgram closed WS: code=%s reason=%r session=%s",
-                                    msg.data, msg.extra, session_id,
-                                )
-                                break
-                            if msg.type == WSMsgType.ERROR:
-                                logger.error(
-                                    "Deepgram WS error: %s session=%s",
-                                    dg_ws.exception(), session_id,
-                                )
-                                break
-                            if msg.type not in (WSMsgType.TEXT, WSMsgType.BINARY):
-                                logger.debug("Deepgram WS msg type=%s session=%s", msg.type, session_id)
-                                continue
-                            try:
-                                data = json.loads(msg.data)
-                                msg_type = data.get("type")
-                                if msg_type == "Metadata":
-                                    logger.info("Deepgram connected: session=%s req_id=%s",
-                                                session_id, data.get("request_id", ""))
-                                elif msg_type == "Results":
-                                    is_final = data.get("is_final", False)
-                                    speech_final = data.get("speech_final", False)
-                                    alt = data.get("channel", {}).get("alternatives", [{}])[0]
-                                    transcript = alt.get("transcript", "").strip()
-                                    logger.info("DG result: is_final=%s speech_final=%s text=%r",
-                                                is_final, speech_final, transcript)
-                                    if is_final and transcript:
-                                        await transcript_queue.put(transcript)
-                                elif msg_type == "SpeechStarted":
-                                    logger.info("Deepgram: speech started session=%s", session_id)
-                                elif msg_type == "UtteranceEnd":
-                                    logger.info("Deepgram: utterance end session=%s", session_id)
-                                else:
-                                    logger.info("Deepgram msg type=%s session=%s", msg_type, session_id)
-                            except Exception as e:
-                                logger.warning("recv_dg parse error: %s", e)
-                    except Exception as exc:
-                        logger.error("recv_dg failed: %s", exc)
-                    finally:
-                        logger.info("recv_dg exited session=%s", session_id)
-                        dg_closed.set()
+        logger.info("Deepgram SDK connected session=%s", session_id)
+        await ws.send_text(json.dumps({"type": "ready"}))
 
-                async def process() -> None:
-                    tracer = trace.get_tracer("recruiter-agent")
-                    while True:
-                        transcript = await transcript_queue.get()
-                        logger.info("voice transcript session=%s text=%s", session_id, transcript)
-                        await ws.send_text(json.dumps({"type": "transcript", "text": transcript}))
+        async def process() -> None:
+            tracer = trace.get_tracer("recruiter-agent")
+            while True:
+                transcript = await transcript_queue.get()
+                logger.info("voice transcript session=%s text=%s", session_id, transcript)
+                await ws.send_text(json.dumps({"type": "transcript", "text": transcript}))
 
-                        with tracer.start_as_current_span("voice.turn") as span:
-                            span.set_attribute("session_id", session_id)
-                            span.set_attribute("transcript_len", len(transcript))
+                with tracer.start_as_current_span("voice.turn") as span:
+                    span.set_attribute("session_id", session_id)
+                    span.set_attribute("transcript_len", len(transcript))
 
-                            with tracer.start_as_current_span("voice.agent_turn"):
-                                result = agent_turn(ctx["state"], transcript)
-                            reply = result.get("reply", "")
-                            ctx["state"] = result.get("state", ctx["state"])
-                            save_session(session_id, ctx["state"])
-                            span.set_attribute("reply_len", len(reply))
+                    with tracer.start_as_current_span("voice.agent_turn"):
+                        result = agent_turn(ctx["state"], transcript)
+                    reply = result.get("reply", "")
+                    ctx["state"] = result.get("state", ctx["state"])
+                    save_session(session_id, ctx["state"])
+                    span.set_attribute("reply_len", len(reply))
 
-                        await ws.send_text(json.dumps({"type": "reply", "text": reply}))
+                await ws.send_text(json.dumps({"type": "reply", "text": reply}))
 
-                        with tracer.start_as_current_span("voice.tts"):
-                            await _tts_stream(reply, ws)
+                with tracer.start_as_current_span("voice.tts"):
+                    await _tts_stream(reply, ws)
 
-                async def keepalive() -> None:
-                    try:
-                        while True:
-                            await asyncio.sleep(8)
-                            await dg_ws.send_str(json.dumps({"type": "KeepAlive"}))
-                    except Exception:
-                        pass
+        proc_task = asyncio.create_task(process())
 
-                dg_task = asyncio.create_task(recv_dg())
-                proc_task = asyncio.create_task(process())
-                ka_task = asyncio.create_task(keepalive())
-
-                chunk_count = 0
-                try:
-                    async for chunk in ws.iter_bytes():
-                        if dg_closed.is_set():
-                            logger.warning("Deepgram closed — stopping audio relay session=%s", session_id)
-                            break
-                        chunk_count += 1
-                        if chunk_count <= 3 or chunk_count % 20 == 0:
-                            logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(chunk), session_id)
-                        await dg_ws.send_bytes(chunk)
-                except WebSocketDisconnect:
-                    logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
-                except Exception as exc:
-                    logger.warning("relay error after %d chunks: %s", chunk_count, exc)
-                finally:
-                    ka_task.cancel()
-                    dg_task.cancel()
-                    proc_task.cancel()
-                    try:
-                        await dg_ws.send_str(json.dumps({"type": "CloseStream"}))
-                    except Exception:
-                        pass
+        chunk_count = 0
+        try:
+            async for chunk in ws.iter_bytes():
+                chunk_count += 1
+                if chunk_count <= 3 or chunk_count % 20 == 0:
+                    logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(chunk), session_id)
+                await dg_connection.send(chunk)
+        except WebSocketDisconnect:
+            logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
+        except Exception as exc:
+            logger.warning("relay error after %d chunks: %s", chunk_count, exc)
+        finally:
+            proc_task.cancel()
+            await dg_connection.finish()
 
     except Exception as exc:
         logger.exception("voice_handler error: %s", exc)
         try:
-            message = str(exc)
-            if "HTTP 401" in message:
-                message = "Deepgram rejected DEEPGRAM_API_KEY (HTTP 401). Check the active Cloud Run revision env/secret value."
-            await ws.send_text(json.dumps({"type": "error", "message": message}))
+            await ws.send_text(json.dumps({"type": "error", "message": str(exc)}))
         except Exception:
             pass
     finally:
-        # Always close the browser WebSocket with a clean code so the client
-        # sees 1000 instead of 1005 (no-status) when voice_handler exits
         try:
             await ws.close(code=1000)
         except Exception:
@@ -266,7 +223,6 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 async def voice_bench_handler(ws: WebSocket, session_id: str) -> None:
     """
     Benchmark endpoint — accepts text transcript directly, bypasses Deepgram STT.
-    Measures real agent+TTS latency through the deployed WebSocket stack.
     Send: {"transcript": "your message"}
     Receive: {"type": "reply", "text": "..."} then binary MP3 bytes then {"type": "audio_end"}
     """
