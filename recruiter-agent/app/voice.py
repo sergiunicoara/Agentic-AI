@@ -73,7 +73,7 @@ async def _tts_bytes(text: str) -> bytes | None:
         logger.error("TTS sentence error: %s", exc)
         return None
 
-_DG_WS_URL = (
+_DG_WS_BASE = (
     "wss://api.deepgram.com/v1/listen"
     "?model=nova-2"
     "&language=en-US"
@@ -119,10 +119,11 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     ctx = {"state": load_session(session_id) or State()}
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
 
-    dg_headers = {"Authorization": f"Token {DEEPGRAM_KEY}"}
+    # Query-param auth — compatible with all websockets versions (no additional_headers quirks)
+    dg_url = _DG_WS_BASE + f"&token={DEEPGRAM_KEY}"
 
     try:
-        async with websockets.connect(_DG_WS_URL, additional_headers=dg_headers) as dg_ws:
+        async with websockets.connect(dg_url) as dg_ws:
             await ws.send_text(json.dumps({"type": "ready"}))
 
             async def recv_dg() -> None:
@@ -165,7 +166,11 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 
             try:
                 async for chunk in ws.iter_bytes():
-                    await dg_ws.send(chunk)
+                    try:
+                        await dg_ws.send(chunk)
+                    except websockets.exceptions.ConnectionClosed as exc:
+                        logger.warning("Deepgram WS closed mid-stream: %s", exc)
+                        break
             except WebSocketDisconnect:
                 pass
             finally:
@@ -176,6 +181,16 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                 except Exception:
                     pass
 
+    except websockets.exceptions.ConnectionClosed as exc:
+        close_code = exc.rcvd.code if exc.rcvd else None
+        if close_code and close_code != 1000:
+            logger.error("Deepgram closed with code %s: %s", close_code, exc)
+            try:
+                await ws.send_text(json.dumps({"type": "error", "message": f"Voice service error (code {close_code})"}))
+            except Exception:
+                pass
+        else:
+            logger.info("Deepgram connection closed normally")
     except Exception as exc:
         logger.exception("voice_handler error: %s", exc)
         try:
