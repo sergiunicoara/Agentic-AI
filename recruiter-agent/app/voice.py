@@ -167,10 +167,19 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
         logger.info("Deepgram SDK connected session=%s", session_id)
         await ws.send_text(json.dumps({"type": "ready"}))
 
+        input_done: asyncio.Event = asyncio.Event()
+
         async def process() -> None:
             tracer = trace.get_tracer("recruiter-agent")
             while True:
-                transcript = await transcript_queue.get()
+                try:
+                    transcript = await asyncio.wait_for(transcript_queue.get(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    # Exit cleanly once mic is done and nothing left to process
+                    if input_done.is_set() and transcript_queue.empty():
+                        break
+                    continue
+
                 logger.info("voice transcript session=%s text=%s", session_id, transcript)
                 await ws.send_text(json.dumps({"type": "transcript", "text": transcript}))
 
@@ -190,22 +199,45 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                 with tracer.start_as_current_span("voice.tts"):
                     await _tts_stream(reply, ws)
 
+                if input_done.is_set() and transcript_queue.empty():
+                    break  # Turn complete, nothing more to process
+
         proc_task = asyncio.create_task(process())
 
+        # Relay loop: handles binary audio chunks AND text control messages
         chunk_count = 0
         try:
-            async for chunk in ws.iter_bytes():
-                chunk_count += 1
-                if chunk_count <= 3 or chunk_count % 20 == 0:
-                    logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(chunk), session_id)
-                await dg_connection.send(chunk)
+            while True:
+                msg = await ws.receive()
+                if msg["type"] == "websocket.disconnect":
+                    logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
+                    break
+                if msg.get("bytes"):
+                    chunk_count += 1
+                    if chunk_count <= 3 or chunk_count % 20 == 0:
+                        logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(msg["bytes"]), session_id)
+                    await dg_connection.send(msg["bytes"])
+                elif msg.get("text"):
+                    try:
+                        ctrl = json.loads(msg["text"])
+                        if ctrl.get("type") == "input_complete":
+                            logger.info("input_complete after %d chunks session=%s", chunk_count, session_id)
+                            break
+                    except Exception:
+                        pass
         except WebSocketDisconnect:
             logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
         except Exception as exc:
             logger.warning("relay error after %d chunks: %s", chunk_count, exc)
-        finally:
-            proc_task.cancel()
-            await dg_connection.finish()
+
+        # Finalise Deepgram and wait for process() to deliver reply + audio
+        input_done.set()
+        await dg_connection.finish()
+        try:
+            await asyncio.wait_for(proc_task, timeout=30.0)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
+        proc_task.cancel()
 
     except Exception as exc:
         logger.exception("voice_handler error: %s", exc)

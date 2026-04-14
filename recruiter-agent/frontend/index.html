@@ -560,7 +560,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // --- Voice session ---
     function startVoiceSession(addYou, addAI) {
-      if (isRecording) { stopVoiceSession(); return; }
+      if (isRecording) { stopAudioCapture(); return; }
 
       navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
         const sid = sessionId || "voice-session";
@@ -626,12 +626,26 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function stopVoiceSession() {
+      // Full teardown — called on WS close or error
       isRecording = false;
       setMicActive(false);
       if (audioProcessor) { audioProcessor.disconnect(); audioProcessor = null; }
       if (audioContext) { audioContext.close(); audioContext = null; }
       if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
       if (voiceWs) { voiceWs.close(); voiceWs = null; }
+    }
+
+    function stopAudioCapture() {
+      // Stop mic only — keep WebSocket open so server can send back transcript + reply
+      isRecording = false;
+      setMicActive(false);
+      if (audioProcessor) { audioProcessor.disconnect(); audioProcessor = null; }
+      if (audioContext) { audioContext.close(); audioContext = null; }
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      // Tell server we're done sending audio; it will close the WS after the reply
+      if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
+        voiceWs.send(JSON.stringify({ type: "input_complete" }));
+      }
     }
 
     function setMicActive(active) {
