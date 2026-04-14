@@ -73,9 +73,8 @@ async def _tts_bytes(text: str) -> bytes | None:
         logger.error("TTS sentence error: %s", exc)
         return None
 
-_DG_WS_BASE = (
-    "wss://api.deepgram.com/v1/listen"
-    "?model=nova-2"
+_DG_WS_PARAMS = (
+    "model=nova-2"
     "&language=en-US"
     "&encoding=opus"
     "&container=webm"
@@ -120,36 +119,40 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     ctx = {"state": load_session(session_id) or State()}
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
 
-    dg_headers = {"Authorization": f"Token {DEEPGRAM_KEY}"}
+    # Token as first query param — websockets 15 silently drops additional_headers
+    dg_url = f"wss://api.deepgram.com/v1/listen?token={DEEPGRAM_KEY}&{_DG_WS_PARAMS}"
 
     try:
-        async with websockets.connect(_DG_WS_BASE, additional_headers=dg_headers) as dg_ws:
+        async with websockets.connect(dg_url) as dg_ws:
             logger.info("Deepgram WS established session=%s", session_id)
             await ws.send_text(json.dumps({"type": "ready"}))
 
             async def recv_dg() -> None:
-                async for raw in dg_ws:
-                    try:
-                        data = json.loads(raw)
-                        msg_type = data.get("type")
-                        if msg_type == "Metadata":
-                            logger.info("Deepgram connected: session=%s req_id=%s",
-                                        session_id, data.get("request_id", ""))
-                        elif msg_type == "Results":
-                            is_final = data.get("is_final", False)
-                            speech_final = data.get("speech_final", False)
-                            alt = data.get("channel", {}).get("alternatives", [{}])[0]
-                            transcript = alt.get("transcript", "").strip()
-                            logger.debug("DG result: is_final=%s speech_final=%s text=%r",
-                                         is_final, speech_final, transcript)
-                            if speech_final and transcript:
-                                await transcript_queue.put(transcript)
-                        elif msg_type == "SpeechStarted":
-                            logger.debug("Deepgram: speech started")
-                        elif msg_type == "UtteranceEnd":
-                            logger.debug("Deepgram: utterance end")
-                    except Exception:
-                        pass
+                try:
+                    async for raw in dg_ws:
+                        try:
+                            data = json.loads(raw)
+                            msg_type = data.get("type")
+                            if msg_type == "Metadata":
+                                logger.info("Deepgram connected: session=%s req_id=%s",
+                                            session_id, data.get("request_id", ""))
+                            elif msg_type == "Results":
+                                is_final = data.get("is_final", False)
+                                speech_final = data.get("speech_final", False)
+                                alt = data.get("channel", {}).get("alternatives", [{}])[0]
+                                transcript = alt.get("transcript", "").strip()
+                                logger.info("DG result: is_final=%s speech_final=%s text=%r",
+                                             is_final, speech_final, transcript)
+                                if speech_final and transcript:
+                                    await transcript_queue.put(transcript)
+                            elif msg_type == "SpeechStarted":
+                                logger.info("Deepgram: speech started session=%s", session_id)
+                            elif msg_type == "UtteranceEnd":
+                                logger.info("Deepgram: utterance end session=%s", session_id)
+                        except Exception:
+                            pass
+                except Exception as exc:
+                    logger.error("recv_dg failed: %s", exc)
 
             async def process() -> None:
                 tracer = trace.get_tracer("recruiter-agent")
