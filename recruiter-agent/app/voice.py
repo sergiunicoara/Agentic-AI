@@ -69,7 +69,7 @@ def _get_deepgram_key() -> str:
 
 
 async def _tts_bytes(text: str) -> bytes | None:
-    """Synthesise a single sentence via Google Cloud TTS. Returns MP3 bytes."""
+    """Synthesise a single sentence via Google Cloud Neural2-D. Returns MP3 bytes."""
     if not text.strip():
         return None
     try:
@@ -84,7 +84,7 @@ async def _tts_bytes(text: str) -> bytes | None:
         )
         return response.audio_content
     except Exception as exc:
-        logger.error("TTS sentence error: %s", exc)
+        logger.error("TTS error: %s", exc)
         return None
 
 
