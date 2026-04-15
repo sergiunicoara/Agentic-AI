@@ -128,7 +128,7 @@
               <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm shadow-lg shadow-black/40">
                 <h2 class="font-semibold text-slate-50 mb-2">Why it’s interesting</h2>
                 <ul class="list-disc list-inside space-y-1 text-slate-300">
-                  <li>This page <em>is</em> the voice pipeline — Deepgram STT + TTS, barge-in, ~170ms latency</li>
+                  <li>This page <em>is</em> the voice pipeline — Deepgram STT + TTS, barge-in, ~400ms first audio</li>
                   <li>Deterministic agent loop — fully testable, no LLM in the routing layer</li>
                   <li>LLM-as-Judge CI gate with golden dataset (RAGAS context_precision=1.0)</li>
                   <li>Critic agent (A2A) + MCP tool endpoints for agent-to-agent validation</li>
@@ -189,7 +189,7 @@
                     </button>
                   </div>
                   <p class="mt-1 text-[11px] text-slate-500">
-                    Try: <span class="font-medium text-slate-300">“Senior ML Engineer”</span> or paste a real JD.
+                    Try: <span class=”font-medium text-slate-300”>”Lead AI Engineer”</span> or paste a real JD.
                   </p>
                 </div>
               </div>
@@ -478,7 +478,7 @@ document.addEventListener("DOMContentLoaded", function () {
   })();
 
   // =====================================
-  // VOICE MODULE — Deepgram STT + ElevenLabs TTS
+  // VOICE MODULE — Deepgram STT + Google Neural TTS
   // =====================================
   (function initVoice() {
     function resolveVoiceWsUrl() {
@@ -524,7 +524,7 @@ document.addEventListener("DOMContentLoaded", function () {
       window.speechSynthesis.speak(utter);
     };
 
-    window._voiceAutoSpeak = function () {};  // ElevenLabs audio handles auto-speak in voice mode
+    window._voiceAutoSpeak = function () {};  // server TTS handles auto-speak in voice mode
 
     // --- Stop buttons ---
     ["page-stop", "widget-stop"].forEach(function (id) {
