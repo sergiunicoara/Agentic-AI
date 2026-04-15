@@ -20,6 +20,13 @@ logger = logging.getLogger(__name__)
 _tts_client = texttospeech.TextToSpeechClient()
 
 _MD_STRIP = re.compile(r"\*{1,2}([^*]+)\*{1,2}|`([^`]+)`|#{1,6}\s*")
+_EMOJI_RE = re.compile(
+    "[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF"
+    "\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF"
+    "\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF"
+    "\U00002702-\U000027B0\U000024C2-\U0001F251\U0001F1E0-\U0001F1FF]+",
+    re.UNICODE,
+)
 _TTS_VOICE = texttospeech.VoiceSelectionParams(
     language_code="en-US", name="en-US-Neural2-D"
 )
@@ -30,6 +37,12 @@ _TTS_AUDIO_CFG = texttospeech.AudioConfig(
 
 def _strip_markdown(text: str) -> str:
     text = _MD_STRIP.sub(lambda m: m.group(1) or m.group(2) or "", text)
+    return text.strip()
+
+
+def _clean_reply(text: str) -> str:
+    """Remove emojis from agent reply before sending to UI / TTS."""
+    text = _EMOJI_RE.sub("", text)
     return text.strip()
 
 
@@ -75,25 +88,71 @@ async def _tts_bytes(text: str) -> bytes | None:
         return None
 
 
-async def _tts_stream(text: str, ws: WebSocket) -> None:
-    """
-    Split reply into sentences, TTS each in parallel, stream MP3 bytes to client.
-    """
+async def _tts_stream(
+    text: str, ws: WebSocket, cancel: asyncio.Event | None = None
+) -> None:
+    """Stream TTS sentence-by-sentence.  Aborts mid-stream if *cancel* is set —
+    even while a synthesis task is in-flight — so barge-in is truly instant."""
     sentences = _split_sentences(text)
     if not sentences:
         await ws.send_text(json.dumps({"type": "audio_end"}))
         return
 
+    # Kick off all synthesis tasks in parallel upfront
     tasks = [asyncio.create_task(_tts_bytes(s)) for s in sentences]
+
     for task in tasks:
-        audio = await task
+        if cancel and cancel.is_set():
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            break
+
+        if cancel:
+            # Wait for this sentence OR a barge-in — whichever comes first
+            cancel_waiter = asyncio.ensure_future(cancel.wait())
+            try:
+                done, _ = await asyncio.wait(
+                    {task, cancel_waiter},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            finally:
+                if not cancel_waiter.done():
+                    cancel_waiter.cancel()
+
+            if cancel.is_set():
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                break
+
+            try:
+                audio = task.result()
+            except Exception:
+                audio = None
+        else:
+            audio = await task
+
         if audio:
             await ws.send_bytes(audio)
 
     await ws.send_text(json.dumps({"type": "audio_end"}))
 
 
-async def voice_handler(ws: WebSocket, session_id: str) -> None:
+async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000) -> None:
+    """
+    Continuous conversation loop.
+
+    Design:
+    - One WebSocket = one full session; Deepgram stays open throughout.
+    - Each is_final Deepgram transcript triggers an agent turn + TTS automatically.
+    - Mic muting during TTS is handled entirely on the frontend (ttsPlaying flag),
+      so we don't need is_speaking on the server — removing it eliminates the race
+      where a transcript arrives before barge_in resets the flag.
+    - Barge-in: stop button → frontend sends barge_in → tts_cancel event set →
+      _tts_stream exits immediately (even mid-synthesis) → process() free at once.
+    - Press mic again → stop_session → clean shutdown.
+    """
     await ws.accept()
 
     deepgram_key = _get_deepgram_key()
@@ -104,9 +163,9 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 
     ctx = {"state": load_session(session_id) or State()}
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
-    loop = asyncio.get_event_loop()
+    session_done = asyncio.Event()
+    tts_cancel = asyncio.Event()  # set by barge_in to abort the current TTS stream
 
-    # --- Deepgram SDK setup ---
     deepgram = DeepgramClient(deepgram_key)
     dg_connection = deepgram.listen.asyncwebsocket.v("1")
 
@@ -116,7 +175,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
             transcript = alt.transcript.strip()
             is_final = result.is_final
             speech_final = result.speech_final
-            logger.info("DG result: is_final=%s speech_final=%s text=%r session=%s",
+            logger.info("DG: is_final=%s speech_final=%s text=%r session=%s",
                         is_final, speech_final, transcript, session_id)
             if is_final and transcript:
                 await transcript_queue.put(transcript)
@@ -124,7 +183,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
             logger.warning("on_transcript error: %s", exc)
 
     async def on_metadata(self, metadata, **kwargs) -> None:
-        logger.info("Deepgram connected: session=%s metadata=%s", session_id, metadata)
+        logger.info("Deepgram connected session=%s metadata=%s", session_id, metadata)
 
     async def on_speech_started(self, speech_started, **kwargs) -> None:
         logger.info("Deepgram: speech started session=%s", session_id)
@@ -133,7 +192,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
         logger.info("Deepgram: utterance end session=%s", session_id)
 
     async def on_close(self, close, **kwargs) -> None:
-        logger.info("Deepgram connection closed session=%s close=%s", session_id, close)
+        logger.info("Deepgram closed session=%s close=%s", session_id, close)
 
     async def on_error(self, error, **kwargs) -> None:
         logger.error("Deepgram error: %s session=%s", error, session_id)
@@ -145,13 +204,14 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
     dg_connection.on(LiveTranscriptionEvents.Close, on_close)
     dg_connection.on(LiveTranscriptionEvents.Error, on_error)
 
-    # linear16 raw PCM — each WebSocket chunk is self-contained, no container needed
+    logger.info("voice_handler sample_rate=%d session=%s", sample_rate, session_id)
     options = {
         "model": "nova-2",
         "language": "en-US",
         "encoding": "linear16",
-        "sample_rate": 16000,
-        "endpointing": 500,
+        "sample_rate": sample_rate,
+        "endpointing": 150,        # ms silence before is_final — lower = faster for short commands
+        "utterance_end_ms": 1000,  # force finalize if speech detected but no clear endpoint
         "punctuate": True,
         "interim_results": True,
         "vad_events": True,
@@ -167,44 +227,41 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
         logger.info("Deepgram SDK connected session=%s", session_id)
         await ws.send_text(json.dumps({"type": "ready"}))
 
-        input_done: asyncio.Event = asyncio.Event()
-
         async def process() -> None:
             tracer = trace.get_tracer("recruiter-agent")
-            while True:
+            while not session_done.is_set():
                 try:
                     transcript = await asyncio.wait_for(transcript_queue.get(), timeout=0.5)
                 except asyncio.TimeoutError:
-                    # Exit cleanly once mic is done and nothing left to process
-                    if input_done.is_set() and transcript_queue.empty():
-                        break
                     continue
 
-                logger.info("voice transcript session=%s text=%s", session_id, transcript)
-                await ws.send_text(json.dumps({"type": "transcript", "text": transcript}))
+                try:
+                    display = transcript.strip(".,!?;: ")
+                    logger.info("voice turn session=%s text=%r", session_id, display)
+                    await ws.send_text(json.dumps({"type": "transcript", "text": display}))
 
-                with tracer.start_as_current_span("voice.turn") as span:
-                    span.set_attribute("session_id", session_id)
-                    span.set_attribute("transcript_len", len(transcript))
+                    with tracer.start_as_current_span("voice.turn") as span:
+                        span.set_attribute("session_id", session_id)
+                        span.set_attribute("transcript_len", len(transcript))
+                        with tracer.start_as_current_span("voice.agent_turn"):
+                            result = agent_turn(ctx["state"], transcript)
+                        reply = result.get("reply", "")
+                        ctx["state"] = result.get("state", ctx["state"])
+                        save_session(session_id, ctx["state"])
+                        span.set_attribute("reply_len", len(reply))
 
-                    with tracer.start_as_current_span("voice.agent_turn"):
-                        result = agent_turn(ctx["state"], transcript)
-                    reply = result.get("reply", "")
-                    ctx["state"] = result.get("state", ctx["state"])
-                    save_session(session_id, ctx["state"])
-                    span.set_attribute("reply_len", len(reply))
+                    reply = _clean_reply(reply)
+                    await ws.send_text(json.dumps({"type": "reply", "text": reply}))
 
-                await ws.send_text(json.dumps({"type": "reply", "text": reply}))
+                    tts_cancel.clear()
+                    with tracer.start_as_current_span("voice.tts"):
+                        await _tts_stream(reply, ws, cancel=tts_cancel)
 
-                with tracer.start_as_current_span("voice.tts"):
-                    await _tts_stream(reply, ws)
-
-                if input_done.is_set() and transcript_queue.empty():
-                    break  # Turn complete, nothing more to process
+                except Exception as exc:
+                    logger.error("process() turn error session=%s: %s", session_id, exc, exc_info=True)
 
         proc_task = asyncio.create_task(process())
 
-        # Relay loop: handles binary audio chunks AND text control messages
         chunk_count = 0
         try:
             while True:
@@ -214,24 +271,26 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
                     break
                 if msg.get("bytes"):
                     chunk_count += 1
-                    if chunk_count <= 3 or chunk_count % 20 == 0:
+                    if chunk_count <= 3 or chunk_count % 50 == 0:
                         logger.info("audio chunk #%d size=%d session=%s", chunk_count, len(msg["bytes"]), session_id)
                     await dg_connection.send(msg["bytes"])
                 elif msg.get("text"):
                     try:
                         ctrl = json.loads(msg["text"])
-                        if ctrl.get("type") == "input_complete":
-                            logger.info("input_complete after %d chunks session=%s", chunk_count, session_id)
+                        if ctrl.get("type") == "stop_session":
+                            logger.info("stop_session after %d chunks session=%s", chunk_count, session_id)
                             break
+                        elif ctrl.get("type") == "barge_in":
+                            tts_cancel.set()
+                            logger.info("barge_in: tts_cancel set session=%s", session_id)
                     except Exception:
                         pass
         except WebSocketDisconnect:
-            logger.info("client disconnected after %d chunks session=%s", chunk_count, session_id)
+            logger.info("WebSocketDisconnect after %d chunks session=%s", chunk_count, session_id)
         except Exception as exc:
-            logger.warning("relay error after %d chunks: %s", chunk_count, exc)
+            logger.warning("relay error after %d chunks: %s session=%s", chunk_count, exc, session_id)
 
-        # Finalise Deepgram and wait for process() to deliver reply + audio
-        input_done.set()
+        session_done.set()
         await dg_connection.finish()
         try:
             await asyncio.wait_for(proc_task, timeout=30.0)
@@ -253,11 +312,7 @@ async def voice_handler(ws: WebSocket, session_id: str) -> None:
 
 
 async def voice_bench_handler(ws: WebSocket, session_id: str) -> None:
-    """
-    Benchmark endpoint — accepts text transcript directly, bypasses Deepgram STT.
-    Send: {"transcript": "your message"}
-    Receive: {"type": "reply", "text": "..."} then binary MP3 bytes then {"type": "audio_end"}
-    """
+    """Benchmark endpoint — text transcript in, reply + MP3 out."""
     await ws.accept()
     ctx = {"state": load_session(session_id) or State()}
 
@@ -270,12 +325,10 @@ async def voice_bench_handler(ws: WebSocket, session_id: str) -> None:
                 continue
 
             await ws.send_text(json.dumps({"type": "transcript", "text": transcript}))
-
             result = agent_turn(ctx["state"], transcript)
             reply = result.get("reply", "")
             ctx["state"] = result.get("state", ctx["state"])
             save_session(session_id, ctx["state"])
-
             await ws.send_text(json.dumps({"type": "reply", "text": reply}))
             await _tts_stream(reply, ws)
 

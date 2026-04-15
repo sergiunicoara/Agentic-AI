@@ -229,6 +229,13 @@ def load_github_projects() -> List[Dict[str, Any]]:
         logger.warning("Failed to fetch GitHub repos for %s: %s", GITHUB_USERNAME, e)
         return projects
 
+    # System/meta files that should never surface as projects
+    _SKIP_FILENAMES = {
+        "agents.md", "memory.md", "claude.md", "contributing.md",
+        "changelog.md", "license.md", "code_of_conduct.md", "security.md",
+        "todo.md", "notes.md", "feedback_uv.md", "feedback.md",
+    }
+
     for repo_info in repos:
         repo_name = repo_info.get("name")
         if not repo_name:
@@ -252,6 +259,15 @@ def load_github_projects() -> List[Dict[str, Any]]:
             if not path:
                 continue
             name = f.get("name") or path
+
+            # Skip system/meta files
+            if name.lower() in _SKIP_FILENAMES:
+                continue
+
+            # Only process files at depth 0 (repo root) or depth 1 (one subdirectory)
+            # Avoids pulling in deeply nested config/memory files
+            if path.count("/") > 1:
+                continue
 
             try:
                 text = _download_file(owner_login, repo_name, path)

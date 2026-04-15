@@ -1,269 +1,280 @@
-# 🚀 Sergiu – AI Recruiter Tour Agent
-### Production-ready Multi-Agent System (Google/Kaggle Agents Style)
+# Sergiu – AI Recruiter Tour Agent
+### Production Voice AI + Multi-Agent System
 
-This project implements a production-grade AI Recruiter Tour Agent inspired by the Google/Kaggle "Agents" course. It acts as an interactive recruiter companion, helping hiring managers instantly understand your strongest qualifications through agentic workflows — with a full evaluation and observability stack.
+An interactive AI recruiter agent that helps hiring managers understand Sergiu's strongest qualifications through agentic workflows — with a live voice pipeline, full evaluation stack, and observability.
 
----
-
-## 🧠 Core Capabilities
-
-* **✔️ Deterministic Multi-Stage Pipeline:** Role extraction → criteria parsing → project ranking → CV Q&A — no LLM in the orchestrator loop.
-* **✔️ Recruiter-Aware Entry:** Tailors first messages based on referral source (GitHub/LinkedIn).
-* **✔️ Project Relevance Ranking:** Gemini embeddings score and shortlist the most relevant portfolio projects per role.
-* **✔️ Deep-Dive Flow:** Explains impact and role-match project-by-project with transparent reasoning.
-* **✔️ ATS-Ready Outputs:** Generates polished ATS summaries and recruiter email drafts.
-* **✔️ CV RAG (Gemini Embeddings):** High-precision retrieval over the candidate CV using `text-embedding-004`.
-* **✔️ Full Trajectory Logging:** Every turn (user + agent) recorded with ISO timestamps and session ID, emitted to structured Cloud Logs.
-* **✔️ LLM-as-a-Judge:** Multi-metric evaluation — faithfulness, relevancy, and factuality (0.0–1.0 each) + overall 1–5 score per turn.
-* **✔️ Golden Evaluation Dataset:** 15 hand-curated cases covering all pipeline stages, run against live endpoints via the eval suite.
-* **✔️ Critic Agent (A2A):** Autonomous critic agent that calls the judge via the MCP tool interface, issues PASS/FAIL verdicts, and tracks per-session quality metrics.
-* **✔️ MCP Tool Registry:** Agent capabilities exposed as named JSON-schema tools via `/mcp/tools` and `/mcp/call` for Agent-to-Agent interoperability.
-* **✔️ OpenTelemetry Tracing:** OTel spans on every `/chat`, `/mcp/call`, and `/a2a/validate` request, wired to Cloud Trace on startup.
-* **✔️ Voice Interface:** Browser-native STT (mic input) and TTS (AI responses read aloud) via the Web Speech API — no extra API keys required.
+**Live:** https://recruiter-agent-969006882005.europe-west1.run.app
 
 ---
 
-## 🗺️ System Architecture
+## Core Capabilities
+
+- **Deterministic orchestrator** — role extraction → criteria parsing → project ranking → CV Q&A with no LLM in the routing loop (35ms agent turn)
+- **Real-time voice pipeline** — Deepgram nova-2 STT over WebSocket → agent → Google Neural2-D TTS with sentence-level streaming. Barge-in via RMS VAD. ~600ms speech-to-first-audio E2E.
+- **Continuous conversation** — one mic press opens a persistent session; Deepgram auto-detects utterance end, agent responds, TTS streams back. No push-to-talk.
+- **CV RAG** — Gemini `text-embedding-004` embeddings over the candidate CV for recruiter Q&A (phone, certifications, location, skills)
+- **ATS outputs** — role-matched project deep dives, ATS-style summaries, recruiter email drafts
+- **LLM-as-Judge** — multi-metric eval per turn: faithfulness, relevancy, factuality (0.0–1.0 each)
+- **Critic Agent (A2A)** — autonomous critic calls the judge via MCP tool interface, issues PASS/FAIL verdicts, tracks session-level quality
+- **MCP tool registry** — agent capabilities exposed as named JSON-schema tools via `/mcp/tools` + `/mcp/call`
+- **OTel tracing** — every `/chat`, `/voice`, `/mcp/call`, `/a2a/validate` request has a span wired to Cloud Trace
+
+---
+
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        FRONTEND                              │
-│   index.html — JS chat UI + Web Speech API (STT / TTS)      │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ POST /chat
-┌──────────────────────────▼──────────────────────────────────┐
-│                      ORCHESTRATOR                            │
-│   agent.py — deterministic pipeline, no LLM in loop         │
-│                                                              │
-│   Stage 1 → extract_role()       regex heuristics           │
-│   Stage 2 → criteria parsing     normalize_criteria()       │
-│   Stage 3 → project ranking      keyword scoring            │
-│   Stage 4 → CV Q&A               routes to RAG              │
-└──────┬───────────────────┬────────────────┬─────────────────┘
-       │                   │                │
-┌──────▼──────┐   ┌────────▼───────┐   ┌───▼─────────────────┐
-│  cv_rag.py  │   │   tools.py     │   │ github_portfolio.py  │
-│             │   │                │   │                      │
-│  Gemini     │   │ Keyword score  │   │ GitHub API           │
-│  embeddings │   │ over tags +    │   │ + TTL cache (6h)     │
-│  text-004   │   │ summary        │   │ + static fallback    │
-│             │   │                │   │                      │
-│  Chunk CV   │   │ ATS summary    │   │ Markdown → project   │
-│  Cosine sim │   │ Email draft    │   │ dict parser          │
-│  Gemini gen │   │                │   │                      │
-└─────────────┘   └────────────────┘   └──────────────────────┘
-       │
-┌──────▼──────────────────────────────────────────────────────┐
-│                    EVALUATION LAYER                          │
-│                                                              │
-│   judge.py          faithfulness / relevancy / factuality    │
-│                     0.0–1.0 each + overall score 1–5        │
-│                                                              │
-│   critic_agent.py   A2A call → judge via MCP tool interface  │
-│                     PASS / FAIL + recommended_actions        │
-│                     per-session aggregate metrics            │
-│                                                              │
-│   eval_runner.py    15 golden cases → /chat + /mcp/call     │
-│                     pass_rate, avg_faithfulness, ...         │
-└──────────────────────────────┬──────────────────────────────┘
+Browser (index.html)
+│
+├── POST /chat ─────────────────────────────────────────────────────┐
+│                                                                    │
+└── WebSocket /voice                                                 │
+      ├── send: PCM16 audio chunks (48kHz)                          │
+      ├── send: JSON { barge_in / stop_session }                    │
+      ├── recv: JSON { ready / transcript / reply / audio_end }     │
+      └── recv: binary MP3 chunks                                   │
+                                                                    │
+┌───────────────────────────────────────────────────────────────────▼──┐
+│                          FastAPI  (server.py)                         │
+└──────────────┬────────────────────────────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────────────────────────┐
+│                     voice_handler  (voice.py)                        │
+│                                                                      │
+│  Deepgram nova-2 WebSocket                                          │
+│    PCM16 in → is_final transcripts → asyncio.Queue                  │
+│                                                                      │
+│  process() loop                                                      │
+│    transcript → agent_turn() → reply                                │
+│                                                                      │
+│  Google Neural2-D TTS                                               │
+│    reply → split sentences → parallel synthesis → MP3 stream        │
+│                                                                      │
+│  Barge-in: RMS VAD on mic → tts_cancel Event → abort mid-stream    │
+│  Keepalive: zeros sent to Deepgram during TTS to hold connection    │
+└──────────────┬──────────────────────────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────────────────────────┐
+│                       agent_turn  (agent.py)                         │
+│                                                                      │
+│  Stage 1: extract_role()        regex, deterministic                │
+│  Stage 2: criteria parsing      normalize_criteria()                │
+│           voice_ai / production_rag / observability /               │
+│           low_latency / leadership / ownership / communication      │
+│  Stage 3: project ranking       keyword scoring over tags+summary   │
+│  Stage 4: CV Q&A                routes to cv_rag.py                 │
+└──────┬───────────────────┬─────────────────────────────────────────┘
+       │                   │
+┌──────▼──────┐   ┌────────▼──────────────────────────┐
+│  cv_rag.py  │   │            tools.py                │
+│             │   │                                    │
+│  Gemini     │   │  STATIC_PROJECTS (priority):       │
+│  embeddings │   │  • Production Voice AI Pipeline    │
+│  text-004   │   │  • Agent Observability Dashboard   │
+│             │   │  • GraphRAG + RAGAS Pipeline       │
+│  Chunk CV   │   │                                    │
+│  Cosine sim │   │  GitHub-backed (TTL 6h):           │
+│  Gemini gen │   │  github_portfolio.py               │
+└─────────────┘   │  → README.md files, depth ≤ 1     │
+                  │  → system files filtered out        │
+                  │                                    │
+                  │  ATS summary + email draft         │
+                  └────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                       EVALUATION LAYER                               │
+│                                                                      │
+│  judge.py          faithfulness / relevancy / factuality 0.0–1.0   │
+│  critic_agent.py   A2A → judge via MCP, PASS/FAIL + session agg.   │
+│  eval_runner.py    15 golden cases → /chat + /mcp/call              │
+└──────────────────────────────┬──────────────────────────────────────┘
                                │
-┌──────────────────────────────▼──────────────────────────────┐
-│                     MCP / A2A LAYER                          │
-│                                                              │
-│   /mcp/tools      tool discovery (JSON schemas)             │
-│   /mcp/call       tool dispatch                             │
-│   /a2a/validate   critic agent endpoint                     │
-│   /a2a/summary    session aggregate metrics                 │
-└──────────────────────────────┬──────────────────────────────┘
+┌──────────────────────────────▼──────────────────────────────────────┐
+│                         MCP / A2A LAYER                              │
+│  /mcp/tools        tool discovery (JSON schemas)                    │
+│  /mcp/call         tool dispatch                                    │
+│  /a2a/validate     critic agent endpoint                            │
+│  /a2a/summary      session aggregate metrics                        │
+└──────────────────────────────┬──────────────────────────────────────┘
                                │
-┌──────────────────────────────▼──────────────────────────────┐
-│                    OBSERVABILITY                             │
-│   OTel spans on every endpoint → Cloud Trace                │
-│   Trajectory logs: session_id + timestamps → Cloud Logging  │
-│   Critic logs: verdict + all 3 metric dimensions            │
-└──────────────────────────────┬──────────────────────────────┘
+┌──────────────────────────────▼──────────────────────────────────────┐
+│                        OBSERVABILITY                                  │
+│  OTel spans per endpoint → Cloud Trace                              │
+│  Trajectory logs: session_id + timestamps → Cloud Logging           │
+│  Critic logs: verdict + all 3 metric dimensions                     │
+└──────────────────────────────┬──────────────────────────────────────┘
                                │
-┌──────────────────────────────▼──────────────────────────────┐
-│                    DEPLOYMENT                                │
-│   Google Cloud Run  --min-instances 0  --cpu-throttling     │
-│   GOOGLE_API_KEY injected from Secret Manager               │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────▼──────────────────────────────────────┐
+│                         DEPLOYMENT                                    │
+│  Google Cloud Run  --min-instances 0  --cpu-throttling              │
+│  Secrets: GOOGLE_API_KEY, DEEPGRAM_API_KEY, GOOGLE_APPLICATION_     │
+│           CREDENTIALS via Secret Manager                            │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🏗️ Tech Stack
+## Latency (benchmarked, `/voice/bench` endpoint)
+
+| Stage | Measured |
+|---|---|
+| Agent routing (deterministic) | **35ms avg** |
+| First TTS audio from transcript | **~400ms** |
+| Speech-to-first-audio E2E (incl. Deepgram) | **~600ms** |
+| Full TTS loop | **700ms – 1.1s** |
+
+Agent routing is fast because there is no LLM in the orchestration path — routing is pure Python regex + keyword matching. LLM calls only happen inside tools (CV RAG, ATS generation).
+
+---
+
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | **Backend** | FastAPI, Uvicorn |
+| **Voice STT** | Deepgram nova-2 (WebSocket streaming) |
+| **Voice TTS** | Google Cloud Neural2-D (sentence-level streaming, free tier) |
 | **LLM** | Gemini 1.5 Flash (`google-genai`) |
 | **Embeddings** | `models/text-embedding-004` |
-| **Evaluation** | LLM-as-a-Judge + `ops/eval_data.json` (15 golden cases) |
-| **Observability** | OpenTelemetry tracing + structured trajectory logs → Cloud Logging |
-| **A2A / MCP** | Critic Agent + MCP tool registry (`/mcp/tools`, `/mcp/call`, `/a2a/validate`) |
-| **Frontend** | Vanilla JS chat UI with voice (Web Speech API) |
-| **Cloud** | Google Cloud Run — zero-cost optimized (`--min-instances 0`, `--cpu-throttling`) |
+| **Evaluation** | LLM-as-Judge + 15 golden cases (`ops/eval_data.json`) |
+| **Observability** | OpenTelemetry → Cloud Trace + structured trajectory logs |
+| **A2A / MCP** | Critic Agent + MCP tool registry |
+| **Session state** | SQLite (`/tmp/sessions.db`) |
+| **Frontend** | Vanilla JS — text chat + WebSocket voice pipeline |
+| **Deployment** | Google Cloud Run (zero-cost optimized) |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
-```text
+```
 recruiter-agent/
-├── README.md                     <-- You are here
-├── deploy.ps1                    <-- Automated zero-cost GCP deployment
-├── Dockerfile                    <-- Optimized Python-slim container
-├── requirements.txt              <-- Python dependencies
-├── main.py                       <-- Uvicorn entry point
-│
-├── ops/
-│   └── eval_data.json            <-- 15 golden evaluation cases (golden dataset)
+├── README.md
+├── Dockerfile
+├── requirements.txt
+├── dev.bat                       <-- local dev (Python 3.11, uvicorn --reload)
 │
 ├── app/
-│   ├── agent.py                  <-- Deterministic orchestrator (role → criteria → projects → ATS)
-│   ├── critic_agent.py           <-- Autonomous critic agent (A2A validator, PASS/FAIL verdicts)
+│   ├── server.py                 <-- FastAPI routes (/chat, /voice, /mcp/*, /a2a/*)
+│   ├── agent.py                  <-- Deterministic orchestrator
+│   ├── voice.py                  <-- Voice pipeline (Deepgram STT + Google TTS + barge-in)
 │   ├── cv_rag.py                 <-- CV vector search / RAG (Gemini embeddings)
-│   ├── judge.py                  <-- LLM-as-a-Judge (faithfulness, relevancy, factuality)
-│   ├── mcp.py                    <-- MCP-style tool registry + dispatcher
-│   ├── tools.py                  <-- Project ranking + ATS generation
-│   ├── github_portfolio.py       <-- Live GitHub portfolio loader (TTL-cached)
-│   ├── server.py                 <-- FastAPI routes (/chat, /mcp/*, /a2a/*)
-│   ├── quality.py                <-- Trajectory model (Step + timestamps + session ID)
-│   ├── session_store.py          <-- Session state management
-│   ├── otel.py                   <-- OpenTelemetry tracer factory
-│   ├── memory/
-│   │   ├── store.py              <-- Long-term memory store
-│   │   └── extractor.py         <-- Memory extraction logic
+│   ├── tools.py                  <-- Project ranking, static projects, ATS generation
+│   ├── github_portfolio.py       <-- Live GitHub portfolio loader (TTL-cached, depth ≤ 1)
+│   ├── critic_agent.py           <-- Critic Agent (A2A validator, PASS/FAIL verdicts)
+│   ├── judge.py                  <-- LLM-as-Judge (faithfulness, relevancy, factuality)
+│   ├── mcp.py                    <-- MCP tool registry + dispatcher
+│   ├── session_store.py          <-- SQLite session state
+│   ├── quality.py                <-- Trajectory model (steps + timestamps)
+│   ├── utils/
+│   │   └── normalize.py          <-- Criteria normalization + VALID_CRITERIA registry
 │   ├── telemetry/
-│   │   ├── tracing.py            <-- OTel TracerProvider setup (OTLP or Console)
-│   │   ├── logging.py            <-- Structured logging configuration
-│   │   └── metrics.py            <-- OTel metrics
+│   │   ├── tracing.py
+│   │   ├── logging.py
+│   │   └── metrics.py
 │   └── ops/
-│       └── eval_runner.py        <-- Eval suite (loads golden dataset, aggregates metrics)
+│       └── eval_runner.py        <-- Eval suite (golden dataset, aggregate metrics)
 │
 └── frontend/
-    └── index.html                <-- Chat UI with voice (STT + TTS)
+    └── index.html                <-- Chat UI + WebSocket voice pipeline
 ```
 
 ---
 
-## 🤖 Agent-to-Agent (A2A) Architecture
-
-The system implements a two-agent architecture connected via an MCP-inspired tool registry:
+## Voice Pipeline
 
 ```
-Recruiter Agent (/chat)
-        │
-        │  structured turn (user_message + agent_reply)
-        ▼
-  /a2a/validate
-        │
-        ▼
-  Critic Agent (critic_agent.py)
-        │  calls judge via MCP tool interface
-        ▼
-  /mcp/call → judge_recruiter_turn
-        │
-        ▼
-  LLM Judge (judge.py)
-        │  returns faithfulness / relevancy / factuality
-        ▼
-  PASS / FAIL verdict + recommended_actions
+Browser mic (PCM16, 48kHz)
+  │
+  │  WebSocket /voice?session_id=&sample_rate=
+  ▼
+Deepgram nova-2
+  │  endpointing=150ms, punctuate=true, interim_results=true
+  │  is_final transcripts → asyncio.Queue
+  ▼
+agent_turn()  [35ms]
+  ▼
+Google Neural2-D TTS
+  │  split into sentences → parallel synthesis tasks
+  │  stream MP3 chunks over WebSocket as each sentence completes
+  ▼
+Browser Audio element
+  │  onplay  → ttsPlaying=true  (mic sends silence to Deepgram)
+  │  onended → ttsPlaying=false (mic sends real audio)
+  └  barge-in: RMS > 0.015 → pause audio + send barge_in → tts_cancel.set()
 ```
 
-**Endpoints:**
+**Barge-in flow**: user speaks over TTS → RMS VAD detects in ~85ms → audio paused client-side + `barge_in` sent to server → `asyncio.Event` cancels `_tts_stream` mid-synthesis → `process()` loop free immediately.
 
-| Endpoint | Description |
-|---|---|
-| `POST /a2a/validate` | Submit a recruiter turn for critic agent validation |
-| `GET  /a2a/summary/{session_id}` | Aggregate quality metrics for a critic session |
-| `GET  /mcp/tools` | Discover available MCP tools and their JSON schemas |
-| `POST /mcp/call` | Dispatch a named MCP tool call |
-
-**Available MCP tools:**
-
-| Tool | Description |
-|---|---|
-| `cv_rag_query` | Answer a natural language question from the CV via RAG |
-| `best_projects_for_role` | Return ranked portfolio projects for a role + criteria |
-| `ats_summary_and_email` | Generate ATS summary and recruiter outreach email |
-| `judge_recruiter_turn` | Run the LLM judge and return multi-metric scores |
+**Silence keepalive**: during TTS playback, the ScriptProcessor sends zero-filled PCM16 to Deepgram instead of real mic audio. This prevents the connection from timing out during long responses without sending transcribable audio.
 
 ---
 
-## 🧪 Evaluation Suite (LLM-as-a-Judge)
+## Evaluation Suite
 
-Behavioral evaluation runs against live endpoints using the golden dataset.
+```bash
+python -m app.ops.eval_runner --base-url http://localhost:8080
+```
 
-**Golden dataset** — `ops/eval_data.json` — 15 hand-curated cases:
-- Role extraction (plain sentence, JD paste, startup context)
-- Criteria parsing (canonical and unrecognized inputs)
-- Project deep-dive and ATS summary triggers
-- CV Q&A (contact, skills, education)
-- Session commands (reset, help, full JD paste)
-
-**Scoring metrics per case:**
+15 golden cases covering all pipeline stages. Metrics per case:
 
 | Metric | Range | What it measures |
 |---|---|---|
 | `score` | 1–5 | Overall reply quality |
 | `faithfulness` | 0.0–1.0 | Grounded, no hallucination |
-| `relevancy` | 0.0–1.0 | Directly addresses the user question |
-| `factuality` | 0.0–1.0 | Specific claims (projects, skills) are accurate |
-
-**Run the eval suite:**
-```bash
-python -m app.ops.eval_runner --base-url http://localhost:8080
-```
-
-Output includes per-case results and aggregate metrics: `pass_rate`, `avg_score`, `avg_faithfulness`, `avg_relevancy`, `avg_factuality`.
+| `relevancy` | 0.0–1.0 | Directly addresses the user input |
+| `factuality` | 0.0–1.0 | Specific claims are accurate |
 
 ---
 
-## 🎙️ Voice Interface
+## A2A / MCP Endpoints
 
-Browser-native voice — no extra API keys or backend changes required.
-
-| Feature | How to use |
+| Endpoint | Description |
 |---|---|
-| **Speech-to-text** | Click the mic icon next to Send → speak → transcript fills the input |
-| **Text-to-speech** | Click the speaker icon on any AI message bubble to replay it |
-| **Auto-speak** | Toggle `🔇 Auto-speak` in the header → turns `🔊` → new AI replies are read aloud automatically |
-| **Stop** | A red `■ Stop` button appears while speech is playing — click to cancel immediately |
+| `POST /a2a/validate` | Submit a turn for critic agent validation |
+| `GET  /a2a/summary/{session_id}` | Aggregate quality metrics for a session |
+| `GET  /mcp/tools` | Discover available tools and their JSON schemas |
+| `POST /mcp/call` | Dispatch a named tool call |
 
-> Requires Chrome or Edge. Mic buttons are hidden automatically in browsers without Web Speech API support (e.g. Firefox).
+**Available MCP tools:**
 
----
-
-## 🔭 Observability
-
-Every request is instrumented end-to-end:
-
-- **OTel spans** on `/chat` (with `agent.turn` child span), `/mcp/call`, and `/a2a/validate` — sent to Cloud Trace via OTLP or logged to console
-- **Trajectory logs** — each chat turn emits a structured JSON log with `session_id`, `turn_count`, user step, and agent step (role, criteria, memory events)
-- **Critic logs** — each validation emits `verdict`, `score`, and all three metric dimensions
+| Tool | Description |
+|---|---|
+| `cv_rag_query` | Answer a question from the CV via RAG |
+| `best_projects_for_role` | Return ranked projects for a role + criteria |
+| `ats_summary_and_email` | Generate ATS summary + recruiter email |
+| `judge_recruiter_turn` | Run LLM judge, return multi-metric scores |
 
 ---
 
-## 🚀 Deployment (Zero-Cost Optimized)
+## Local Development
 
-**Prerequisites:**
-- Google Cloud SDK + Docker Desktop installed
-- `GOOGLE_API_KEY` stored in Secret Manager ([Google AI Studio](https://aistudio.google.com/app/apikey))
-
-**Deploy:**
-```powershell
-.\deploy.ps1
+```bat
+dev.bat
 ```
 
-The script creates the Artifact Registry repository, builds the Docker image, and deploys to Cloud Run.
+Then in browser console:
+```js
+localStorage.setItem("backendUrl", "http://localhost:8080/chat")
+```
+
+Open `http://localhost:8080`. Hot-reload enabled via `uvicorn --reload`.
 
 ---
 
-## 💰 Cost-Control Features
+## Deployment
 
-- `--min-instances 0` — no billing for idle time (scales to zero)
-- `--cpu-throttling` — stops CPU billing immediately after each request
-- `--set-secrets` — `GOOGLE_API_KEY` injected from Secret Manager at runtime
-- Artifact Registry standard storage (keep under 500 MB for free tier)
+```bash
+gcloud run deploy recruiter-agent --source . --region europe-west1
+```
+
+**Required secrets in Secret Manager:**
+- `GOOGLE_API_KEY` — Gemini API key
+- `DEEPGRAM_API_KEY` — Deepgram STT
+- `GOOGLE_APPLICATION_CREDENTIALS` — service account JSON for Google Cloud TTS
+
+**Cost-control:**
+- `--min-instances 0` — scales to zero, no idle billing
+- `--cpu-throttling` — CPU billing stops after each request
+- Google Cloud TTS Neural2: 1M characters free/month (resets monthly)
+- Deepgram: $200 free credit on signup

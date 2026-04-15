@@ -18,6 +18,78 @@ logger = logging.getLogger(__name__)
 
 STATIC_PROJECTS: List[Dict[str, Any]] = [
     {
+        "id": "recruiter-agent:voice-pipeline",
+        "title": "Production Voice AI Pipeline",
+        "summary": (
+            "Real-time voice agent on Cloud Run: Deepgram nova-2 STT over WebSocket → "
+            "deterministic agentic orchestrator → Google Neural2-D TTS with sentence-level "
+            "streaming. Continuous conversation loop with barge-in (RMS VAD), silence keepalive, "
+            "and SQLite session state. OTel-traced, critic agent (A2A), LLM-as-Judge evaluation "
+            "harness, MCP tool endpoints, and CI golden dataset tests. ~170ms agent + TTS first-audio latency."
+        ),
+        "impact": [
+            "Sub-200ms agent latency end-to-end on Cloud Run",
+            "Barge-in via RMS VAD — user interrupts TTS mid-sentence instantly",
+            "Silence keepalive prevents Deepgram timeout during TTS playback",
+            "OTel span per voice turn: transcript len, reply len, session_id",
+            "Critic agent scores every reply on faithfulness, relevancy, factuality",
+            "MCP tool endpoints enable agent-to-agent discovery and validation",
+        ],
+        "tags": [
+            "voice", "stt", "tts", "deepgram", "websocket", "agentic", "production",
+            "cloud-run", "low-latency", "low_latency", "streaming", "real-time",
+            "observability", "rag", "voice_ai", "python",
+        ],
+        "link": "https://github.com/sergiunicoara/Agentic-AI/tree/main/recruiter-agent",
+        "source_repo": "Agentic-AI",
+    },
+    {
+        "id": "agent-observability:otel-dashboard",
+        "title": "Agent Observability Dashboard (OTel + gRPC)",
+        "summary": (
+            "Full-stack observability platform for agentic workflows: FastAPI + gRPC backend, "
+            "React/Recharts frontend, OTel Collector, Postgres audit log, Redis JWT revocation. "
+            "Real-time event streaming via gRPC-Web → Envoy. RBAC, AuditLogMiddleware, "
+            "and an SDK with AgentTracer context manager for any agentic span."
+        ),
+        "impact": [
+            "Production-grade OTel instrumentation with OTLP export to collector",
+            "Real-time dashboard streams latency metrics per agent turn",
+            "SDK: AgentTracer wraps any agentic span — zero boilerplate for consumers",
+            "Docker Compose one-command: collector + backend + frontend + Postgres + Redis",
+            "RBAC (viewer/developer/admin) with JWT + Redis revocation",
+        ],
+        "tags": [
+            "observability", "otel", "opentelemetry", "langsmith", "langfuse", "grpc",
+            "real-time", "streaming", "production", "agents", "monitoring", "tracing",
+            "evaluation", "fastapi", "python",
+        ],
+        "link": "https://github.com/sergiunicoara/Agentic-AI/tree/main/agent-observability",
+        "source_repo": "Agentic-AI",
+    },
+    {
+        "id": "graphrag:ragas-pipeline",
+        "title": "GraphRAG Pipeline with RAGAS Evaluation",
+        "summary": (
+            "Production RAG pipeline with graph-augmented retrieval: embeddings, vector store, "
+            "re-ranking, and a RAGAS evaluation harness. Achieves context_precision=1.0 and "
+            "context_recall=1.0 on the golden test set. Automated CI gate blocks deploys if "
+            "recall drops below threshold."
+        ),
+        "impact": [
+            "context_precision = 1.0, context_recall = 1.0 on eval dataset",
+            "Automated RAGAS CI gate: no deploy if recall regresses",
+            "Graph-augmented retrieval outperforms naive cosine on multi-hop queries",
+            "End-to-end: ingestion → chunking → embedding → retrieval → ranking → LLM response",
+        ],
+        "tags": [
+            "rag", "production_rag", "retrieval", "embeddings", "ranking", "evaluation",
+            "ragas", "production", "pipeline", "llm", "graphrag", "vector search",
+        ],
+        "link": "https://github.com/sergiunicoara/Agentic-AI",
+        "source_repo": "Agentic-AI",
+    },
+    {
         "id": "Generative-AI:portfolio",
         "title": "End-to-End Generative AI Portfolio",
         "summary": (

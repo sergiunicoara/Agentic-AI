@@ -21,6 +21,7 @@ from .cv_rag import get_cv_rag  # <-- CV RAG integration
 
 VALID_ROLES = [
     # Longer/more specific variants must come BEFORE shorter ones
+    "lead ai engineer",
     "senior machine learning engineer",
     "senior ml engineer",
     "senior ai engineer",
@@ -28,6 +29,8 @@ VALID_ROLES = [
     "senior nlp engineer",
     "senior data scientist",
     "senior software engineer",
+    "senior voice ai engineer",
+    "voice ai engineer",
     "machine learning engineer",
     "ml engineer",
     "ai engineer",
@@ -238,6 +241,21 @@ def _match_criteria_to_project(
                 reasons.append(
                     "- **Communication**: project explanation is structured and business-facing."
                 )
+            elif c_low == "voice_ai":
+                reasons.append(
+                    "- **Voice AI**: directly applicable — Deepgram STT + TTS over WebSocket, "
+                    "barge-in, real-time streaming, and low-latency conversation loop."
+                )
+            elif c_low == "observability":
+                reasons.append(
+                    "- **Observability**: OTel tracing, LangSmith-compatible evaluation harness, "
+                    "critic agent scoring every turn on faithfulness/relevancy/factuality."
+                )
+            elif c_low == "low_latency":
+                reasons.append(
+                    "- **Low Latency**: ~170ms agent + first-audio on Cloud Run; "
+                    "sentence-level TTS streaming and async WebSocket architecture."
+                )
             continue
 
         joined = " & ".join(evidence)
@@ -340,7 +358,7 @@ def _extract_implicit_criteria(msg: str) -> List[str]:
     low = msg.lower()
     raw: List[str] = []
 
-    if "rag" in low or "retrieval" in low:
+    if "rag" in low or "retrieval" in low or "embeddings" in low or "vector" in low:
         raw.append("production rag")
     if "leadership" in low or "lead" in low or "mentor" in low:
         raw.append("leadership")
@@ -350,6 +368,12 @@ def _extract_implicit_criteria(msg: str) -> List[str]:
         raw.append("communication")
     if any(w in low for w in ["transformer", "transformers", "fine-tuning", "fine-tune", "finetuning", "deep learning"]):
         raw.append("deep learning")
+    if any(w in low for w in ["voice", "stt", "tts", "speech", "asr", "deepgram", "phonebot", "voicebot", "telephony", "audio"]):
+        raw.append("voice_ai")
+    if any(w in low for w in ["observability", "langsmith", "langfuse", "otel", "opentelemetry", "tracing", "evaluation", "evals"]):
+        raw.append("observability")
+    if any(w in low for w in ["low-latency", "low latency", "real-time", "realtime", "streaming", "latency"]):
+        raw.append("low_latency")
 
     return normalize_criteria(raw)
 
@@ -361,7 +385,7 @@ def _derive_criteria_from_jd(msg: str) -> List[str]:
     low = msg.lower()
     raw: List[str] = []
 
-    if "rag" in low or "retrieval" in low:
+    if "rag" in low or "retrieval" in low or "embeddings" in low or "vector" in low or "ranking" in low:
         raw.append("production rag")
     if "leadership" in low or "lead" in low or "mentor" in low:
         raw.append("leadership")
@@ -369,6 +393,12 @@ def _derive_criteria_from_jd(msg: str) -> List[str]:
         raw.append("ownership")
     if "communication" in low or "stakeholder" in low or "present" in low:
         raw.append("communication")
+    if any(w in low for w in ["voice", "stt", "tts", "speech", "asr", "deepgram", "phonebot", "voicebot", "telephony", "audio"]):
+        raw.append("voice_ai")
+    if any(w in low for w in ["observability", "langsmith", "langfuse", "otel", "opentelemetry", "tracing", "evaluation pipeline"]):
+        raw.append("observability")
+    if any(w in low for w in ["low-latency", "low latency", "real-time", "realtime", "streaming", "latency"]):
+        raw.append("low_latency")
 
     normalized = normalize_criteria(raw)
     # simple fallback so we always have something
@@ -466,7 +496,9 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
     in tools (Gemini, RAG, etc.).
     """
     msg = user_message.strip()
-    low = msg.lower()
+    # Deepgram punctuate:true appends periods ("Two." "Another.") — strip trailing
+    # punctuation so short-command matching works regardless of STT punctuation.
+    low = msg.lower().strip(".,!?;:")
 
     # --------------------------------------------------------
     # Global commands
@@ -589,18 +621,10 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
         projects, deep_idx = _get_projects_for_state(state)
 
         # OPTION 1: deep dive / another / yes / next
-        if low in [
-            "1",
-            "one",
-            "deep",
-            "dive",
-            "deep dive",
-            "another",
-            "next",
-            "more",
-            "yes",
-            "y",
-        ]:
+        # Also match short phrases containing a nav word (e.g. "next one", "show next")
+        _NAV = {"1", "one", "deep", "dive", "another", "next", "more", "yes", "y"}
+        _low_words = low.split()
+        if low in _NAV or (len(_low_words) <= 3 and any(w in _NAV for w in _low_words)):
             total = len(projects)
             if total == 0:
                 # ultra-defensive, should never happen
@@ -628,8 +652,8 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
 
             return {"reply": reply, "state": state}
 
-        # OPTION 2: ATS summary
-        if low in ["2", "two", "ats", "summary", "ats summary"]:
+        # OPTION 2: ATS summary  ("to"/"too" are common STT substitutions for "two")
+        if low in ["2", "two", "to", "too", "ats", "summary", "ats summary"]:
             # Ensure projects shortlist exists
             projects, _ = _get_projects_for_state(state)
             summaries = generate_ats_summary_and_email(role, criteria, projects)
@@ -719,8 +743,10 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
             state.role = role
             remember(state, "set_role", {"role": role})
 
-            # Check if criteria were embedded in the same message
-            implicit_criteria = _extract_implicit_criteria(msg)
+            # Strip the detected role from the message before looking for criteria —
+            # otherwise role words ("lead", "senior") falsely trigger criteria ("leadership").
+            msg_for_criteria = re.sub(re.escape(role), "", msg, flags=re.IGNORECASE).strip()
+            implicit_criteria = _extract_implicit_criteria(msg_for_criteria)
             if implicit_criteria:
                 state.criteria = implicit_criteria
                 remember(

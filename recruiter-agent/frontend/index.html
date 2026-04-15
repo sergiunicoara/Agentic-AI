@@ -65,17 +65,18 @@
             <!-- HERO -->
             <section>
               <div class="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 mb-4">
-                Live AI agent · Built with Gemini &amp; FastAPI
+                Live voice AI agent · Deepgram STT · FastAPI · Cloud Run
               </div>
 
               <h1 class="text-4xl md:text-5xl font-semibold tracking-tight text-slate-50">
-                An AI recruiter that explains how
-                <span class="text-sky-400">Sergiu</span> fits your role.
+                An AI recruiter — with a
+                <span class="text-sky-400">live voice pipeline</span> — that explains how Sergiu fits your role.
               </h1>
 
               <p class="mt-4 text-slate-300 text-lg max-w-xl">
-                Paste any job description. The agent extracts requirements, searches Sergiu’s portfolio,
-                and produces recruiter-friendly summaries with concrete impact.
+                Paste any job description or speak your requirements. The agent extracts criteria, selects
+                best-fit projects, and produces recruiter-ready summaries with measurable impact.
+                Try the mic button — it’s a real STT/TTS conversation loop.
               </p>
 
               <div class="mt-6 flex flex-wrap gap-3">
@@ -97,16 +98,16 @@
 
               <dl class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-slate-300">
                 <div>
-                  <dt class="text-slate-400">Stack</dt>
-                  <dd class="font-medium">FastAPI · Gemini · RAG</dd>
+                  <dt class="text-slate-400">Voice stack</dt>
+                  <dd class="font-medium">Deepgram · Neural TTS · WebSocket</dd>
                 </div>
                 <div>
                   <dt class="text-slate-400">Focus</dt>
-                  <dd class="font-medium">Production AI Agents</dd>
+                  <dd class="font-medium">Voice AI · Agentic Systems · RAG</dd>
                 </div>
                 <div>
-                  <dt class="text-slate-400">Extras</dt>
-                  <dd class="font-medium">Sessions · Judge · SQLite</dd>
+                  <dt class="text-slate-400">Infra</dt>
+                  <dd class="font-medium">Cloud Run · OTel · LLM-Judge</dd>
                 </div>
               </dl>
             </section>
@@ -116,20 +117,22 @@
               <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm shadow-lg shadow-black/40">
                 <h2 class="font-semibold text-slate-50 mb-2">What this agent does</h2>
                 <ul class="list-disc list-inside space-y-1 text-slate-300">
-                  <li>Understands job descriptions &amp; titles</li>
-                  <li>Matches to Sergiu’s projects &amp; skills</li>
-                  <li>Explains recruiter relevance &amp; impact</li>
-                  <li>Provides ATS-style summaries + email drafts</li>
+                  <li>Understands JDs — extracts role, criteria, voice/RAG/observability signals</li>
+                  <li>Matches to Sergiu’s projects with measurable impact</li>
+                  <li>Explains fit per criterion — voice AI, RAG, low-latency, ownership</li>
+                  <li>ATS-style summaries + recruiter email drafts</li>
+                  <li>CV Q&amp;A via RAG — ask anything about skills, certs, location</li>
                 </ul>
               </div>
 
               <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm shadow-lg shadow-black/40">
                 <h2 class="font-semibold text-slate-50 mb-2">Why it’s interesting</h2>
                 <ul class="list-disc list-inside space-y-1 text-slate-300">
-                  <li>Deterministic agent loop for evals</li>
-                  <li>RAG over CV for recruiter Q&amp;A</li>
-                  <li>LLM-as-judge CI gate for quality</li>
-                  <li>Cloud Run deployment, ready for production</li>
+                  <li>This page <em>is</em> the voice pipeline — Deepgram STT + TTS, barge-in, ~170ms latency</li>
+                  <li>Deterministic agent loop — fully testable, no LLM in the routing layer</li>
+                  <li>LLM-as-Judge CI gate with golden dataset (RAGAS context_precision=1.0)</li>
+                  <li>Critic agent (A2A) + MCP tool endpoints for agent-to-agent validation</li>
+                  <li>OTel tracing every turn, Cloud Run production deployment</li>
                 </ul>
               </div>
             </section>
@@ -198,6 +201,12 @@
                 <h3 class="font-semibold text-slate-50 mb-2">Quick prompts</h3>
                 <div class="flex flex-col gap-2">
                   <button
+                    class="text-left rounded-lg border border-emerald-700/60 hover:border-emerald-400/60 hover:bg-emerald-500/10 px-3 py-2 text-xs text-slate-200"
+                    data-sample="We're building a production AI phone assistant for law firms. Looking for a Lead AI Engineer with hands-on voice pipeline experience — STT/TTS integration, real-time agentic workflows, low-latency streaming, RAG architectures, and LLM observability. Python, production deployments required."
+                  >
+                    🎙️ Lead AI Engineer · voice pipeline · RAG · observability
+                  </button>
+                  <button
                     class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
                     data-sample="I'm hiring a Senior ML Engineer to build and productionize LLM-powered features. We care about ownership, production RAG, and communication with product."
                   >
@@ -207,13 +216,13 @@
                     class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
                     data-sample="We are hiring an LLM Engineer to design and ship retrieval-augmented generation systems, with strong MLOps and observability."
                   >
-                    📎 LLM Engineer · production RAG · MLOps
+                    📎 LLM Engineer · production RAG · observability
                   </button>
                   <button
                     class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
-                    data-sample="Give me an ATS-style summary and recruiter email I can use to introduce Sergiu for a Data Scientist role focused on NLP and experimentation."
+                    data-sample="Give me an ATS-style summary and recruiter email I can use to introduce Sergiu for a Senior AI Engineer role focused on voice AI, agentic workflows, and production RAG."
                   >
-                    📝 ATS summary + recruiter email
+                    📝 ATS summary + recruiter email · voice AI
                   </button>
                 </div>
               </div>
@@ -238,8 +247,8 @@
       <!-- FOOTER -->
       <footer class="border-t border-slate-800 bg-slate-950/90 text-xs text-slate-500 py-4 px-4">
         <div class="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between gap-2">
-          <span>© Sergiu — AI/ML Engineer.</span>
-          <span>Demo: Gemini · FastAPI · Cloud Run.</span>
+          <span>© Sergiu — AI/ML Engineer · Voice AI · Agentic Systems.</span>
+          <span>Stack: Deepgram · Gemini · FastAPI · Cloud Run · OTel.</span>
         </div>
       </footer>
 
@@ -404,9 +413,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Initial welcome
     addAI(
-      "👋 Hi! I’m Sergiu’s AI recruiter agent.<br><br>" +
-        "Tell me the role you’re hiring for (e.g. <b>Senior ML Engineer</b>, <b>LLM Engineer</b>, <b>Data Scientist</b>) " +
-        "or paste a full job description."
+      "Hi! I’m Sergiu’s AI recruiter agent.<br><br>" +
+        "Tell me the role you’re hiring for — or paste a full job description.<br>" +
+        "E.g. <b>Lead AI Engineer</b>, <b>Senior ML Engineer</b>, <b>Voice AI Engineer</b>.<br><br>" +
+        "You can also hit the mic button to speak your requirements directly."
     );
 
     function handleSend(text) {
@@ -523,7 +533,12 @@ document.addEventListener("DOMContentLoaded", function () {
       btn.addEventListener("click", function () {
         if (currentAudio) { currentAudio.pause(); currentAudio = null; }
         if (window.speechSynthesis) window.speechSynthesis.cancel();
+        ttsPlaying = false;  // re-enable mic — pause() never fires onended
         showStopBtns(false);
+        // Tell server to reset is_speaking so the next transcript isn't dropped
+        if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
+          voiceWs.send(JSON.stringify({ type: "barge_in" }));
+        }
       });
     });
 
@@ -552,44 +567,106 @@ document.addEventListener("DOMContentLoaded", function () {
       audioChunks = [];
       const url = URL.createObjectURL(blob);
       currentAudio = new Audio(url);
-      currentAudio.onplay = function () { showStopBtns(true); };
-      currentAudio.onended = function () { showStopBtns(false); URL.revokeObjectURL(url); currentAudio = null; };
-      currentAudio.onerror = function () { showStopBtns(false); URL.revokeObjectURL(url); currentAudio = null; };
-      currentAudio.play().catch(function () {});
+      currentAudio.onplay = function () {
+        ttsPlaying = true;
+        console.log("[voice] TTS playback started — mic muted");
+        showStopBtns(true);
+      };
+      currentAudio.onended = function () {
+        ttsPlaying = false;
+        console.log("[voice] TTS playback ended — mic live");
+        showStopBtns(false);
+        URL.revokeObjectURL(url);
+        currentAudio = null;
+      };
+      currentAudio.onerror = function () {
+        ttsPlaying = false;
+        console.log("[voice] TTS playback error — mic live");
+        showStopBtns(false);
+        URL.revokeObjectURL(url);
+        currentAudio = null;
+      };
+      currentAudio.play().catch(function (e) {
+        console.warn("[voice] TTS play() blocked:", e);
+        ttsPlaying = false;
+      });
     }
 
     // --- Voice session ---
+    // One mic press = start full conversation session.
+    // Speak naturally; Deepgram auto-detects end of each utterance and triggers the agent.
+    // Press mic again to end the session entirely.
+    let ttsPlaying = false;
+    let bargeinChunks = 0;  // consecutive loud chunks during TTS — for auto barge-in
+
     function startVoiceSession(addYou, addAI) {
-      if (isRecording) { stopAudioCapture(); return; }
+      if (isRecording) { stopVoiceSession(); return; }
 
       navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
-        const sid = sessionId || "voice-session";
-        voiceWs = new WebSocket(VOICE_WS_URL + "?session_id=" + encodeURIComponent(sid));
-        voiceWs.binaryType = "arraybuffer";
+        // Create AudioContext first so we read the real sample rate before opening WebSocket.
+        // Browsers often ignore { sampleRate: 16000 } — this way we always tell Deepgram
+        // the true rate so decoding is correct on every session.
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const actualRate = audioContext.sampleRate;
+        console.log("[voice] AudioContext sample_rate:", actualRate);
 
-        voiceWs.onopen = function () {
-          // wait for "ready" before starting recorder
-        };
+        const sid = sessionId || "voice-session";
+        voiceWs = new WebSocket(
+          VOICE_WS_URL + "?session_id=" + encodeURIComponent(sid) + "&sample_rate=" + actualRate
+        );
+        voiceWs.binaryType = "arraybuffer";
 
         voiceWs.onmessage = function (e) {
           if (e.data instanceof ArrayBuffer) {
+            // MP3 bytes from TTS — accumulate until audio_end
             audioChunks.push(new Blob([e.data], { type: "audio/mpeg" }));
             return;
           }
           try {
             const msg = JSON.parse(e.data);
             if (msg.type === "ready") {
-              // Raw PCM linear16 at 16kHz — each chunk is self-contained, no container issues
-              audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+              // Wire ScriptProcessor → send raw PCM to server
               const source = audioContext.createMediaStreamSource(stream);
-              // 4096 samples @ 16kHz = 256ms per chunk
               audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
               source.connect(audioProcessor);
               audioProcessor.connect(audioContext.destination);
               audioProcessor.onaudioprocess = function (ev) {
                 if (!voiceWs || voiceWs.readyState !== WebSocket.OPEN) return;
                 const float32 = ev.inputBuffer.getChannelData(0);
-                const int16 = new Int16Array(float32.length);
+                const int16 = new Int16Array(float32.length); // zeros by default
+
+                if (ttsPlaying) {
+                  // Compute RMS to detect if user is speaking over TTS
+                  let rms = 0;
+                  for (let i = 0; i < float32.length; i++) rms += float32[i] * float32[i];
+                  rms = Math.sqrt(rms / float32.length);
+
+                  if (rms > 0.015) {
+                    bargeinChunks++;
+                  } else {
+                    bargeinChunks = 0;
+                  }
+
+                  if (bargeinChunks >= 1) {
+                    // One loud chunk (~85 ms) = user speaking — auto barge-in immediately
+                    console.log("[voice] auto barge-in rms=" + rms.toFixed(4));
+                    bargeinChunks = 0;
+                    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+                    ttsPlaying = false;
+                    showStopBtns(false);
+                    if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
+                      voiceWs.send(JSON.stringify({ type: "barge_in" }));
+                    }
+                    // Fall through: send this chunk as real audio below
+                  } else {
+                    // Send silence — keeps Deepgram connection alive without transcribing TTS
+                    voiceWs.send(int16.buffer);
+                    return;
+                  }
+                }
+
+                // Real mic audio (either ttsPlaying just ended via barge-in, or normal flow)
+                bargeinChunks = 0;
                 for (let i = 0; i < float32.length; i++) {
                   const s = Math.max(-1, Math.min(1, float32[i]));
                   int16[i] = s < 0 ? s * 32768 : s * 32767;
@@ -613,11 +690,11 @@ document.addEventListener("DOMContentLoaded", function () {
         };
 
         voiceWs.onclose = function (event) {
-          if (event.code && event.code !== 1000) {
+          if (event.code && event.code !== 1000 && event.code !== 1005) {
             const reason = event.reason ? ": " + event.reason : "";
             addAI("Voice connection closed (code " + event.code + ")" + reason);
           }
-          stopVoiceSession();
+          _teardownAudio();
         };
         voiceWs.onerror = function () { addAI("⚠️ Voice connection failed."); stopVoiceSession(); };
       }).catch(function () {
@@ -625,27 +702,23 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
-    function stopVoiceSession() {
-      // Full teardown — called on WS close or error
+    function _teardownAudio() {
       isRecording = false;
+      ttsPlaying = false;
       setMicActive(false);
       if (audioProcessor) { audioProcessor.disconnect(); audioProcessor = null; }
       if (audioContext) { audioContext.close(); audioContext = null; }
       if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-      if (voiceWs) { voiceWs.close(); voiceWs = null; }
+      voiceWs = null;
     }
 
-    function stopAudioCapture() {
-      // Stop mic only — keep WebSocket open so server can send back transcript + reply
-      isRecording = false;
-      setMicActive(false);
-      if (audioProcessor) { audioProcessor.disconnect(); audioProcessor = null; }
-      if (audioContext) { audioContext.close(); audioContext = null; }
-      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-      // Tell server we're done sending audio; it will close the WS after the reply
+    function stopVoiceSession() {
+      // Tell server to stop, then tear down audio
       if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
-        voiceWs.send(JSON.stringify({ type: "input_complete" }));
+        voiceWs.send(JSON.stringify({ type: "stop_session" }));
+        voiceWs.close(1000);
       }
+      _teardownAudio();
     }
 
     function setMicActive(active) {

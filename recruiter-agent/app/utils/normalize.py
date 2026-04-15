@@ -6,9 +6,23 @@ import re
 VALID_CRITERIA = {
     "leadership": ["leadership", "leadershi", "leader", "leading"],
     "communication": ["communication", "comms", "communication skills"],
-    "ownership": ["ownership", "owner", "takes ownership"],
-    "production_rag": ["production rag", "rag", "retrieval", "prod rag"],
+    "ownership": ["ownership", "owner", "takes ownership", "end-to-end", "end to end"],
+    "production_rag": ["production rag", "rag", "retrieval", "prod rag", "embeddings", "ranking", "vector search", "graphrag"],
     "deep_learning": ["deep learning", "transformer", "transformers", "fine-tuning", "fine-tune", "finetuning", "bert", "llm fine-tuning"],
+    "voice_ai": [
+        "voice ai", "voice", "stt", "tts", "speech", "asr",
+        "deepgram", "telephony", "speech-to-text", "text-to-speech",
+        "phone bot", "phonebot", "voicebot", "voice bot", "phone assistant",
+        "elevenlabs", "eleven labs", "whisper", "asr/stt", "audio",
+    ],
+    "observability": [
+        "observability", "langsmith", "langfuse", "otel", "opentelemetry",
+        "tracing", "monitoring", "evaluation", "evals", "llm evaluation",
+    ],
+    "low_latency": [
+        "low latency", "low-latency", "latency", "real-time", "realtime",
+        "streaming", "real time", "sub-200ms", "fast response",
+    ],
 }
 
 def slugify(text: str) -> str:
