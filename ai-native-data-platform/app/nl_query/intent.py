@@ -87,9 +87,26 @@ OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 
 
 def extract_intent(nl_query: str) -> QueryIntent:
+    if PROVIDER == "dspy" and OPENAI_API_KEY:
+        return _extract_dspy(nl_query)
     if PROVIDER == "openai" and OPENAI_API_KEY:
         return _extract_openai(nl_query)
     return _extract_mock(nl_query)
+
+
+def _extract_dspy(nl_query: str) -> QueryIntent:
+    """DSPy-powered extractor.
+
+    Uses the compiled IntentExtractor (few-shot demonstrations discovered by
+    BootstrapFewShot) when app/nl_query/compiled_intent.json exists, otherwise
+    falls back to zero-shot with the typed signature.
+
+    Enable with: LLM_PROVIDER=dspy
+    Compile with: python scripts/optimize_nl_intent.py
+    """
+    from app.nl_query.dspy_intent import get_extractor  # lazy import
+
+    return get_extractor()(nl_query=nl_query)
 
 
 def _extract_openai(nl_query: str) -> QueryIntent:

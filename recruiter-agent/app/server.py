@@ -256,8 +256,8 @@ async def a2a_validate_endpoint(req: A2AValidateRequest) -> Dict[str, Any]:
 # ------------------------------------------------------------------
 
 @app.websocket("/voice")
-async def voice_endpoint(ws: WebSocket, session_id: str = "default"):
-    await voice_handler(ws, session_id)
+async def voice_endpoint(ws: WebSocket, session_id: str = "default", sample_rate: int = 48000):
+    await voice_handler(ws, session_id, sample_rate)
 
 
 @app.websocket("/voice/bench")

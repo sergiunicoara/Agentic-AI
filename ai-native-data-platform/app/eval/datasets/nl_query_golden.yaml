@@ -1,0 +1,142 @@
+# Golden dataset: natural language → expected SQL
+# Used by scripts/optimize_nl_intent.py to drive BootstrapFewShot.
+#
+# Expected SQL uses SQLAlchemy :name placeholders that build_sql produces:
+#   :_workspace_id  — always injected for workspace-scoped tables
+#   :_v0, :_v1 ... — positional filter values
+#
+# Tables with workspace_id column (scoped): document, document_chunk, trace_log
+# Tables without (not scoped):              ingestion_run
+#
+# Run `python scripts/optimize_nl_intent.py` to compile against this dataset.
+
+version: "1.0"
+description: "NL→SQL golden dataset for DSPy BootstrapFewShot optimization"
+
+examples:
+
+  # ── document table ────────────────────────────────────────────────────────
+
+  - nl_query: "How many documents have been ingested?"
+    expected_sql: >-
+      SELECT COUNT(*) FROM document
+      WHERE workspace_id = :_workspace_id LIMIT 100
+
+  - nl_query: "List all documents"
+    expected_sql: >-
+      SELECT id, workspace_id, source_name, external_id, title, text, created_at
+      FROM document
+      WHERE workspace_id = :_workspace_id LIMIT 100
+
+  - nl_query: "Show the 10 most recently ingested documents"
+    expected_sql: >-
+      SELECT id, workspace_id, source_name, external_id, title, text, created_at
+      FROM document
+      WHERE workspace_id = :_workspace_id
+      ORDER BY created_at DESC LIMIT 10
+
+  - nl_query: "List documents uploaded from the upload source"
+    expected_sql: >-
+      SELECT id, workspace_id, source_name, external_id, title, text, created_at
+      FROM document
+      WHERE workspace_id = :_workspace_id AND source_name = :_v0 LIMIT 100
+
+  - nl_query: "Find documents whose title contains 'report'"
+    expected_sql: >-
+      SELECT id, workspace_id, source_name, external_id, title, text, created_at
+      FROM document
+      WHERE workspace_id = :_workspace_id AND title ILIKE :_v0 LIMIT 100
+
+  - nl_query: "How many documents are there per source?"
+    expected_sql: >-
+      SELECT source_name, COUNT(*) FROM document
+      WHERE workspace_id = :_workspace_id
+      GROUP BY source_name LIMIT 100
+
+  # ── document_chunk table ──────────────────────────────────────────────────
+
+  - nl_query: "How many chunks were indexed in total?"
+    expected_sql: >-
+      SELECT COUNT(*) FROM document_chunk
+      WHERE workspace_id = :_workspace_id LIMIT 100
+
+  - nl_query: "Show the chunk count per document"
+    expected_sql: >-
+      SELECT document_id, COUNT(*) FROM document_chunk
+      WHERE workspace_id = :_workspace_id
+      GROUP BY document_id LIMIT 100
+
+  - nl_query: "List chunks for embedding version v2"
+    expected_sql: >-
+      SELECT id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding_version, created_at
+      FROM document_chunk
+      WHERE workspace_id = :_workspace_id AND embedding_version = :_v0 LIMIT 100
+
+  - nl_query: "Show the 20 most recent document chunks"
+    expected_sql: >-
+      SELECT id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding_version, created_at
+      FROM document_chunk
+      WHERE workspace_id = :_workspace_id
+      ORDER BY created_at DESC LIMIT 20
+
+  # ── ingestion_run table (not workspace-scoped) ────────────────────────────
+
+  - nl_query: "Show all failed ingestion runs"
+    expected_sql: >-
+      SELECT id, document_id, status, embedding_version, error, created_at, finished_at
+      FROM ingestion_run
+      WHERE status = :_v0 LIMIT 100
+
+  - nl_query: "How many ingestion runs are there per status?"
+    expected_sql: >-
+      SELECT status, COUNT(*) FROM ingestion_run
+      GROUP BY status LIMIT 100
+
+  - nl_query: "Show the most recent ingestion run with an error"
+    expected_sql: >-
+      SELECT id, document_id, status, embedding_version, error, created_at, finished_at
+      FROM ingestion_run
+      WHERE error IS NOT NULL
+      ORDER BY created_at DESC LIMIT 1
+
+  - nl_query: "How many ingestion runs completed successfully?"
+    expected_sql: >-
+      SELECT COUNT(*) FROM ingestion_run
+      WHERE status = :_v0 LIMIT 100
+
+  # ── trace_log table ───────────────────────────────────────────────────────
+
+  - nl_query: "What is the average latency across all traces?"
+    expected_sql: >-
+      SELECT AVG(latency_ms) FROM trace_log
+      WHERE workspace_id = :_workspace_id LIMIT 100
+
+  - nl_query: "Show the 5 slowest traces"
+    expected_sql: >-
+      SELECT id, trace_type, workspace_id, latency_ms, created_at
+      FROM trace_log
+      WHERE workspace_id = :_workspace_id
+      ORDER BY latency_ms DESC LIMIT 5
+
+  - nl_query: "What is the average latency per trace type?"
+    expected_sql: >-
+      SELECT trace_type, AVG(latency_ms) FROM trace_log
+      WHERE workspace_id = :_workspace_id
+      GROUP BY trace_type LIMIT 100
+
+  - nl_query: "Count traces with latency above 1000 milliseconds"
+    expected_sql: >-
+      SELECT COUNT(*) FROM trace_log
+      WHERE workspace_id = :_workspace_id AND latency_ms > :_v0 LIMIT 100
+
+  - nl_query: "What is the maximum latency recorded?"
+    expected_sql: >-
+      SELECT MAX(latency_ms) FROM trace_log
+      WHERE workspace_id = :_workspace_id LIMIT 100
+
+  - nl_query: "Show all generation traces from the last 100 records"
+    expected_sql: >-
+      SELECT id, trace_type, workspace_id, latency_ms, created_at
+      FROM trace_log
+      WHERE workspace_id = :_workspace_id AND trace_type = :_v0
+      ORDER BY created_at DESC LIMIT 100

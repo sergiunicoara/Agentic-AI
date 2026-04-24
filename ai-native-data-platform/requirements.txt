@@ -26,3 +26,6 @@ pdf2image               # PDF page → image conversion (requires poppler system
 # Evaluation
 ragas                   # RAGAS metrics: faithfulness, answer_relevancy, context_precision, context_recall
 datasets                # required by ragas
+
+# NL→SQL prompt optimization
+dspy-ai                 # BootstrapFewShot optimizer for intent extractor (run scripts/optimize_nl_intent.py)

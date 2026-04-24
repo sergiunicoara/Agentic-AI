@@ -6,16 +6,16 @@ from pydantic import BaseModel, Field
 
 
 class TranscriptIn(BaseModel):
-    workspace_id: str = Field(min_length=2)
-    source: str = "upload"
-    external_id: str | None = None
-    title: str = Field(min_length=3)
-    text: str = Field(min_length=40)
+    workspace_id: str = Field(min_length=2, max_length=128)
+    source: str = Field(default="upload", max_length=256)
+    external_id: str | None = Field(default=None, max_length=512)
+    title: str = Field(min_length=3, max_length=500)
+    text: str = Field(min_length=40, max_length=500_000)
 
 
 class AskIn(BaseModel):
-    workspace_id: str
-    query: str = Field(min_length=5)
+    workspace_id: str = Field(min_length=2, max_length=128)
+    query: str = Field(min_length=5, max_length=2_000)
     top_k: int = Field(default=10, ge=1, le=50)
 
 
@@ -52,8 +52,8 @@ class GenOut(BaseModel):
 
 
 class NLQueryIn(BaseModel):
-    workspace_id: str
-    query: str = Field(min_length=5)
+    workspace_id: str = Field(min_length=2, max_length=128)
+    query: str = Field(min_length=5, max_length=500)
 
 
 class NLQueryOut(BaseModel):

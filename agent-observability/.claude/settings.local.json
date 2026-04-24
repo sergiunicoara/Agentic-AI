@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install pdfplumber reportlab pypdf)",
+      "Bash(python3 -m pip install pdfplumber reportlab pypdf)",
+      "Bash(py --version)",
+      "Bash(py -m pip install pdfplumber reportlab pypdf)",
+      "Bash(py -c \":*)",
+      "Bash(py \"C:/Users/Sergiu/Desktop/update_cv.py\")",
+      "Bash(py \"C:/Users/Sergiu/Desktop/update_cv_v2.py\")",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\CV Sergiu Nicoara17022026.docx\" unpacked_cv/)",
+      "Bash(python3 scripts/office/unpack.py \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\CV Sergiu Nicoara17022026.docx\" unpacked_cv/)",
+      "Bash(py scripts/office/unpack.py \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\CV Sergiu Nicoara17022026.docx\" unpacked_cv/)",
+      "Bash(py edit_cv.py)"
+    ]
+  }
+}

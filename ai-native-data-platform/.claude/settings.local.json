@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Sergiu/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/530431a5-76c3-4034-8f08-be3759ca73b1/ff00199f-0c93-4bb1-825c-a53eca483061/skills/docx/**)",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\CV Sergiu Nicoara17022026.docx\" unpacked/)",
+      "Bash(python3 scripts/office/unpack.py \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\CV Sergiu Nicoara17022026.docx\" unpacked/)",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "Read(//usr/**)",
+      "Bash(cmd.exe /c \"where python\")",
+      "Bash(cmd.exe /c \"where py\")",
+      "Bash(cmd.exe /c \"py --version\")",
+      "Bash(cmd.exe /c \"C:\\\\Users\\\\Sergiu\\\\AppData\\\\Local\\\\cursor-agent\\\\python.exe --version\")",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\Sergiu\\\\AppData\\\\Local\\\\cursor-agent\" \")",
+      "Bash(unzip -o \"C:/Users/Sergiu/Desktop/CV Sergiu Nicoara17022026.docx\" -d /tmp/cv_unpacked/)",
+      "Bash(pandoc 'C:/Users/Sergiu/Desktop/CV Sergiu Nicoara17022026.docx' -t plain)",
+      "Bash(xmllint --format /tmp/cv_unpacked/word/document.xml)",
+      "Bash(node -e \":*)",
+      "Bash(grep -v '^$')",
+      "Bash(unzip -o \"C:/Users/Sergiu/Desktop/CV Sergiu Nicoara17022026.docx\" word/document.xml -d \"C:/Users/Sergiu/AppData/Local/Temp/cv_edit/\")",
+      "Bash(unzip -o \"C:/Users/Sergiu/Desktop/CV Sergiu Nicoara17022026.docx\" -d \"C:/Users/Sergiu/AppData/Local/Temp/cv_edit/\")",
+      "Read(//c/Users/Sergiu/AppData/Local/Temp/cv_edit/**)",
+      "Bash(zip -r \"C:/Users/Sergiu/Desktop/CV Sergiu Nicoara19032026.docx\" .)",
+      "Bash(powershell -Command \":*)",
+      "Bash(python3 -c \"from app.data.db import write_session_scope; import inspect; print\\(inspect.getsourcefile\\(write_session_scope\\)\\)\")",
+      "Bash(find \"C:/Users/Sergiu/Desktop/Projects/Agentic-AI/ai-native-data-platform\" -type f -name \"*.py\" -exec grep -l \"Mount\\\\|StaticFiles\\\\|render_template\" {} \\\\;)"
+    ]
+  }
+}

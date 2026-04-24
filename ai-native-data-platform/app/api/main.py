@@ -36,6 +36,8 @@ from app.schemas import AskIn, AskOut, Citation, ImageIngestOut, NLQueryIn, NLQu
 from app.nl_query.service import NLQueryError, run_nl_query
 from app.ingestion.pipeline import enqueue, start_worker
 from app.ingestion.multimodal import enqueue_images, pdf_to_images, start_multimodal_worker
+from app.core.safety.prompt_guard import check_query
+from app.core.safety.output_moderation import moderate_output
 
 
 configure_logging()
@@ -164,6 +166,12 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
 
     t0 = time.time()
 
+    # Prompt injection guard — scan the query before it reaches any LLM prompt.
+    guard = check_query(payload.query)
+    if not guard.safe:
+        emit_event("prompt_injection_blocked", {"workspace_id": workspace_id, "reason": guard.reason})
+        raise HTTPException(400, f"Query rejected: {guard.reason}")
+
     # A/B retrieval experiment routing.
     # - X-Experiment allows explicit selection (debugging/analysis)
     # - otherwise stable percentage rollout chooses treatment
@@ -250,6 +258,18 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
                 answer = "I don’t know based on the provided context."
                 citations = []
                 unknown = True
+
+        if not unknown:
+            # Output moderation — PII redaction + toxicity gate.
+            moderation = moderate_output(answer)
+            if not moderation.safe:
+                emit_event("output_moderation_blocked", {"workspace_id": workspace_id, "flags": moderation.flags})
+                answer = "I don’t know based on the provided context."
+                citations = []
+                unknown = True
+            elif moderation.redacted is not None:
+                emit_event("output_pii_redacted", {"workspace_id": workspace_id, "flags": moderation.flags})
+                answer = moderation.redacted
 
     latency_ms = int((time.time() - t0) * 1000)
 
