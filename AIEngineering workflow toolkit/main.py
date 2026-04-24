@@ -224,5 +224,35 @@ def queue(clear):
         click.echo("[AIWT] Queue cleared.")
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# ui
+# ──────────────────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind host.")
+@click.option("--port", default=8000, show_default=True, type=int, help="Bind port.")
+@click.option("--reload", is_flag=True, default=False, help="Enable auto-reload (dev mode).")
+def ui(host, port, reload):
+    """Start the web UI server (FastAPI + React)."""
+    try:
+        import uvicorn
+    except ImportError:
+        click.echo("uvicorn is not installed. Run: uv pip install 'ai-engineering-workflow-toolkit[ui]'", err=True)
+        sys.exit(1)
+
+    ui_dist = _REPO_ROOT / "ui" / "dist"
+    if not ui_dist.exists():
+        click.echo(
+            "React UI not built yet. Run:\n"
+            "  cd ui && npm install && npm run build",
+            err=True,
+        )
+        click.echo("Starting API-only mode (no frontend).")
+
+    click.echo(f"[AIWT] Web UI → http://{host}:{port}")
+    click.echo(f"[AIWT] API docs → http://{host}:{port}/api/docs\n")
+    uvicorn.run("api.app:app", host=host, port=port, reload=reload)
+
+
 if __name__ == "__main__":
     cli()

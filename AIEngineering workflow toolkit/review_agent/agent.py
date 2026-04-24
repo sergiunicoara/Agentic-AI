@@ -14,6 +14,7 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import Callable, Awaitable
 
 import anthropic
 
@@ -22,6 +23,8 @@ from observability.tracer import get_tracer
 _MODEL = os.getenv("REVIEW_MODEL", "claude-opus-4-6")
 
 tracer = get_tracer("review_agent")
+
+ProgressCallback = Callable[[dict], Awaitable[None]]
 
 _DISPOSITION_SCHEMA = {
     "name": "review_disposition",
@@ -105,12 +108,24 @@ class ReviewAgent:
     def __init__(self):
         self.client = anthropic.Anthropic()
 
-    async def review(self, orchestrator_output: dict) -> dict:
+    async def review(
+        self,
+        orchestrator_output: dict,
+        on_progress: ProgressCallback | None = None,
+    ) -> dict:
         """
         Produce the final ReviewDisposition from the orchestrator's merged output.
         """
         with tracer.start_as_current_span("review_agent.review") as span:
             start = time.monotonic()
+
+            if on_progress:
+                await on_progress({
+                    "type": "layer_start",
+                    "layer": 4,
+                    "name": "Review Agent",
+                    "detail": "Validating traceability and producing final disposition...",
+                })
 
             diff = orchestrator_output.get("diff", "")
             tool_output = orchestrator_output.get("tool_output", {})
@@ -153,18 +168,47 @@ class ReviewAgent:
                         "review.suppressed_count", disposition.get("suppressed_count", 0)
                     )
 
+                    if on_progress:
+                        await on_progress({
+                            "type": "verdict",
+                            "verdict": disposition.get("verdict"),
+                            "finding_count": len(disposition.get("findings", [])),
+                            "suppressed_count": disposition.get("suppressed_count", 0),
+                        })
+                        await on_progress({
+                            "type": "layer_complete",
+                            "layer": 4,
+                            "name": "Review Agent",
+                            "detail": f"Review complete · verdict: {disposition.get('verdict')}",
+                        })
+
                     # Log suppressed findings to regression log
                     if disposition.get("suppressed_count", 0) > 0:
                         self._log_suppressed(disposition, orchestrator_output)
 
                     return disposition
 
-            return {
+            # Fallback
+            fallback = {
                 "verdict": "comment",
                 "findings": [],
                 "suppressed_count": 0,
                 "summary": "Review agent produced no output.",
             }
+            if on_progress:
+                await on_progress({
+                    "type": "verdict",
+                    "verdict": "comment",
+                    "finding_count": 0,
+                    "suppressed_count": 0,
+                })
+                await on_progress({
+                    "type": "layer_complete",
+                    "layer": 4,
+                    "name": "Review Agent",
+                    "detail": "Review complete",
+                })
+            return fallback
 
     def _build_user_message(
         self, diff: str, tool_output: dict, subagent_verdicts: dict

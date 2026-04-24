@@ -40,6 +40,12 @@ judgement occurs.
 └──────────────────────────┬──────────────────────────────────────────┘
                            │ regression failures
                            └──► revise skills/hooks in Layer 1
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  WEB UI — Commercial Interface                                       │
+│  React + FastAPI · Live pipeline animation · WebSocket progress      │
+│  Dashboard · Review history · Domain-filtered findings              │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -61,7 +67,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OTEL_EXPORTER_ENDPOINT=localhost:4317  # optional, defaults to console
 ```
 
-### 3. Review a diff
+### 3. Review a diff (CLI)
 
 ```bash
 # Review current git staged diff
@@ -74,13 +80,36 @@ python main.py review --diff path/to/changes.patch
 python main.py review --file src/my_module.py
 ```
 
-### 4. Run evaluation harness
+### 4. Start the Web UI
+
+```bash
+# Install web server dependencies
+pip install -e ".[ui]"
+
+# Build the React frontend (first time only)
+cd ui && npm install && npm run build && cd ..
+
+# Start the server
+python main.py ui
+# → http://localhost:8000
+# → API docs: http://localhost:8000/api/docs
+```
+
+The web UI provides:
+- **Dashboard** — review history, approve-rate stats, latest eval regression score
+- **New Review** — paste any git diff, watch the pipeline animate live via WebSocket
+- **Review Detail** — verdict banner, domain-filtered findings with evidence and suggestions
+
+### 5. Run evaluation harness
 
 ```bash
 python main.py eval
+
+# Single case with verbose scores
+python main.py eval --case GC-001 --verbose
 ```
 
-### 5. Start MCP server (for Claude Code integration)
+### 6. Start MCP server (for Claude Code integration)
 
 ```bash
 python main.py serve
@@ -106,7 +135,8 @@ python main.py serve
 
 Single responsibility: coordination. Loads skills, invokes the MCP server for deterministic
 tool output, then passes that output to the three subagents in parallel. Merges all outputs
-into a single consolidated input for the review agent.
+into a single consolidated input for the review agent. Accepts an optional `on_progress`
+callback that drives real-time WebSocket event streaming to the web UI.
 
 Model: `claude-opus-4-6`
 
@@ -153,6 +183,26 @@ and scores each output with an LLM-as-judge prompt. Results are appended to
 
 **Regression threshold**: 4.0/5.0 average score across all golden cases.
 
+**Scoring dimensions**:
+- **Traceability** (0–5): every finding cites tool output or a diff line verbatim
+- **Accuracy** (0–5): correct issues caught, zero hallucinations
+- **Actionability** (0–5): findings are specific, line-referenced, and directly fixable
+
+### Web UI
+
+FastAPI backend + React (Vite + Tailwind, dark theme) frontend. Thin transport layer over
+the existing pipeline — no business logic lives here.
+
+| Component | Purpose |
+|-----------|---------|
+| `api/app.py` | FastAPI app, REST endpoints, WebSocket progress bus |
+| `api/database.py` | SQLite review history and aggregate stats |
+| `ui/src/pages/Dashboard.tsx` | Stats cards, eval score bar, review history table |
+| `ui/src/pages/NewReview.tsx` | Diff submission form with example loader |
+| `ui/src/pages/ReviewDetail.tsx` | Live pipeline animation + verdict + findings |
+| `ui/src/components/PipelineViz.tsx` | Layer-by-layer progress with tool/subagent badges |
+| `ui/src/components/FindingCard.tsx` | Collapsible finding card with evidence display |
+
 ---
 
 ## File Structure
@@ -160,12 +210,13 @@ and scores each output with an LLM-as-judge prompt. Results are appended to
 ```
 AIEngineering workflow toolkit/
 ├── AGENTS.md                    # Layer 1: Agent operating constraints
+├── RECORDING_SCRIPT.md          # Screen-share walkthrough script (25 min)
 ├── README.md
 ├── pyproject.toml
-├── main.py                      # CLI entry point
+├── main.py                      # CLI: review / eval / serve / ui
 │
 ├── .claude/
-│   ├── settings.json            # Hook configuration
+│   ├── settings.json
 │   └── hooks/
 │       ├── pre_tool_use.py      # Pre-commit hook
 │       └── post_tool_use.py     # Post-file-write hook
@@ -196,11 +247,33 @@ AIEngineering workflow toolkit/
 ├── observability/               # Layer 5
 │   └── tracer.py
 │
-└── eval/                        # Layer 5
-    ├── harness.py
-    ├── judge.py
-    ├── golden_dataset.json
-    └── regression_log.jsonl     # auto-generated
+├── eval/                        # Layer 5
+│   ├── harness.py
+│   ├── judge.py
+│   ├── golden_dataset.json
+│   └── regression_log.jsonl     # auto-generated
+│
+├── api/                         # Web UI — backend
+│   ├── app.py                   # FastAPI + WebSocket server
+│   └── database.py              # SQLite persistence
+│
+└── ui/                          # Web UI — frontend
+    ├── package.json
+    ├── vite.config.ts
+    ├── tailwind.config.js
+    ├── src/
+    │   ├── App.tsx
+    │   ├── types.ts
+    │   ├── api/client.ts
+    │   ├── pages/
+    │   │   ├── Dashboard.tsx
+    │   │   ├── NewReview.tsx
+    │   │   └── ReviewDetail.tsx
+    │   └── components/
+    │       ├── Sidebar.tsx
+    │       ├── PipelineViz.tsx
+    │       └── FindingCard.tsx
+    └── dist/                    # Built assets (after npm run build)
 ```
 
 ---
@@ -221,5 +294,11 @@ reviewers (security, architecture, style) each required to interpret determinist
 before forming a verdict; an independent review agent that merges findings, validates
 traceability, and produces a structured disposition with line-level annotations; and an
 LLM-as-judge evaluation harness with a golden dataset and regression logging that closes the
-feedback loop on every skill or prompt revision. All agent spans are instrumented with
-OpenTelemetry and integrated with the Agent Observability Dashboard for live trace visibility.
+feedback loop on every skill or prompt revision.
+
+A React + FastAPI web interface surfaces the pipeline commercially: real-time WebSocket
+progress animation through each pipeline layer, verdict banner, domain-filtered findings with
+collapsible evidence and suggestions, historical review dashboard, and live eval score tracking.
+
+All agent spans are instrumented with OpenTelemetry and integrated with the Agent Observability
+Dashboard for live trace visibility.
