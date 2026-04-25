@@ -10,6 +10,7 @@ Usage:
     python main.py eval
     python main.py eval --case GC-001
     python main.py eval --verbose
+    python main.py eval --compare          # show delta vs previous run
 """
 import asyncio
 import json
@@ -24,24 +25,50 @@ _GOLDEN_DATASET = _REPO_ROOT / "eval" / "golden_dataset.json"
 _REGRESSION_LOG = _REPO_ROOT / "eval" / "regression_log.jsonl"
 _REGRESSION_THRESHOLD = 4.0
 
+# ANSI colours
+_GREEN  = "\033[92m"
+_RED    = "\033[91m"
+_YELLOW = "\033[93m"
+_CYAN   = "\033[96m"
+_BOLD   = "\033[1m"
+_DIM    = "\033[2m"
+_RESET  = "\033[0m"
+
+
+def _load_eval_log() -> list[dict]:
+    if not _REGRESSION_LOG.exists():
+        return []
+    entries = []
+    for line in _REGRESSION_LOG.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and '"cases_run"' in line:
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+    return entries
+
+
+def _delta_str(current: float, previous: float | None) -> str:
+    if previous is None:
+        return ""
+    d = current - previous
+    if abs(d) < 0.05:
+        return f"  {_DIM}(±0.0){_RESET}"
+    arrow = "↑" if d > 0 else "↓"
+    colour = _GREEN if d > 0 else _RED
+    return f"  {colour}({d:+.1f} {arrow}){_RESET}"
+
 
 async def run_harness(
     case_id: str | None = None,
     verbose: bool = False,
+    compare: bool = False,
 ) -> dict:
     """
     Run the evaluation harness.
 
-    Returns:
-    {
-        "run_id": str,
-        "timestamp": str,
-        "cases_run": int,
-        "cases_passed": int,
-        "avg_composite": float,
-        "passed_threshold": bool,
-        "results": [...]
-    }
+    Returns summary dict with run_id, avg_composite, passed_threshold, results, etc.
     """
     from orchestrator.agent import OrchestratorAgent
     from review_agent.agent import ReviewAgent
@@ -54,25 +81,41 @@ async def run_harness(
         if not golden_cases:
             raise ValueError(f"Case {case_id!r} not found in golden dataset.")
 
-    run_id = f"eval-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
-    results = []
-    total_composite = 0.0
+    # Load previous run for comparison
+    prev_run: dict | None = None
+    prev_by_case: dict[str, float] = {}
+    if compare:
+        history = _load_eval_log()
+        if history:
+            prev_run = history[-1]
+            for pc in prev_run.get("per_case", []):
+                prev_by_case[pc["case_id"]] = pc.get("composite_score", 0.0)
 
-    print(f"\n{'='*60}")
-    print(f"  AI Engineering Workflow Toolkit — Evaluation Harness")
-    print(f"  Run ID: {run_id}")
+    run_id = f"eval-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+
+    compare_header = ""
+    if compare and prev_run:
+        prev_avg = prev_run.get("avg_composite", 0.0)
+        compare_header = (
+            f"  Comparing vs: {_DIM}{prev_run['run_id']}{_RESET}  "
+            f"(prev avg: {prev_avg:.2f}/5.0)"
+        )
+
+    print(f"\n{'='*62}")
+    print(f"  {_BOLD}AI Engineering Workflow Toolkit — Evaluation Harness{_RESET}")
+    print(f"  Run ID: {_DIM}{run_id}{_RESET}")
     print(f"  Cases:  {len(golden_cases)}")
-    print(f"{'='*60}\n")
+    if compare_header:
+        print(compare_header)
+    print(f"{'='*62}\n")
 
     orchestrator = OrchestratorAgent()
     reviewer = ReviewAgent()
 
-    # Semaphore limits concurrent pipeline executions to avoid API rate limits
     _CONCURRENCY = int(os.getenv("AIWT_EVAL_CONCURRENCY", "5"))
     sem = asyncio.Semaphore(_CONCURRENCY)
     print_lock = asyncio.Lock()
 
-    # results[idx] is filled by each task; None until complete
     case_results: list[dict | None] = [None] * len(golden_cases)
 
     async def _run_case(idx: int, case: dict) -> None:
@@ -93,6 +136,7 @@ async def run_harness(
 
                 elapsed = time.monotonic() - case_start
                 composite = score.get("composite", 0.0)
+
                 result = {
                     "case_id": case["id"],
                     "description": case["description"],
@@ -110,9 +154,19 @@ async def run_harness(
                     "run_id": run_id,
                 }
 
-                status = "PASS" if composite >= _REGRESSION_THRESHOLD else "FAIL"
-                verdict_flag = "[+]" if verdict_correct else "[!]"
-                lines = [f"  [{case['id']}] {case['description']}... {status} ({composite:.1f}/5.0) verdict {verdict_flag}"]
+                passed = composite >= _REGRESSION_THRESHOLD
+                status_str = f"{_GREEN}PASS{_RESET}" if passed else f"{_RED}FAIL{_RESET}"
+                verdict_flag = f"{_GREEN}[+]{_RESET}" if verdict_correct else f"{_RED}[!]{_RESET}"
+                score_str = f"{composite:.1f}/5.0"
+
+                delta = _delta_str(composite, prev_by_case.get(case["id"]))
+
+                lines = [
+                    f"  [{_CYAN}{case['id']}{_RESET}] "
+                    f"{case['description'][:45]:<45} "
+                    f"{status_str} ({score_str}) verdict {verdict_flag}"
+                    f"{delta}"
+                ]
                 if verbose:
                     lines.append(
                         f"     Traceability: {score.get('traceability'):.1f}  "
@@ -120,9 +174,9 @@ async def run_harness(
                         f"Actionability: {score.get('actionability'):.1f}"
                     )
                     if score.get("missed_findings"):
-                        lines.append(f"     Missed: {score['missed_findings']}")
+                        lines.append(f"     {_YELLOW}Missed:{_RESET}       {score['missed_findings']}")
                     if score.get("hallucinated_findings"):
-                        lines.append(f"     Hallucinated: {score['hallucinated_findings']}")
+                        lines.append(f"     {_RED}Hallucinated:{_RESET}  {score['hallucinated_findings']}")
 
             except Exception as e:
                 elapsed = time.monotonic() - case_start
@@ -134,21 +188,16 @@ async def run_harness(
                     "elapsed_ms": int(elapsed * 1000),
                     "run_id": run_id,
                 }
-                lines = [f"  [{case['id']}] {case['description']}... ERROR ({e})"]
+                lines = [f"  [{case['id']}] {case['description']}... {_RED}ERROR{_RESET} ({e})"]
 
             case_results[idx] = result
-            # Print immediately as each case finishes so the terminal isn't silent
             async with print_lock:
                 print("\n".join(lines), flush=True)
 
-    # Launch all cases concurrently (bounded by semaphore)
     await asyncio.gather(*[_run_case(i, c) for i, c in enumerate(golden_cases)])
 
-    # Accumulate totals in original case order
-    for result in case_results:
-        results.append(result)
-        total_composite += result.get("composite_score", 0.0)
-
+    results = [r for r in case_results if r is not None]
+    total_composite = sum(r.get("composite_score", 0.0) for r in results)
     avg_composite = total_composite / len(results) if results else 0.0
     passed_threshold = avg_composite >= _REGRESSION_THRESHOLD
     cases_passed = sum(1 for r in results if r.get("composite_score", 0) >= _REGRESSION_THRESHOLD)
@@ -164,20 +213,28 @@ async def run_harness(
         "results": results,
     }
 
-    # Append to regression log
     _append_regression_log(summary)
 
-    print(f"\n{'='*60}")
-    print(f"  Results: {cases_passed}/{len(results)} passed")
-    print(f"  Average composite score: {avg_composite:.2f}/5.0")
-    status = "PASSED" if passed_threshold else "FAILED"
-    print(f"  Threshold ({_REGRESSION_THRESHOLD}/5.0): {status}")
-    print(f"  Logged to: {_REGRESSION_LOG}")
-    print(f"{'='*60}\n")
+    # ── Summary banner ─────────────────────────────────────────────────────────
+    avg_delta = ""
+    if compare and prev_run:
+        avg_delta = _delta_str(avg_composite, prev_run.get("avg_composite"))
+
+    threshold_colour = _GREEN if passed_threshold else _RED
+    status_word = f"{threshold_colour}{'PASSED' if passed_threshold else 'FAILED'}{_RESET}"
+
+    print(f"\n{'='*62}")
+    print(f"  Results:  {cases_passed}/{len(results)} passed")
+    print(f"  Avg score: {_BOLD}{avg_composite:.2f}/5.0{_RESET}{avg_delta}")
+    print(f"  Threshold ({_REGRESSION_THRESHOLD}/5.0): {status_word}")
+    print(f"  Logged → {_DIM}{_REGRESSION_LOG}{_RESET}")
+    print(f"{'='*62}\n")
 
     if not passed_threshold:
-        print("  [!] Regression threshold not met. Review failed cases and")
-        print("      revise skills/prompts in Layer 1 before deployment.\n")
+        print(
+            f"  {_RED}[!]{_RESET} Regression threshold not met. Review failed cases and\n"
+            f"      revise skills/prompts in Layer 1 before deployment.\n"
+        )
 
     return summary
 

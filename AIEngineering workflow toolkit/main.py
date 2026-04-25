@@ -153,10 +153,12 @@ def _print_disposition(disposition: dict) -> None:
 @cli.command()
 @click.option("--case", default=None, help="Run a single case by ID (e.g. GC-001).")
 @click.option("--verbose", is_flag=True, default=False, help="Show per-dimension scores.")
-def eval(case, verbose):
+@click.option("--compare", is_flag=True, default=False,
+              help="Show score delta (↑/↓) vs the previous eval run.")
+def eval(case, verbose, compare):
     """Run the LLM-as-judge evaluation harness against the golden dataset."""
     from eval.harness import run_harness
-    summary = asyncio.run(run_harness(case_id=case, verbose=verbose))
+    summary = asyncio.run(run_harness(case_id=case, verbose=verbose, compare=compare))
     if not summary["passed_threshold"]:
         sys.exit(1)
 

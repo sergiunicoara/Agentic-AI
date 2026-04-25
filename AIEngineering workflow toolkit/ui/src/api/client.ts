@@ -1,12 +1,22 @@
-import type { ReviewSummary, ReviewDetail, Stats, EvalResult, ProgressEvent } from '../types'
+import type {
+  ReviewSummary,
+  ReviewDetail,
+  Stats,
+  EvalResult,
+  ProgressEvent,
+} from '../types'
 
-const BASE = ''  // same origin
+const BASE = ''
 
-export async function submitReview(diff: string, title: string): Promise<{ id: string; title: string }> {
+export async function submitReview(
+  diff: string,
+  title: string,
+  source: 'manual' | 'hook' = 'manual',
+): Promise<{ id: string; title: string; source: string }> {
   const res = await fetch(`${BASE}/api/reviews`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ diff, title }),
+    body: JSON.stringify({ diff, title, source }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
@@ -36,6 +46,12 @@ export async function fetchStats(): Promise<Stats> {
 export async function fetchEvalLatest(): Promise<EvalResult | null> {
   const res = await fetch(`${BASE}/api/eval/latest`)
   if (!res.ok) return null
+  return res.json()
+}
+
+export async function fetchEvalHistory(n = 8): Promise<EvalResult[]> {
+  const res = await fetch(`${BASE}/api/eval/history?n=${n}`)
+  if (!res.ok) return []
   return res.json()
 }
 

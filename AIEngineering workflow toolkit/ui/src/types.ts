@@ -2,6 +2,7 @@ export type Severity = 'error' | 'warning' | 'info'
 export type Domain = 'security' | 'architecture' | 'style' | 'tool'
 export type Verdict = 'approve' | 'request_changes' | 'comment'
 export type ReviewStatus = 'running' | 'complete' | 'error'
+export type ReviewSource = 'manual' | 'hook'
 export type LayerStatus = 'idle' | 'running' | 'complete'
 
 export interface Finding {
@@ -27,9 +28,11 @@ export interface ReviewSummary {
   id: string
   title: string
   status: ReviewStatus
+  source: ReviewSource
   verdict: Verdict | null
   finding_count: number
   suppressed_count: number
+  elapsed_ms: number
   created_at: string
 }
 
@@ -37,9 +40,11 @@ export interface ReviewDetail {
   id: string
   title: string
   status: ReviewStatus
+  source: ReviewSource
   diff: string
   result: ReviewDisposition | null
   error: string | null
+  elapsed_ms: number
   created_at: string
 }
 
@@ -49,6 +54,8 @@ export interface Stats {
   comment: number
   request_changes: number
   total_findings: number
+  total_elapsed_ms: number
+  estimated_minutes_saved: number
 }
 
 export interface EvalResult {
@@ -68,7 +75,7 @@ export type ProgressEvent =
   | { type: 'tool_result'; tool: string; tool_label: string; finding_count: number }
   | { type: 'subagent_complete'; domain: string; finding_count: number }
   | { type: 'verdict'; verdict: Verdict; finding_count: number; suppressed_count: number }
-  | { type: 'complete'; review_id: string; verdict: Verdict }
+  | { type: 'complete'; review_id: string; verdict: Verdict; elapsed_ms?: number }
   | { type: 'error'; message: string }
   | { type: 'ping' }
 
@@ -86,8 +93,8 @@ export interface SubagentResult {
 export interface LayerState {
   status: LayerStatus
   detail: string
-  toolResults: Record<string, ToolResult>   // key: tool id
-  subagentResults: Record<string, SubagentResult>  // key: domain
+  toolResults: Record<string, ToolResult>
+  subagentResults: Record<string, SubagentResult>
 }
 
 export type PipelineState = Record<string, LayerState>

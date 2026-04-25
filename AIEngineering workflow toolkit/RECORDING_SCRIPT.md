@@ -253,6 +253,97 @@ Claude Code (open terminal in VS Code), `.claude/hooks/`, `skills/v1/`, `AGENTS.
 
 ---
 
+---
+
+## BREAKTHROUGH MOMENT 1 — Live hook firing
+**Insert at: end of Section 3 (Implementation), right after the demo**
+**Time: ~16:30 | Duration: ~1 min**
+
+### What to show
+Have VS Code open to any Python file in the project (e.g. `mcp_server/server.py`).
+The AIWT server must be running (`python main.py ui`).
+
+### What to say
+
+> "One more thing I want to show you — the hooks layer. Watch what happens when Claude Code writes a file."
+
+**→ In VS Code, use Claude Code to make a one-line change to `mcp_server/server.py` and save it.**
+
+> "The `post_tool_use.py` hook fires automatically. It generates a diff, detects the server is running, and POSTs it directly to the API."
+
+**→ Switch to browser, hit refresh on Dashboard — the new review appears with an `AUTO` badge.**
+
+> "The pipeline is now reviewing its own changes. The system governs itself. I didn't click anything — the commit trigger fired the hook, the hook hit the API, and the pipeline is running."
+
+**→ Click the AUTO review to show it animating.**
+
+---
+
+## BREAKTHROUGH MOMENT 2 — Eval degradation demo
+**Insert at: Section 4 (Testing & Quality), after first eval run**
+**Time: ~19:00 | Duration: ~2 min**
+
+### What to show
+Terminal + `skills/v1/security_review.md` open in VS Code.
+
+### What to say
+
+> "Now let me show you what model lifecycle management actually looks like in practice — not as a concept."
+
+**→ Open `skills/v1/security_review.md`, delete one paragraph (e.g. the section on hardcoded secrets). Save.**
+
+> "I've just degraded the security skill. Let me run the eval with `--compare` to see the impact."
+
+```bash
+python main.py eval --compare
+```
+
+**→ Wait for results. Point at the red delta arrows.**
+
+> "You can see specific cases that regressed — the delta arrows show exactly where accuracy dropped. That's the eval catching a skill change before it ships."
+
+**→ Revert the skill file change. Run eval --compare again.**
+
+> "Reverted. Scores recover. This is the full model lifecycle loop: change a skill, measure the impact, ship or revert. No guessing."
+
+---
+
+## BREAKTHROUGH MOMENT 3 — Time saved panel
+**Insert at: Section 2 (Architecture) or closing**
+**Time: ~6:30 or 27:30 | Duration: 30 sec**
+
+### What to show
+Browser → Dashboard, point at the "Est. Time Saved" stat card.
+
+### What to say
+
+> "The dashboard tracks estimated time saved. Assuming a 20-minute manual review, every automated review saves roughly 18 minutes. At scale — 50 PRs a week, that's 15 hours of senior developer time back per week. That's the business case for governed AI review."
+
+---
+
+## BREAKTHROUGH MOMENT 4 — OTel traces link
+**Insert at: end of Section 3 (demo), after verdict appears**
+**Time: ~17:00 | Duration: 30 sec**
+
+### What to show
+Review Detail page → click "View OTel Traces" button (top right) → agent-observability dashboard opens showing spans.
+
+**Pre-requisite**: `agent-observability` stack must be running (`docker compose up` in the observability project).
+
+### What to say
+
+> "Every pipeline run emits OpenTelemetry spans. I can click here to jump directly into the observability dashboard and see the full trace — orchestrator, subagents, review agent — with timing and attributes. This is production-grade instrumentation, not a demo afterthought."
+
+---
+
+## BREAKTHROUGH MOMENT 5 — Domain pivot (closing, 30 sec)
+
+**→ Return to Dashboard, point at the stats**
+
+> "Everything you've seen is domain-agnostic — it works on any Python codebase. For Innovorg specifically, where you're shipping content generation pipelines, skill taxonomy APIs, and certification logic, I'd extend the skill library with domain-specific rules: validate that AI-generated learning content matches your taxonomy schema, flag certification boundary violations, enforce learning-path integrity constraints. Same pipeline, same eval harness, same OTel instrumentation — different skills."
+
+---
+
 ## Key phrases to land
 
 - *"Grounded in deterministic tool output before any LLM judgement occurs"*
@@ -260,3 +351,6 @@ Claude Code (open terminal in VS Code), `.claude/hooks/`, `skills/v1/`, `AGENTS.
 - *"The sequencing constraint IS the product"*
 - *"Model lifecycle management applied to a production agentic system"*
 - *"AGENTS.md is the governance layer for the entire repository"*
+- *"The system governs itself"* (hook moment)
+- *"Change a skill, measure the impact, ship or revert"* (eval degradation)
+- *"15 hours of senior developer time back per week"* (business value)
