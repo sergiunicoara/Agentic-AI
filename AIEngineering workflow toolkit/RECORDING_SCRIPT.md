@@ -8,7 +8,7 @@
 - [ ] `python main.py ui` running in a **background** terminal tab (server must be up for hook demo)
 - [ ] `ANTHROPIC_API_KEY` exported in that terminal
 - [ ] Browser open at `http://localhost:8000` — Dashboard visible
-- [ ] VS Code open, project root loaded, file tree visible in sidebar
+- [ ] Cursor open, project root loaded, file tree visible in sidebar
 - [ ] Loom recording set to 1080p, mic level checked
 - [ ] *(Optional — for OTel demo)* `agent-observability` stack running: `docker compose up`
 - [ ] Practice the hook demo once: save a file, confirm `✓ Live review started` appears in terminal
@@ -40,7 +40,7 @@
 ## ⏱ 0:00 — SECTION 1: Feature Request
 **Target: 2:30**
 
-📌 **SCREEN:** VS Code — `AGENTS.md` and `README.md` open side by side. No code visible yet.
+📌 **SCREEN:** Cursor — `AGENTS.md` and `README.md` open side by side. No code visible yet.
 
 ---
 
@@ -87,7 +87,7 @@
 >
 > **Layer 5** — eval harness with a golden dataset, OTel spans on every run, regression threshold 4.0/5.0."
 
-**→ Switch to VS Code file tree. Show the 5 directories: `orchestrator/`, `mcp_server/`, `subagents/`, `review_agent/`, `eval/`.**
+**→ Switch to Cursor file tree. Show the 5 directories: `orchestrator/`, `mcp_server/`, `subagents/`, `review_agent/`, `eval/`.**
 
 > "One deliberate decision: no agent framework. No LangChain, no CrewAI. Hand-rolled asyncio with explicit sequencing. When the sequencing constraint IS the product — tools must run before LLMs — a framework that abstracts that away is a liability, not an asset."
 
@@ -105,7 +105,7 @@
 ## ⏱ 7:00 — SECTION 3a: Implementation — Code Walkthrough
 **Target: 5:00 → end at 12:00**
 
-📌 **SCREEN:** VS Code — `orchestrator/agent.py`
+📌 **SCREEN:** Cursor — `orchestrator/agent.py`
 
 ---
 
@@ -181,13 +181,13 @@
 > ### ⚡ BREAKTHROUGH 1 — Live Hook Firing
 > **⏱ ~16:00 · 75 seconds · THE moment that separates this from every other demo**
 
-📌 **SCREEN:** VS Code — switch to `mcp_server/server.py`
+📌 **SCREEN:** Cursor — switch to `mcp_server/server.py`
 
 ---
 
 > "Now watch what happens when I save a file through Claude Code."
 
-**→ In VS Code, use Claude Code to make a trivial one-line change to `mcp_server/server.py` — e.g. add a comment. Let Claude write the file.**
+**→ In Cursor, use Claude Code to make a trivial one-line change to `mcp_server/server.py` — e.g. add a comment. Let Claude write the file.**
 
 **→ Watch the terminal where `python main.py ui` is running. Wait for the line:**
 ```
@@ -225,7 +225,7 @@
 ## ⏱ 17:45 — SECTION 4a: Testing — Golden Dataset
 **Target: 1:15 → end at 19:00**
 
-📌 **SCREEN:** VS Code — `eval/golden_dataset.json`
+📌 **SCREEN:** Cursor — `eval/golden_dataset.json`
 
 ---
 
@@ -251,7 +251,7 @@ python main.py eval --case GC-001 --verbose
 > ### ⚡ BREAKTHROUGH 2 — Eval Degradation
 > **⏱ ~19:00 · 2:30 · Shows model lifecycle management in practice**
 
-📌 **SCREEN:** VS Code — `skills/v1/security_review.md`
+📌 **SCREEN:** Cursor — `skills/v1/security_review.md`
 
 ---
 
@@ -272,7 +272,7 @@ python main.py eval --compare
 
 > "There — specific cases regressed. The delta arrows show exactly where accuracy dropped. That's the eval catching a skill change before it ships. This is why you don't eyeball prompts — you measure them."
 
-**→ In VS Code, undo the deletion with Ctrl+Z. Save. Run in terminal:**
+**→ In Cursor, undo the deletion with Ctrl+Z. Save. Run in terminal:**
 ```bash
 python main.py eval --compare
 ```
@@ -312,7 +312,7 @@ python main.py --help
 ## ⏱ 23:00 — SECTION 6: AI/ML Deep Dive
 **Target: 4:00 → end at 27:00**
 
-📌 **SCREEN:** VS Code — `.claude/hooks/` directory visible in sidebar
+📌 **SCREEN:** Cursor — `.claude/hooks/` directory visible in sidebar
 
 ---
 
