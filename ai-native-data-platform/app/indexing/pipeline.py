@@ -118,7 +118,7 @@ def run_manifest(
                               id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding, embedding_version
                             )
                             VALUES (
-                              :id, :document_id, :workspace_id, :chunk_index, :chunk_text, :chunk_hash, :embedding::vector, :embedding_version
+                              :id, :document_id, :workspace_id, :chunk_index, :chunk_text, :chunk_hash, CAST(:embedding AS vector), :embedding_version
                             )
                             ON CONFLICT (document_id, chunk_index, embedding_version) DO NOTHING
                             """

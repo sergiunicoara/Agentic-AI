@@ -1,165 +1,206 @@
-# AI-Native Data Platform (Scale-oriented RAG scaffold)
+# AI-Native Data Platform
 
-This repository is a **platform-style** scaffold for building and operating Retrieval-Augmented Generation (RAG) systems at scale.
-It is intentionally opinionated around the hiring signals you care about:
+Production-grade RAG platform scaffold demonstrating the engineering patterns used in real AI-native systems: multi-stage retrieval, multimodal ingestion, runtime reliability contracts, DSPy-optimized NL→SQL, and a full Prometheus + Grafana observability stack.
 
-- **Retrieval architectures**: multi-stage retrieval (dense + lexical), fusion (RRF), reranking (MMR), embedding lifecycle/versioning.
-- **Multimodal ingestion**: image and PDF visual page understanding via GPT-4o Vision / Gemini Vision — captions embedded and retrieved alongside text chunks.
-- **Evaluation**: dataset-driven offline evaluation with RAGAS metrics, experiment configs, and CI-friendly quality/latency gates.
-- **ML reliability**: explicit runtime contracts (SLO-inspired guardrails), groundedness checks, and structured observability/tracing.
-- **Natural language query layer**: NLP → JSON → SQL pipeline so analysts can query the platform's data in plain English, without writing SQL.
+## What's inside
 
-## Architecture (high level)
-
-- **Text ingestion pipeline** (`app/ingestion/pipeline.py`)
-  - Idempotent chunking + embedding
-  - Chunk-level dedupe via content hash
-  - Embedding version tags to support re-embedding/migrations
-
-- **Multimodal ingestion pipeline** (`app/ingestion/multimodal.py`)
-  - Accepts images (PNG/JPG) and PDFs via `POST /ingest/image`
-  - PDF pages converted to images via `pdf2image`
-  - Each image captioned by vision model (GPT-4o / Gemini Vision / mock)
-  - Captions embedded with the same model as text chunks — stored in `image_chunk`
-  - Content-hash dedup; background worker mirrors text ingestion architecture
-
-- **Retrieval stack** (`app/retrieval/*`)
-  - Dense retriever (pgvector ANN on `document_chunk`)
-  - Lexical retriever (Postgres full-text search)
-  - Multimodal dense retriever — UNION across `document_chunk` + `image_chunk`, unified by cosine score
-  - Fusion (Reciprocal Rank Fusion by default)
-  - Reranking (MMR)
-  - Each `RetrievedChunk` carries a `modality` field (`text` | `image`) for downstream handling
-  - Trace persistence for offline debugging and eval sampling
-
-- **Generation + groundedness** (`app/generation/*`)
-  - Strict JSON schema outputs
-  - Citation snippet verification + minimum evidence gate (works for both text and image captions)
-  - Generation traces persisted to Postgres
-
-- **Evaluation system** (`app/eval/*`)
-  - Dataset: `app/eval/datasets/cases.jsonl`
-  - Experiment configs: `app/eval/experiments/*.yaml`
-  - Runner: `python -m app.eval.run --experiment ...`
-  - RAGAS evaluation (`app/eval/ragas_eval.py`): faithfulness, answer_relevancy, context_precision, context_recall — supports mixed text/image corpora
-  - Produces `artifacts/eval_summary.json` and fails with exit code 2 on gate violations
-
-- **Reliability contracts** (`app/core/reliability/contracts.py`)
-  - Latency SLO guardrails (P95 ≤ 800ms)
-  - Empty-retrieval guardrails
-  - Safe degradation to `unknown=true` responses on violations
-
-- **Natural language query layer** (`app/nl_query/`)
-  - `POST /query/natural-language` — plain English → SQL → results
-  - PydanticAI extracts a structured `QueryIntent` (table, filters, aggregation, order, limit)
-  - SQL builder produces parameterized queries; workspace scoping is always injected
-  - Table/column whitelist + injection guard before any SQL reaches the DB
-  - Hard `statement_timeout` per query; results capped at 1 000 rows
-  - Every query written to `nl_query_audit_log` (generated SQL, params, latency, errors)
+| Subsystem | What it does |
+|---|---|
+| **Text ingestion** | Idempotent chunking + embedding, chunk-level hash dedup, embedding version tags |
+| **Multimodal ingestion** | PDF/image → GPT-4o Vision captions → embeddings stored in `image_chunk` |
+| **Retrieval stack** | Dense (pgvector ANN) + lexical (Postgres FTS) + hybrid fusion (RRF) + MMR reranking |
+| **Grounded generation** | Strict JSON schema outputs, citation snippet verification, minimum evidence gate |
+| **Reliability contracts** | Runtime SLO guardrails (latency, empty-retrieval, groundedness), rolling window SLO, EWMA anomaly detection, leader-elected automated remediation |
+| **NL→SQL layer** | DSPy-optimized intent extraction → parameterized SQL → workspace-scoped results |
+| **Observability** | Prometheus `/metrics`, 15-panel Grafana dashboard, structured JSON trace logs |
+| **Safety** | Prompt injection detection (5 taxonomies), PII redaction, toxicity filtering, audit events |
+| **Evaluation** | RAGAS offline eval, CI quality/latency gates, golden dataset, experiment configs |
 
 ## Quickstart
 
 ```bash
+# Start everything
 docker compose up -d
-psql postgresql://app:app@localhost:5432/app -f scripts/init_db.sql
 
-# Terminal 1: text ingestion worker
-python -m app.worker_main
-
-# Terminal 2: API
-uvicorn app.main:app --reload
+# Init schema + seed demo workspace
+docker compose exec db psql -U app -d app < scripts/init_db.sql
 ```
 
-Seeded demo credentials:
-- `X-Workspace-Id: demo`
-- `X-API-Key: demo`
+All services come up automatically:
 
-## Multimodal ingestion
+| Service | URL |
+|---|---|
+| API + Swagger UI | http://localhost:8000/docs |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 (admin / admin) |
 
-Ingest an image or a PDF (each page becomes a vision-captioned chunk):
+Demo credentials for every API call:
+```
+X-Workspace-Id: demo
+X-API-Key: demo
+```
+
+## Use case walkthrough
+
+### 1. Ingest a document
 
 ```bash
-# Single image
-curl -X POST http://localhost:8000/ingest/image \
+curl -X POST http://localhost:8000/ingest/transcript \
+  -H "Content-Type: application/json" \
   -H "X-Workspace-Id: demo" \
   -H "X-API-Key: demo" \
-  -F "file=@chart.png" \
-  -F "source=report" \
-  -F "external_id=fig-1"
+  -d '{
+    "workspace_id": "demo",
+    "title": "Refund Policy",
+    "text": "Customers may request a full refund within 30 days of purchase..."
+  }'
+# → {"status": "queued", "document_id": "..."}
+```
 
-# PDF — each page is captioned individually
-curl -X POST http://localhost:8000/ingest/image \
+Background worker chunks the text, embeds it, and writes vectors to pgvector.
+
+### 2. Ask a question (RAG)
+
+```bash
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
   -H "X-Workspace-Id: demo" \
   -H "X-API-Key: demo" \
-  -F "file=@report.pdf"
+  -d '{"workspace_id": "demo", "query": "How long do I have to get a refund?"}'
+# → {"answer": "30 days...", "citations": [...], "unknown": false}
 ```
 
-Response:
+Flow: embed query → Redis cache check → pgvector ANN retrieval → RRF fusion → MMR rerank → LLM grounded generation → citation verification → SLO trace.  
+If retrieval returns nothing or groundedness fails → `"unknown": true`, no hallucination.
 
-```json
-{ "status": "queued", "page_count": 12 }
-```
-
-Configure the vision provider via environment variable:
-
-```bash
-VISION_PROVIDER=openai    # GPT-4o Vision
-VISION_PROVIDER=gemini    # Gemini 1.5 Flash
-VISION_PROVIDER=mock      # deterministic, no API key needed (default)
-```
-
-Enable unified text + image retrieval:
-
-```bash
-MULTIMODAL_RETRIEVAL=true
-```
-
-When enabled, `/ask` queries both `document_chunk` and `image_chunk` in a single ranked pass. Each result carries `modality: "text" | "image"` so citations can reference both sources.
-
-## Natural language queries
-
-Ask questions about the platform's own data in plain English:
+### 3. Natural language data queries
 
 ```bash
 curl -X POST http://localhost:8000/query/natural-language \
+  -H "Content-Type: application/json" \
   -H "X-Workspace-Id: demo" \
   -H "X-API-Key: demo" \
-  -H "Content-Type: application/json" \
-  -d '{"workspace_id": "demo", "query": "Show me the 10 most recent failed ingestion runs"}'
+  -d '{"workspace_id": "demo", "query": "Show failed ingestion runs from today"}'
+# → {"sql": "SELECT ... FROM ingestion_run WHERE status = :_v0 ...", "results": [...], "row_count": 2}
 ```
 
-Response includes the generated SQL for transparency:
+DSPy-optimized intent extraction (BootstrapFewShot, 20-example golden dataset) → safe parameterized SQL → workspace scoped + audit logged.
 
-```json
-{
-  "sql": "SELECT id, document_id, status, error, created_at FROM ingestion_run WHERE workspace_id = :_workspace_id AND status = :_v0 ORDER BY created_at DESC LIMIT 10",
-  "results": [...],
-  "row_count": 3
-}
-```
-
-Queryable tables: `document`, `document_chunk`, `ingestion_run`, `trace_log`.
-Sensitive tables (`workspace_api_key`) and write operations are not exposed.
-
-Switch to real LLM intent extraction by setting `LLM_PROVIDER=openai` — falls back to a
-deterministic mock when unset (safe for CI and local dev without an API key).
-
-## Retrieval configuration
-
-Key knobs (see `app/core/config.py`):
+### 4. Ingest images / PDFs
 
 ```bash
+curl -X POST http://localhost:8000/ingest/image \
+  -H "X-Workspace-Id: demo" -H "X-API-Key: demo" \
+  -F "file=@report.pdf"
+# → {"status": "queued", "page_count": 5}
+```
+
+Each page is vision-captioned, embedded, and retrieved alongside text chunks via a unified UNION query.
+
+## Environment variables
+
+```bash
+# LLM + embeddings
+OPENAI_API_KEY=sk-...          # required for real embeddings and generation
+LLM_PROVIDER=openai            # openai | mock (default: mock)
+EMBED_PROVIDER=openai          # openai | mock (default: mock)
+OPENAI_CHAT_MODEL=gpt-4.1-mini
+OPENAI_EMBED_MODEL=text-embedding-3-small
+
+# Retrieval
 RETRIEVAL_MODE=hybrid          # dense | lexical | hybrid | multimodal
 FUSION_METHOD=rrf              # rrf | concat
 RERANK_MODE=mmr                # none | mmr
 EMBEDDING_VERSION=v1
-MULTIMODAL_RETRIEVAL=true      # include image_chunk in hybrid retrieval
-VISION_PROVIDER=openai         # openai | gemini | mock
+MULTIMODAL_RETRIEVAL=false     # include image_chunk in retrieval
+
+# Vision
+VISION_PROVIDER=mock           # openai | gemini | mock
+
+# NL query
+NL_QUERY_PROVIDER=dspy         # dspy | openai | mock
+
+# Database
+DATABASE_URL=postgresql+psycopg2://app:app@db:5432/app
+REDIS_URL=redis://redis:6379/0
 ```
 
-## Offline evaluation
+Without `OPENAI_API_KEY` the platform runs fully on deterministic mocks — safe for local dev and CI.
 
-Run a configured experiment:
+## Architecture
+
+```mermaid
+flowchart LR
+  Client -->|/ask| API[FastAPI API]
+  Client -->|/query/natural-language| API
+  Client -->|/ingest/*| API
+  API -->|Auth + Rate limit| Router[Experiment Router]
+  Router --> R[Retrieval Pipeline]
+  R -->|Dense ANN| PG[(Postgres + pgvector)]
+  R -->|Lexical FTS| PG
+  R -->|Multimodal UNION| PG
+  R -->|Query cache| Redis[(Redis)]
+  R --> Rerank[MMR Reranker]
+  Rerank --> Gen[Grounded Generation]
+  Gen -->|LLM| LLM[(OpenAI / mock)]
+  Gen -->|Groundedness check| Guard[Citation verifier]
+  API -->|/ingest/transcript| Worker[Text Ingestion Worker]
+  Worker -->|Embed| Embed[(Embeddings)]
+  Worker --> PG
+  API -->|/ingest/image| MMWorker[Multimodal Worker]
+  MMWorker -->|Vision caption| Vision[(GPT-4o Vision)]
+  MMWorker -->|Embed caption| Embed
+  MMWorker --> PG
+  API -->|NL query| NLQ[DSPy Intent → SQL]
+  NLQ --> PG
+  NLQ -->|Audit log| Audit[(nl_query_audit_log)]
+  API -->|/metrics| Prom[Prometheus]
+  Prom --> Grafana[Grafana dashboards]
+  Prom --> Alert[Alertmanager]
+  API --> SLO[Rolling SLO + anomaly detection]
+  SLO -->|Auto-remediation| Worker
+```
+
+## Key design decisions
+
+**Reliability over accuracy.** Every generation call is wrapped in runtime contracts — if retrieval latency spikes or groundedness drops, the API degrades to `unknown=true` rather than hallucinating. Safe failure is a first-class requirement.
+
+**DSPy for NL→SQL.** The intent extraction layer uses DSPy BootstrapFewShot rather than a hand-written prompt. Optimized against a 20-example golden dataset; normalization layer handles LLM output quirks (table aliases, column name hallucinations, operator variants, SELECT *, COUNT normalization) before Pydantic validation.
+
+**Embedding version tags.** Every chunk carries an `embedding_version` field. Re-embedding after a model upgrade is a controlled migration — old and new vectors coexist until the backfill completes.
+
+**Engine cache per DSN.** `app/data/db.py` maintains a single connection pool per database URL, so read replicas and primary share no pool contention. `session_scope(url=None)` routes to primary by default; retrievers pass their own DSN for shard-local queries.
+
+**Mock-first, real-optional.** Every external call (LLM, embeddings, vision) has a deterministic mock. The entire stack runs without any API key for local development and CI.
+
+## Observability
+
+The Grafana dashboard at `localhost:3000` (Dashboards → Platform Overview) shows:
+
+- Request traffic: RPS, p50/p95/p99 latency, error rate, 429 rate
+- Pipeline latency: retrieval, generation, ingestion
+- SLO rolling window: error rate, unknown rate, p95 with threshold markers
+- Anomaly scores: EWMA z-scores for latency and error drift
+- Reliability violations and generation failures
+- Ingestion job counts by status
+
+Prometheus scrapes `/metrics` every 10 seconds. Alertmanager rules are in `ops/prometheus/alerts.yml`.
+
+## Testing
+
+```bash
+pytest tests/ -v
+```
+
+156 tests covering:
+- **Safety**: prompt injection (5 taxonomies), PII redaction (6 types), toxicity filtering
+- **NL normalization**: table aliases, column aliases, operator aliases, SELECT * expansion, COUNT(*), idempotency
+- **SQL builder**: workspace scoping, all filter operators, ORDER BY, LIMIT, full query shapes
+- **Reliability**: SLO contracts, rolling window p95/error/unknown rates, token bucket rate limiter, citation groundedness
+
+No database required — `tests/conftest.py` injects a mock `app.data.db` before any import.
+
+## Offline evaluation
 
 ```bash
 python -m app.eval.run \
@@ -168,103 +209,13 @@ python -m app.eval.run \
   --json_out artifacts/eval_summary.json
 ```
 
-Run RAGAS evaluation on a mixed-content corpus:
-
-```python
-from app.eval.ragas_eval import RagasTestCase, run_ragas_eval
-
-results = run_ragas_eval([
-    RagasTestCase(
-        question="What does the Q3 chart show?",
-        answer="Revenue grew 18% quarter-over-quarter.",
-        contexts=["[image caption] Bar chart showing Q3 revenue at $4.2M, up from $3.6M in Q2."],
-        ground_truth="Q3 revenue increased 18% vs Q2.",
-    )
-])
-# results[0].faithfulness, .answer_relevancy, .context_precision, .context_recall
-```
-
-The runner enforces gates from the experiment config (pass rate, retrieval quality, P95 latency) and exits non-zero on violations.
-
-## CI evaluation gates
-
-GitHub Actions runs the same evaluation harness on every PR and on pushes to `main`:
-
-- Workflow: `.github/workflows/eval-gates.yml`
-- Spins up **pgvector/Postgres** via `docker compose`
-- Seeds schema + demo workspace (`scripts/init_db.sql`)
-- Executes `python -m app.eval.run ...`
-- Uploads `artifacts/eval_summary.json` as a build artifact
-
-This makes retrieval quality, groundedness checks, and latency budgets **non-negotiable deployment constraints**.
-
-## Results snapshot
-
-CI also renders a compact Markdown summary (`artifacts/results_snapshot.md`) from
-`artifacts/eval_summary.json` and uploads it as a build artifact.
-
-Locally, you can generate the snapshot after running eval:
-
-```bash
-python -m app.eval.render_results \
-  --in_json artifacts/eval_summary.json \
-  --out_md artifacts/results_snapshot.md
-```
-
-## What "scale" looks like here
-
-This scaffold models the design patterns you'd use in a real AI-native platform:
-
-- **Multi-stage retrieval**: cheap candidate generation + bounded expensive reranking
-- **Multimodal unification**: text and image embeddings live in the same vector space — same retrieval path, same reranker, same groundedness checks
-- **Separation of concerns**: ingestion, retrieval, generation, evaluation, and NL query as explicit subsystems
-- **Lifecycle controls**: embedding versioning for safe migrations across text and image models
-- **Operational signals**: structured traces (`trace_log`) and Prometheus metrics (`/metrics`)
-- **Quality gates**: evaluation is treated as a deploy-time constraint, not an ad-hoc notebook
-- **Text-to-SQL in production**: NL query layer inherits auth, rate limiting, audit logging, and workspace scoping from the existing platform — no separate infrastructure required
-
-## Architecture diagram
-
-```mermaid
-flowchart LR
-  Client -->|/ask| API[FastAPI API]
-  Client -->|/query/natural-language| API
-  Client -->|/ingest/image| API
-  API -->|Auth+Rate limits| Router[A/B Experiment Router]
-  Router --> R[Retrieval Pipeline]
-  R -->|Dense ANN text| PG[(Postgres + pgvector)]
-  R -->|Lexical FTS| PG
-  R -->|Multimodal UNION| PG
-  R -->|Cache| Redis[(Redis)]
-  R -->|Traces| Trace[(trace_log)]
-  R --> Gen[Grounded Generation]
-  Gen -->|LLM Provider| LLM[(LLM)]
-  Gen -->|Contracts| Guard[Groundedness & evidence checks]
-  API -->|/ingest/transcript| Worker[Text Ingestion Worker]
-  Worker -->|Embed chunks| Embed[(Embeddings)]
-  Worker --> PG
-  API -->|/ingest/image| MMWorker[Multimodal Ingestion Worker]
-  MMWorker -->|Vision caption| Vision[(GPT-4o / Gemini Vision)]
-  MMWorker -->|Embed caption| Embed
-  MMWorker -->|image_chunk| PG
-  API -->|NL query| NLQ[NL Query Layer]
-  NLQ -->|PydanticAI intent| LLM
-  NLQ -->|Parameterized SQL| PG
-  NLQ -->|Audit log| Audit[(nl_query_audit_log)]
-  API -->|metrics| Prom[Prometheus]
-  Prom --> Alert[Alertmanager]
-  API -->|online signals| Trace
-  Drift[Cron drift monitor] --> Trace
-```
+CI runs the same harness on every PR (`.github/workflows/eval-gates.yml`) — retrieval quality, groundedness, and P95 latency are non-negotiable deployment constraints.
 
 ## Scaling and deployment
 
-See:
-
-- `docs/deployment_k8s.md` for a Kubernetes deployment story (replicas, HPA, caching).
-- `docs/multi_region.md` for a multi-region reference architecture (read-local routing, failover).
-- `docs/replica_lag_routing.md` for replica lag handling and read/write routing logic.
-- `k8s/istio/` for service mesh policies (mTLS, retries, outlier detection).
-- `k8s/networkpolicy.yaml` for network topology hardening (default-deny, explicit allow).
-- `ops/prometheus/alerts.yml` for an example alerting strategy using rolling SLO metrics.
-- `k8s/` for example manifests.
+- `docs/deployment_k8s.md` — Kubernetes deployment (replicas, HPA, caching)
+- `docs/multi_region.md` — multi-region reference architecture (read-local routing, failover)
+- `docs/replica_lag_routing.md` — replica lag handling and read/write routing
+- `k8s/istio/` — service mesh policies (mTLS, retries, outlier detection)
+- `k8s/networkpolicy.yaml` — network topology hardening
+- `ops/prometheus/alerts.yml` — alerting strategy using rolling SLO metrics

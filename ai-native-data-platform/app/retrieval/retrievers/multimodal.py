@@ -43,7 +43,7 @@ class MultimodalDenseRetriever:
               document_id,
               chunk_index,
               chunk_text  AS content,
-              (1 - (embedding <=> :qvec::vector)) AS score,
+              (1 - (embedding <=> CAST(:qvec AS vector))) AS score,
               'text'      AS modality,
               NULL        AS caption
             FROM document_chunk
@@ -57,7 +57,7 @@ class MultimodalDenseRetriever:
               document_id,
               page_number AS chunk_index,
               caption     AS content,
-              (1 - (embedding <=> :qvec::vector)) AS score,
+              (1 - (embedding <=> CAST(:qvec AS vector))) AS score,
               'image'     AS modality,
               caption
             FROM image_chunk

@@ -96,7 +96,7 @@ def _process_job(job: _ImageJob) -> None:
                        page_number, caption, embedding, embedding_version, image_hash)
                     VALUES
                       (:id, :workspace_id, :document_id, :source_name, :external_id,
-                       :page_number, :caption, :embedding::vector, :embedding_version, :image_hash)
+                       :page_number, :caption, CAST(:embedding AS vector), :embedding_version, :image_hash)
                     ON CONFLICT (image_hash, workspace_id) DO NOTHING
                     """
                 ),

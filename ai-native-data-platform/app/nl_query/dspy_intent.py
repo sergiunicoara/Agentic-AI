@@ -73,6 +73,174 @@ class NLToIntent(dspy.Signature):
 
 
 # ---------------------------------------------------------------------------
+# Normalization maps — applied before Pydantic validation
+# The LLM often uses plural, abbreviated, or natural-language variants.
+# ---------------------------------------------------------------------------
+
+_TABLE_ALIASES: dict[str, str] = {
+    "documents": "document",
+    "document_chunks": "document_chunk",
+    "chunks": "document_chunk",
+    "chunk": "document_chunk",
+    "indexed_chunks": "document_chunk",
+    "ingestion_runs": "ingestion_run",
+    "ingestion": "ingestion_run",
+    "runs": "ingestion_run",
+    "traces": "trace_log",
+    "trace_logs": "trace_log",
+    "trace": "trace_log",
+    "logs": "trace_log",
+    "generation_traces": "trace_log",
+    "generation_trace": "trace_log",
+    "latency_records": "trace_log",
+    "request_logs": "trace_log",
+}
+
+_OPERATOR_ALIASES: dict[str, str] = {
+    "contains": "ILIKE",
+    "ilike": "ILIKE",
+    "like": "ILIKE",           # normalise to ILIKE for case-insensitive search
+    "equals": "=",
+    "eq": "=",
+    "not equals": "!=",
+    "ne": "!=",
+    "greater than": ">",
+    "gt": ">",
+    "less than": "<",
+    "lt": "<",
+    "gte": ">=",
+    "lte": "<=",
+    "is null": "IS NULL",
+    "isnull": "IS NULL",
+    "is not null": "IS NOT NULL",
+    "isnotnull": "IS NOT NULL",
+    "in": "IN",
+}
+
+# Per-table column aliases — maps LLM hallucinations to real column names.
+_COLUMN_ALIASES: dict[str, dict[str, str]] = {
+    "document": {
+        "source": "source_name",
+        "timestamp": "created_at",
+        "ingest_timestamp": "created_at",
+        "ingest_time": "created_at",
+        "ingested_at": "created_at",
+        "doc_id": "id",
+    },
+    "document_chunk": {
+        "chunk_id": "id",
+        "text": "chunk_text",
+        "content": "chunk_text",
+        "hash": "chunk_hash",
+        "index": "chunk_index",
+        "timestamp": "created_at",
+        "ingested_at": "created_at",
+        "version": "embedding_version",
+    },
+    "ingestion_run": {
+        "run_id": "id",
+        "ingestion_time": "created_at",
+        "start_time": "created_at",
+        "timestamp": "created_at",
+        "ingested_at": "created_at",
+        "finish_time": "finished_at",
+        "completed_at": "finished_at",
+        "error_message": "error",
+        "err": "error",
+        "message": "error",
+    },
+    "trace_log": {
+        "latency": "latency_ms",
+        "duration": "latency_ms",
+        "duration_ms": "latency_ms",
+        "response_time": "latency_ms",
+        "elapsed_ms": "latency_ms",
+        "timestamp": "created_at",
+        "created": "created_at",
+        "type": "trace_type",
+        "log_type": "trace_type",
+        "log_id": "id",
+        "trace_id": "id",
+    },
+}
+
+
+def _fix_col(col: str, col_map: dict[str, str]) -> str:
+    return col_map.get(str(col).strip().lower(), col)
+
+
+def _normalize_data(data: dict) -> dict:
+    """Coerce LLM output to the exact values Pydantic / build_sql expect."""
+
+    # ── Table name ────────────────────────────────────────────────────────────
+    table = str(data.get("table", "")).strip().lower()
+    table = _TABLE_ALIASES.get(table, table)
+    data["table"] = table
+
+    col_map = _COLUMN_ALIASES.get(table, {})
+    allowed = set(ALLOWED_SCHEMA.get(table, []))
+
+    # ── limit: null → 100 ─────────────────────────────────────────────────────
+    if data.get("limit") is None:
+        data["limit"] = 100
+
+    # ── select_columns: ["*"] → [] so build_sql expands to all columns ────────
+    sc = data.get("select_columns") or []
+    if isinstance(sc, list):
+        if sc in (["*"], ["all"], ["ALL"]):
+            sc = []
+        else:
+            sc = [_fix_col(c, col_map) for c in sc]
+            sc = [c for c in sc if c in allowed]   # drop hallucinated columns
+    data["select_columns"] = sc
+
+    # ── aggregation_column: alias + COUNT(*) normalisation ────────────────────
+    agg = str(data.get("aggregation") or "").upper()
+    agg_col = data.get("aggregation_column")
+    if agg_col:
+        agg_col = _fix_col(str(agg_col), col_map)
+        # COUNT(id) / COUNT(*) / COUNT(1) → COUNT(*) by setting agg_col=null
+        if agg == "COUNT" and agg_col in ("id", "*", "1", "all"):
+            agg_col = None
+        elif agg_col not in allowed:
+            agg_col = None          # drop hallucinated column
+        data["aggregation_column"] = agg_col
+    elif agg == "COUNT":
+        data["aggregation_column"] = None   # ensure COUNT(*)
+
+    # ── group_by: alias + filter ───────────────────────────────────────────────
+    gb = data.get("group_by") or []
+    if isinstance(gb, list):
+        gb = [_fix_col(c, col_map) for c in gb]
+        gb = [c for c in gb if c in allowed]
+    data["group_by"] = gb
+
+    # ── order_by: alias column, drop if still invalid ─────────────────────────
+    ob = data.get("order_by")
+    if ob and isinstance(ob, dict) and "column" in ob:
+        col = _fix_col(str(ob["column"]), col_map)
+        if col in allowed:
+            ob["column"] = col
+        else:
+            data["order_by"] = None
+
+    # ── filters: operator alias + column alias + ILIKE wildcard ──────────────
+    for f in data.get("filters") or []:
+        if not isinstance(f, dict):
+            continue
+        if "column" in f:
+            f["column"] = _fix_col(str(f["column"]), col_map)
+        raw_op = str(f.get("operator", "")).strip().lower()
+        f["operator"] = _OPERATOR_ALIASES.get(raw_op, f.get("operator", "="))
+        if raw_op in ("contains", "like", "ilike") and isinstance(f.get("value"), str):
+            v = f["value"]
+            if not v.startswith("%"):
+                f["value"] = f"%{v}%"
+
+    return data
+
+
+# ---------------------------------------------------------------------------
 # DSPy Module
 # ---------------------------------------------------------------------------
 
@@ -84,7 +252,7 @@ class IntentExtractor(dspy.Module):
         super().__init__()
         self.predict = dspy.ChainOfThought(NLToIntent)
 
-    def forward(self, nl_query: str) -> QueryIntent:  # type: ignore[override]
+    def forward(self, nl_query: str) -> dspy.Prediction:  # type: ignore[override]
         result = self.predict(nl_query=nl_query)
         raw = result.intent_json.strip()
         # Strip accidental markdown fences the LLM sometimes emits.
@@ -92,8 +260,11 @@ class IntentExtractor(dspy.Module):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
-        data = json.loads(raw.strip())
-        return QueryIntent.model_validate(data)
+        data = _normalize_data(json.loads(raw.strip()))
+        intent = QueryIntent.model_validate(data)
+        # Return a Prediction so the metric can access both the raw JSON
+        # (for debugging) and the validated intent object.
+        return dspy.Prediction(intent_json=result.intent_json, intent=intent)
 
 
 # ---------------------------------------------------------------------------

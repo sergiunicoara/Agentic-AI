@@ -106,7 +106,7 @@ def _extract_dspy(nl_query: str) -> QueryIntent:
     """
     from app.nl_query.dspy_intent import get_extractor  # lazy import
 
-    return get_extractor()(nl_query=nl_query)
+    return get_extractor()(nl_query=nl_query).intent
 
 
 def _extract_openai(nl_query: str) -> QueryIntent:

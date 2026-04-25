@@ -41,12 +41,12 @@ class DenseRetriever:
               c.document_id::text AS document_id,
               c.chunk_index AS chunk_index,
               c.chunk_text AS chunk_text,
-              (1 - (c.embedding <=> :qvec::vector)) AS score
+              (1 - (c.embedding <=> CAST(:qvec AS vector))) AS score
             FROM document_chunk c
             JOIN document d ON d.id = c.document_id
             WHERE d.workspace_id = :workspace_id
               AND c.embedding_version = :embedding_version
-            ORDER BY c.embedding <=> :qvec::vector
+            ORDER BY c.embedding <=> CAST(:qvec AS vector)
             LIMIT :k
             """
         )

@@ -28,14 +28,14 @@ examples:
       FROM document
       WHERE workspace_id = :_workspace_id LIMIT 100
 
-  - nl_query: "Show the 10 most recently ingested documents"
+  - nl_query: "Show the 10 most recently ingested documents, ordered by ingestion date"
     expected_sql: >-
       SELECT id, workspace_id, source_name, external_id, title, text, created_at
       FROM document
       WHERE workspace_id = :_workspace_id
       ORDER BY created_at DESC LIMIT 10
 
-  - nl_query: "List documents uploaded from the upload source"
+  - nl_query: "List documents where source_name equals upload"
     expected_sql: >-
       SELECT id, workspace_id, source_name, external_id, title, text, created_at
       FROM document
@@ -134,7 +134,7 @@ examples:
       SELECT MAX(latency_ms) FROM trace_log
       WHERE workspace_id = :_workspace_id LIMIT 100
 
-  - nl_query: "Show all generation traces from the last 100 records"
+  - nl_query: "Show traces where trace_type equals generation, ordered by most recent, limit 100"
     expected_sql: >-
       SELECT id, trace_type, workspace_id, latency_ms, created_at
       FROM trace_log

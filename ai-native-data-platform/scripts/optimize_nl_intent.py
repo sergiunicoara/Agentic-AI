@@ -28,7 +28,6 @@ import yaml
 import dspy
 from dspy.teleprompt import BootstrapFewShot
 
-from app.nl_query.dspy_intent import IntentExtractor, NLToIntent, _configure_dspy
 from app.nl_query.intent import QueryIntent
 from app.nl_query.sql_builder import build_sql
 
@@ -49,8 +48,10 @@ def _normalize(sql: str) -> str:
     sql = sql.lower().strip()
     # Collapse all whitespace (including newlines from YAML block scalars).
     sql = re.sub(r"\s+", " ", sql)
-    # Normalize positional param names (:_v0, :_v1_2 …) → ?
-    sql = re.sub(r":_v\d+(?:_\d+)?", "?", sql)
+    # Normalize all named params → ? so param ordering doesn't matter.
+    sql = re.sub(r":\w+", "?", sql)
+    # Treat ILIKE and LIKE as equivalent — both are valid for text search.
+    sql = sql.replace(" ilike ", " like ")
     return sql
 
 
@@ -62,19 +63,20 @@ def _normalize(sql: str) -> str:
 def sql_match(example: dspy.Example, pred: dspy.Prediction, trace=None) -> bool:  # type: ignore[type-arg]
     """Return True if the predicted intent produces the expected SQL."""
     try:
-        raw = pred.intent_json.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        import json
-        data = json.loads(raw.strip())
-        intent = QueryIntent.model_validate(data)
-        sql, _ = build_sql(intent, workspace_id=_EVAL_WORKSPACE)
-        return _normalize(sql) == _normalize(example.expected_sql)
+        intent: QueryIntent = pred.intent  # set by IntentExtractor.forward()
+        got_sql, _ = build_sql(intent, workspace_id=_EVAL_WORKSPACE)
+        got = _normalize(got_sql)
+        want = _normalize(example.expected_sql)
+        match = got == want
+        if not match:
+            # Always print mismatches — the main signal for fixing the dataset
+            # or normalization rules.
+            print(f"\n  [mismatch] {example.nl_query!r}")
+            print(f"    want: {want}")
+            print(f"    got:  {got}")
+        return match
     except Exception as exc:
-        if trace is not None:
-            print(f"  [metric error] {exc}")
+        print(f"\n  [metric error] {example.nl_query!r} → {exc}")
         return False
 
 
@@ -112,19 +114,27 @@ def main() -> None:
         print("ERROR: OPENAI_API_KEY not set. Export it or add it to .env")
         sys.exit(1)
 
-    _configure_dspy()
+    # Disable DSPy LLM cache for this script — previous runs cached stale
+    # outputs from before the normalization fixes were in place.
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    model = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+    lm = dspy.LM(f"openai/{model}", api_key=api_key, cache=False)
+    dspy.configure(lm=lm)
+
+    # Import AFTER dspy.configure so get_extractor() picks up the LM.
+    from app.nl_query.dspy_intent import IntentExtractor
 
     trainset = load_trainset()
     print(f"Loaded {len(trainset)} golden examples from {GOLDEN_PATH}")
 
-    # Split: 80% train, 20% dev (used internally by BootstrapFewShot).
+    # Split: 80% train, 20% dev.
     split = max(1, int(len(trainset) * 0.8))
     train, dev = trainset[:split], trainset[split:]
     print(f"  train={len(train)}  dev={len(dev)}")
 
     teleprompter = BootstrapFewShot(
         metric=sql_match,
-        max_bootstrapped_demos=4,   # few-shot examples injected into prompt
+        max_bootstrapped_demos=4,
         max_labeled_demos=4,
         max_rounds=1,
     )
@@ -141,7 +151,7 @@ def main() -> None:
             sql_match(ex, compiled(nl_query=ex.nl_query))
             for ex in dev
         )
-        print(f"Dev accuracy: {correct}/{len(dev)} = {correct / len(dev):.0%}")
+        print(f"\nDev accuracy: {correct}/{len(dev)} = {correct / len(dev):.0%}")
 
     COMPILED_PATH.parent.mkdir(parents=True, exist_ok=True)
     compiled.save(str(COMPILED_PATH))

@@ -65,7 +65,7 @@ def process_document(document_id: uuid.UUID) -> None:
                     db.execute(
                         text("""
                           INSERT INTO document_chunk (id, document_id, chunk_index, chunk_text, embedding)
-                          VALUES (:id, :document_id, :chunk_index, :chunk_text, :embedding::vector)
+                          VALUES (:id, :document_id, :chunk_index, :chunk_text, CAST(:embedding AS vector))
                           ON CONFLICT (document_id, chunk_index) DO NOTHING
                         """),
                         {

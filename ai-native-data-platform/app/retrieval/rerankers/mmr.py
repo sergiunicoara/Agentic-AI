@@ -67,7 +67,7 @@ def _fetch_embeddings(chunk_ids: list[str], *, embedding_version: str) -> dict[s
         """
         SELECT id::text AS chunk_id, (embedding::real[]) AS emb
         FROM document_chunk
-        WHERE id = ANY(:ids)
+        WHERE id::text = ANY(:ids)
           AND embedding_version = :embedding_version
         """
     )

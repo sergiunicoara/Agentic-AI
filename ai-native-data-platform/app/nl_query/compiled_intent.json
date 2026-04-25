@@ -1,0 +1,57 @@
+{
+  "predict.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "nl_query": "How many documents have been ingested?",
+        "reasoning": "The query is asking for the total count of documents that have been ingested, which indicates an aggregation operation. We need to count all records in the relevant table that holds the document ingestion data. Typically, this would be the main table for documents in the data platform. Since there are no specific filters or grouping mentioned, we will select all columns for counting. The aggregation function needed here is \"COUNT\". There is no need to group the results, and we do not need to define an order or limit since we are looking for a single aggregation result.",
+        "intent_json": "{\n  \"table\": \"documents\",\n  \"select_columns\": [\"*\"],\n  \"filters\": [],\n  \"aggregation\": \"COUNT\",\n  \"aggregation_column\": null,\n  \"group_by\": [],\n  \"order_by\": null,\n  \"limit\": null\n}"
+      },
+      {
+        "augmented": true,
+        "nl_query": "List all documents",
+        "reasoning": "The query requests to list all documents, which implies that we need to select all columns from the relevant table without any specific filters, aggregations, or ordering. Therefore, the intent JSON will reflect a complete selection from the designated table.",
+        "intent_json": "{\"table\":\"documents\",\"select_columns\":[\"*\"],\"filters\":[],\"aggregation\":null,\"aggregation_column\":null,\"group_by\":[],\"order_by\":null,\"limit\":null}"
+      },
+      {
+        "augmented": true,
+        "nl_query": "List documents where source_name equals upload",
+        "reasoning": "The user is asking for a list of documents filtered by the condition that the `source_name` should equal \"upload\". This means we need to specify the table containing the documents, select all columns for the documents, and apply a filter where `source_name` is \"upload\". No specific aggregation, grouping, or ordering is requested, and the limit is not defined, so we can assume it should return all matching documents.",
+        "intent_json": "{\n  \"table\": \"documents\",\n  \"select_columns\": [\"*\"],\n  \"filters\": [{\"column\": \"source_name\", \"operator\": \"=\", \"value\": \"upload\"}],\n  \"aggregation\": null,\n  \"aggregation_column\": null,\n  \"group_by\": [],\n  \"order_by\": null,\n  \"limit\": null\n}"
+      },
+      {
+        "augmented": true,
+        "nl_query": "Find documents whose title contains 'report'",
+        "reasoning": "The user is looking for documents where the title includes the word 'report'. This indicates that we need to search a table (likely a documents table) for rows where the title column contains a specific value. Since they did not specify any aggregation or order, we will focus on selecting all relevant columns from the documents table, applying a filter on the title.",
+        "intent_json": "{\n  \"table\": \"documents\",\n  \"select_columns\": [\"*\"],\n  \"filters\": [\n    {\n      \"column\": \"title\",\n      \"operator\": \"LIKE\",\n      \"value\": \"%report%\"\n    }\n  ],\n  \"aggregation\": null,\n  \"aggregation_column\": null,\n  \"group_by\": [],\n  \"order_by\": null,\n  \"limit\": null\n}"
+      }
+    ],
+    "signature": {
+      "instructions": "Given the fields `nl_query`, produce the fields `intent_json`.",
+      "fields": [
+        {
+          "prefix": "Nl Query:",
+          "description": "Natural language question about the data platform"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Intent Json:",
+          "description": "JSON object matching schema: {\"table\": str, \"select_columns\": [str], \"filters\": [{\"column\": str, \"operator\": str, \"value\": any}], \"aggregation\": str|null, \"aggregation_column\": str|null, \"group_by\": [str], \"order_by\": {\"column\": str, \"direction\": \"ASC\"|\"DESC\"}|null, \"limit\": int}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.11",
+      "dspy": "3.2.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}
