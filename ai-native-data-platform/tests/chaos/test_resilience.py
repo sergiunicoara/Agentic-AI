@@ -11,7 +11,7 @@ def test_generation_safe_degradation_on_provider_failure(monkeypatch):
     def boom(prompt: str) -> str:
         raise RuntimeError("provider_down")
 
-    monkeypatch.setattr("app.providers.llm.generate", boom)
+    monkeypatch.setattr("app.generation.service.generate", boom)
 
     hits = [RetrievedChunk(id="c1", document_id="d1", chunk_index=0, text="ctx", score=0.9, meta={})]
     out, ms, err = run_rag_safe("demo", "q", hits)
