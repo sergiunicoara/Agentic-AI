@@ -14,12 +14,8 @@
       }
 
       @keyframes shimmer {
-        0% {
-          background-position: -400px 0;
-        }
-        100% {
-          background-position: 400px 0;
-        }
+        0%   { background-position: -400px 0; }
+        100% { background-position:  400px 0; }
       }
 
       .animate-shimmer {
@@ -29,244 +25,209 @@
     </style>
   </head>
 
-  <body class="h-full text-slate-100">
-    <div class="min-h-screen flex flex-col">
+  <body class="h-full overflow-hidden text-slate-100">
+    <div class="h-full flex flex-col">
 
       <!-- HEADER -->
-      <header class="w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
-        <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="h-8 w-8 rounded-xl bg-sky-500/15 border border-sky-500/40 flex items-center justify-center">
+      <header class="shrink-0 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
+        <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <div class="h-7 w-7 rounded-xl bg-sky-500/15 border border-sky-500/40 flex items-center justify-center">
               <span class="text-sky-400 font-semibold text-xs">SR</span>
             </div>
-            <span class="font-semibold tracking-tight">Sergiu’s AI Recruiter Agent</span>
+            <span class="font-semibold tracking-tight text-sm">Sergiu's AI Recruiter Agent</span>
           </div>
-
           <div class="flex items-center space-x-3 text-sm">
-            <a href="https://www.linkedin.com/in/sergiu-nicoara-31b27013/" target="_blank" class="text-slate-300 hover:text-sky-400">
-              LinkedIn
-            </a>
-            <a href="https://github.com/sergiunicoara" target="_blank" class="text-slate-300 hover:text-sky-400">
-              GitHub
-            </a>
-            <a href="https://github.com/sergiunicoara/Agentic-AI/tree/main/recruiter-agent" target="_blank" class="hidden sm:inline text-slate-300 hover:text-sky-400">
-              Source
-            </a>
+            <a href="https://www.linkedin.com/in/sergiu-nicoara-31b27013/" target="_blank" class="text-slate-300 hover:text-sky-400">LinkedIn</a>
+            <a href="https://github.com/sergiunicoara" target="_blank" class="text-slate-300 hover:text-sky-400">GitHub</a>
+            <a href="https://github.com/sergiunicoara/Agentic-AI/tree/main/recruiter-agent" target="_blank" class="hidden sm:inline text-slate-300 hover:text-sky-400">Source</a>
           </div>
         </div>
       </header>
 
-      <!-- MAIN -->
-      <main class="flex-1">
-        <div class="max-w-5xl mx-auto px-4 py-10 space-y-10">
+      <!-- MAIN — flex-1 + min-h-0 so the grid can shrink correctly -->
+      <main class="flex-1 min-h-0">
+        <div class="h-full max-w-5xl mx-auto px-4 py-3 grid lg:grid-cols-[1fr,1.45fr] gap-4">
 
-          <!-- HERO + SIDE CARDS -->
-          <div class="grid gap-10 lg:grid-cols-[1.3fr,1fr] items-start">
+          <!-- LEFT PANEL -->
+          <div class="flex flex-col gap-3 min-h-0 overflow-y-auto">
+
             <!-- HERO -->
-            <section>
-              <div class="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 mb-4">
-                Live voice AI agent · Deepgram STT · FastAPI · Cloud Run
+            <section class="shrink-0">
+              <div class="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300 mb-2">
+                Live voice AI · Deepgram STT · FastAPI · Cloud Run
               </div>
 
-              <h1 class="text-4xl md:text-5xl font-semibold tracking-tight text-slate-50">
+              <h1 class="text-2xl font-semibold tracking-tight text-slate-50 leading-snug">
                 An AI recruiter — with a
                 <span class="text-sky-400">live voice pipeline</span> — that explains how Sergiu fits your role.
               </h1>
 
-              <p class="mt-4 text-slate-300 text-lg max-w-xl">
-                Paste any job description or speak your requirements. The agent extracts criteria, selects
-                best-fit projects, and produces recruiter-ready summaries with measurable impact.
-                Try the mic button — it’s a real STT/TTS conversation loop.
+              <p class="mt-1.5 text-slate-300 text-sm leading-relaxed">
+                Paste a JD or speak your requirements. The agent extracts criteria,
+                selects best-fit projects, and produces recruiter-ready summaries.
+                Hit the mic — it's a real STT/TTS loop.
               </p>
 
-              <div class="mt-6 flex flex-wrap gap-3">
+              <div class="mt-3 flex flex-wrap gap-2">
                 <a
                   href="#live-chat"
-                  class="rounded-lg bg-sky-500 hover:bg-sky-400 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/30"
+                  class="rounded-lg bg-sky-500 hover:bg-sky-400 px-4 py-1.5 text-xs font-semibold text-slate-950 shadow-lg shadow-sky-500/30"
                 >
                   Try the live agent
                 </a>
-
                 <a
                   href="https://github.com/sergiunicoara/Agentic-AI/tree/main/recruiter-agent"
                   target="_blank"
-                  class="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-200 hover:border-slate-500"
+                  class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-500"
                 >
                   View repo &amp; architecture
                 </a>
               </div>
 
-              <dl class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-slate-300">
+              <dl class="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-300">
                 <div>
-                  <dt class="text-slate-400">Voice stack</dt>
-                  <dd class="font-medium">Deepgram · Neural TTS · WebSocket</dd>
+                  <dt class="text-slate-400">Voice</dt>
+                  <dd class="font-medium">Deepgram · Neural TTS</dd>
                 </div>
                 <div>
                   <dt class="text-slate-400">Focus</dt>
-                  <dd class="font-medium">Voice AI · Agentic Systems · RAG</dd>
+                  <dd class="font-medium">Voice AI · RAG</dd>
                 </div>
                 <div>
                   <dt class="text-slate-400">Infra</dt>
-                  <dd class="font-medium">Cloud Run · OTel · LLM-Judge</dd>
+                  <dd class="font-medium">Cloud Run · OTel</dd>
                 </div>
               </dl>
             </section>
 
-            <!-- SIDE CARDS -->
-            <section class="space-y-4">
-              <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm shadow-lg shadow-black/40">
-                <h2 class="font-semibold text-slate-50 mb-2">What this agent does</h2>
-                <ul class="list-disc list-inside space-y-1 text-slate-300">
-                  <li>Understands JDs — extracts role, criteria, voice/RAG/observability signals</li>
-                  <li>Matches to Sergiu’s projects with measurable impact</li>
-                  <li>Explains fit per criterion — voice AI, RAG, low-latency, ownership</li>
-                  <li>ATS-style summaries + recruiter email drafts</li>
-                  <li>CV Q&amp;A via RAG — ask anything about skills, certs, location</li>
-                </ul>
-              </div>
+            <!-- CAPABILITIES + TECH HIGHLIGHTS — merged, compact -->
+            <div class="shrink-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-3 text-xs shadow-lg shadow-black/40">
+              <h2 class="font-semibold text-slate-50 mb-1.5">What this agent does</h2>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-300">
+                <li>Extracts role &amp; criteria from JDs — voice / RAG / observability signals</li>
+                <li>Matches to projects with measurable impact per criterion</li>
+                <li>ATS-style summaries + recruiter email drafts on demand</li>
+                <li>CV Q&amp;A via RAG — skills, certs, location, availability</li>
+                <li>~600ms time-to-first-audio · 35ms deterministic routing · no LLM in hot path</li>
+                <li>LLM-as-Judge CI (RAGAS context_precision=1.0) · Critic A2A · MCP tools · OTel every turn</li>
+              </ul>
+            </div>
 
-              <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-sm shadow-lg shadow-black/40">
-                <h2 class="font-semibold text-slate-50 mb-2">Why it’s interesting</h2>
-                <ul class="list-disc list-inside space-y-1 text-slate-300">
-                  <li>This page <em>is</em> the voice pipeline — Deepgram STT + TTS, barge-in, ~400ms first audio</li>
-                  <li>Deterministic agent loop — fully testable, no LLM in the routing layer</li>
-                  <li>LLM-as-Judge CI gate with golden dataset (RAGAS context_precision=1.0)</li>
-                  <li>Critic agent (A2A) + MCP tool endpoints for agent-to-agent validation</li>
-                  <li>OTel tracing every turn, Cloud Run production deployment</li>
-                </ul>
+            <!-- QUICK PROMPTS -->
+            <div class="shrink-0 rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
+              <h3 class="font-semibold text-slate-50 mb-1.5 text-xs">Quick prompts</h3>
+              <div class="flex flex-col gap-1.5">
+                <button
+                  class="text-left rounded-lg border border-emerald-700/60 hover:border-emerald-400/60 hover:bg-emerald-500/10 px-2.5 py-1.5 text-xs text-slate-200"
+                  data-sample="We're building a production AI phone assistant for law firms. Looking for a Lead AI Engineer with hands-on voice pipeline experience — STT/TTS integration, real-time agentic workflows, low-latency streaming, RAG architectures, and LLM observability. Python, production deployments required."
+                >
+                  🎙️ Lead AI Engineer · voice pipeline · RAG · observability
+                </button>
+                <button
+                  class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-2.5 py-1.5 text-xs text-slate-200"
+                  data-sample="I'm hiring a Senior ML Engineer to build and productionize LLM-powered features. We care about ownership, production RAG, and communication with product."
+                >
+                  🔍 Senior ML Engineer · RAG · ownership · communication
+                </button>
+                <button
+                  class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-2.5 py-1.5 text-xs text-slate-200"
+                  data-sample="We are hiring an LLM Engineer to design and ship retrieval-augmented generation systems, with strong MLOps and observability."
+                >
+                  📎 LLM Engineer · production RAG · MLOps · observability
+                </button>
+                <button
+                  class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-2.5 py-1.5 text-xs text-slate-200"
+                  data-sample="Give me an ATS-style summary and recruiter email I can use to introduce Sergiu for a Senior AI Engineer role focused on voice AI, agentic workflows, and production RAG."
+                >
+                  📝 ATS summary + recruiter email · voice AI
+                </button>
               </div>
-            </section>
+            </div>
           </div>
 
-          <!-- FULL-PAGE CHAT PANEL -->
-          <section id="live-chat" class="grid gap-6 lg:grid-cols-[1.4fr,1fr] items-start">
-            <!-- Chat -->
-            <div class="rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl shadow-black/40 backdrop-blur">
-              <div class="border-b border-slate-800 px-4 py-3 flex items-center justify-between">
-                <div>
-                  <div class="text-xs uppercase tracking-wide text-slate-400">Live demo</div>
-                  <div class="text-sm font-medium text-slate-100">Recruiter Agent Chat</div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <button id="page-stop" title="Stop speaking" class="hidden text-red-400 hover:text-red-300 text-xs flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800/80 transition-colors">
-                    ■ <span class="hidden sm:inline text-[11px]">Stop</span>
-                  </button>
-                  <button id="page-autoSpeak" title="Toggle auto-read aloud" class="text-slate-400 hover:text-sky-400 text-xs flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800/80 transition-colors">
-                    🔇 <span class="hidden sm:inline text-[11px]">Auto-speak</span>
-                  </button>
-                  <div class="flex items-center gap-1 text-xs text-slate-400">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>
-                    Ready
-                  </div>
-                </div>
+          <!-- RIGHT PANEL: CHAT (fills all available height) -->
+          <div id="live-chat" class="min-h-0 flex flex-col rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl shadow-black/40 backdrop-blur overflow-hidden">
+            <div class="shrink-0 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between">
+              <div>
+                <div class="text-xs uppercase tracking-wide text-slate-400">Live demo</div>
+                <div class="text-sm font-medium text-slate-100">Recruiter Agent Chat</div>
               </div>
-
-              <div class="h-[420px] flex flex-col">
-                <div id="page-chat-msgs" class="flex-1 overflow-y-auto px-4 py-3 space-y-2 text-sm">
-                  <!-- messages injected here -->
-                </div>
-
-                <div class="border-t border-slate-800 px-3 py-2">
-                  <div class="flex items-end gap-2">
-                    <textarea
-                      id="page-chat-inp"
-                      rows="2"
-                      class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 resize-none"
-                      placeholder="Paste a job description or ask about fit, impact, CV…"
-                    ></textarea>
-                    <button
-                      id="page-chat-mic"
-                      title="Speak"
-                      class="shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-700/80 px-3 py-2 text-slate-400 hover:text-sky-400 hover:border-sky-500/60 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                    </button>
-                    <button
-                      id="page-chat-send"
-                      class="shrink-0 inline-flex items-center justify-center rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-sky-500/30"
-                    >
-                      Send
-                    </button>
-                  </div>
-                  <p class="mt-1 text-[11px] text-slate-500">
-                    Try: <span class=”font-medium text-slate-300”>”Lead AI Engineer”</span> or paste a real JD.
-                  </p>
+              <div class="flex items-center gap-3">
+                <button id="page-stop" title="Stop speaking" class="hidden text-red-400 hover:text-red-300 text-xs flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800/80 transition-colors">
+                  ■ <span class="hidden sm:inline text-[11px]">Stop</span>
+                </button>
+                <button id="page-autoSpeak" title="Toggle auto-read aloud" class="text-slate-400 hover:text-sky-400 text-xs flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800/80 transition-colors">
+                  🔇 <span class="hidden sm:inline text-[11px]">Auto-speak</span>
+                </button>
+                <div class="flex items-center gap-1 text-xs text-slate-400">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>
+                  Ready
                 </div>
               </div>
             </div>
 
-            <!-- Sample prompts / helper -->
-            <div class="space-y-4">
-              <div class="rounded-2xl border border-slate-800 bg-slate-950/80 p-5 text-sm">
-                <h3 class="font-semibold text-slate-50 mb-2">Quick prompts</h3>
-                <div class="flex flex-col gap-2">
-                  <button
-                    class="text-left rounded-lg border border-emerald-700/60 hover:border-emerald-400/60 hover:bg-emerald-500/10 px-3 py-2 text-xs text-slate-200"
-                    data-sample="We're building a production AI phone assistant for law firms. Looking for a Lead AI Engineer with hands-on voice pipeline experience — STT/TTS integration, real-time agentic workflows, low-latency streaming, RAG architectures, and LLM observability. Python, production deployments required."
-                  >
-                    🎙️ Lead AI Engineer · voice pipeline · RAG · observability
-                  </button>
-                  <button
-                    class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
-                    data-sample="I'm hiring a Senior ML Engineer to build and productionize LLM-powered features. We care about ownership, production RAG, and communication with product."
-                  >
-                    🔍 Senior ML Engineer · RAG · ownership · communication
-                  </button>
-                  <button
-                    class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
-                    data-sample="We are hiring an LLM Engineer to design and ship retrieval-augmented generation systems, with strong MLOps and observability."
-                  >
-                    📎 LLM Engineer · production RAG · observability
-                  </button>
-                  <button
-                    class="text-left rounded-lg border border-slate-700/80 hover:border-sky-500/60 hover:bg-sky-500/10 px-3 py-2 text-xs text-slate-200"
-                    data-sample="Give me an ATS-style summary and recruiter email I can use to introduce Sergiu for a Senior AI Engineer role focused on voice AI, agentic workflows, and production RAG."
-                  >
-                    📝 ATS summary + recruiter email · voice AI
-                  </button>
-                </div>
-              </div>
-
-              <div class="rounded-2xl border border-slate-800 bg-slate-950/80 p-5 text-xs text-slate-300">
-                <h3 class="font-semibold text-slate-50 mb-2">How it works</h3>
-                <p class="mb-2">
-                  The agent runs a deterministic loop:
-                </p>
-                <ol class="list-decimal list-inside space-y-1">
-                  <li>Understands the role &amp; criteria.</li>
-                  <li>Selects best-fit projects from my portfolio.</li>
-                  <li>Generates deep dives + ATS summaries.</li>
-                  <li>Answers CV questions via RAG.</li>
-                </ol>
-              </div>
+            <!-- Messages — flex-1 + min-h-0 so it scrolls rather than expanding the parent -->
+            <div id="page-chat-msgs" class="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2 text-sm">
             </div>
-          </section>
+
+            <div class="shrink-0 border-t border-slate-800 px-3 py-2">
+              <div class="flex items-end gap-2">
+                <textarea
+                  id="page-chat-inp"
+                  rows="2"
+                  class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 resize-none"
+                  placeholder="Paste a job description or ask about fit, impact, CV…"
+                ></textarea>
+                <button
+                  id="page-chat-mic"
+                  title="Speak"
+                  class="shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-700/80 px-3 py-2 text-slate-400 hover:text-sky-400 hover:border-sky-500/60 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4">
+                    <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                  </svg>
+                </button>
+                <button
+                  id="page-chat-send"
+                  class="shrink-0 inline-flex items-center justify-center rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-slate-950 shadow-lg shadow-sky-500/30"
+                >
+                  Send
+                </button>
+              </div>
+              <p class="mt-1 text-[11px] text-slate-500">
+                Try: <span class="font-medium text-slate-300">"Lead AI Engineer"</span> or paste a real JD.
+              </p>
+            </div>
+          </div>
+
         </div>
       </main>
 
       <!-- FOOTER -->
-      <footer class="border-t border-slate-800 bg-slate-950/90 text-xs text-slate-500 py-4 px-4">
-        <div class="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between gap-2">
+      <footer class="shrink-0 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-500 py-2 px-4">
+        <div class="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between gap-1">
           <span>© Sergiu — AI/ML Engineer · Voice AI · Agentic Systems.</span>
           <span>Stack: Deepgram · Gemini · FastAPI · Cloud Run · OTel.</span>
         </div>
       </footer>
 
-      <!-- FLOATING WIDGET -->
+      <!-- FLOATING BUTTON — focuses the chat input -->
       <button
         id="widget-launch"
         class="fixed right-4 bottom-4 sm:right-6 sm:bottom-6 z-40 border-0 px-3.5 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-semibold shadow-xl shadow-sky-500/40 flex items-center gap-2"
       >
-        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-950/80 text-[11px] font-bold text-sky-400 border border-sky-400/60">
-          SR
-        </span>
+        <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-950/80 text-[11px] font-bold text-sky-400 border border-sky-400/60">SR</span>
         <span>Chat with the AI tour</span>
       </button>
 
     </div>
 
     <!-- SHARED CHAT LOGIC -->
-   <script>
+    <script>
 document.addEventListener("DOMContentLoaded", function () {
   // =====================================
   // CONFIG
@@ -381,7 +342,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const data = await res.json();
 
-      // Persist session + state
       if (data.session_id) {
         sessionId = data.session_id;
         localStorage.setItem("tourSessionId", sessionId);
@@ -411,10 +371,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const addYou = (t) => addMsg("you", t);
     window._pageChat = { addAI, addYou };
 
-    // Initial welcome
     addAI(
-      "Hi! I’m Sergiu’s AI recruiter agent.<br><br>" +
-        "Tell me the role you’re hiring for — or paste a full job description.<br>" +
+      "Hi! I'm Sergiu's AI recruiter agent.<br><br>" +
+        "Tell me the role you're hiring for — or paste a full job description.<br>" +
         "E.g. <b>Lead AI Engineer</b>, <b>Senior ML Engineer</b>, <b>Voice AI Engineer</b>.<br><br>" +
         "You can also hit the mic button to speak your requirements directly."
     );
@@ -436,7 +395,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
 
-    // sample prompt buttons
     document.querySelectorAll("[data-sample]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const text = btn.getAttribute("data-sample") || "";
@@ -448,19 +406,18 @@ document.addEventListener("DOMContentLoaded", function () {
   })();
 
   // =====================================
-  // FLOATING BUTTON → scroll to page chat
+  // FLOATING BUTTON → focus chat input
   // =====================================
   (function initLaunchBtn() {
     const launch = document.getElementById("widget-launch");
     if (!launch) return;
 
     launch.addEventListener("click", function () {
-      document.getElementById("live-chat").scrollIntoView({ behavior: "smooth" });
       document.getElementById("page-chat-inp").focus();
     });
 
-    // Auto-scroll + send intro for recruiters arriving from GitHub/LinkedIn
-    (function autoScroll() {
+    // Auto-focus for recruiters arriving from GitHub/LinkedIn
+    (function autoFocus() {
       const ref = document.referrer.toLowerCase();
       const srcParam = new URLSearchParams(location.search).get("src")?.toLowerCase();
       const isRecruiter =
@@ -471,7 +428,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (isRecruiter) {
         setTimeout(function () {
-          document.getElementById("live-chat").scrollIntoView({ behavior: "smooth" });
+          document.getElementById("page-chat-inp").focus();
         }, 600);
       }
     })();
@@ -499,7 +456,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let currentAudio = null;
     let autoSpeak = false;
 
-    // --- Fallback browser TTS (for per-message speak buttons) ---
     function stripHtml(html) {
       const el = document.createElement("div");
       el.innerHTML = html;
@@ -526,23 +482,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
     window._voiceAutoSpeak = function () {};  // server TTS handles auto-speak in voice mode
 
-    // --- Stop buttons ---
     ["page-stop", "widget-stop"].forEach(function (id) {
       const btn = document.getElementById(id);
       if (!btn) return;
       btn.addEventListener("click", function () {
         if (currentAudio) { currentAudio.pause(); currentAudio = null; }
         if (window.speechSynthesis) window.speechSynthesis.cancel();
-        ttsPlaying = false;  // re-enable mic — pause() never fires onended
+        ttsPlaying = false;
         showStopBtns(false);
-        // Tell server to reset is_speaking so the next transcript isn't dropped
         if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
           voiceWs.send(JSON.stringify({ type: "barge_in" }));
         }
       });
     });
 
-    // --- Auto-speak toggle ---
     function updateToggleUI() {
       const icon = autoSpeak ? "🔊" : "🔇";
       const pageBtn = document.getElementById("page-autoSpeak");
@@ -560,7 +513,6 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
 
-    // --- Play accumulated MP3 bytes ---
     function playAudioChunks() {
       if (!audioChunks.length) return;
       const blob = new Blob(audioChunks, { type: "audio/mpeg" });
@@ -592,20 +544,13 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
-    // --- Voice session ---
-    // One mic press = start full conversation session.
-    // Speak naturally; Deepgram auto-detects end of each utterance and triggers the agent.
-    // Press mic again to end the session entirely.
     let ttsPlaying = false;
-    let bargeinChunks = 0;  // consecutive loud chunks during TTS — for auto barge-in
+    let bargeinChunks = 0;
 
     function startVoiceSession(addYou, addAI) {
       if (isRecording) { stopVoiceSession(); return; }
 
       navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
-        // Create AudioContext first so we read the real sample rate before opening WebSocket.
-        // Browsers often ignore { sampleRate: 16000 } — this way we always tell Deepgram
-        // the true rate so decoding is correct on every session.
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const actualRate = audioContext.sampleRate;
         console.log("[voice] AudioContext sample_rate:", actualRate);
@@ -618,14 +563,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
         voiceWs.onmessage = function (e) {
           if (e.data instanceof ArrayBuffer) {
-            // MP3 bytes from TTS — accumulate until audio_end
             audioChunks.push(new Blob([e.data], { type: "audio/mpeg" }));
             return;
           }
           try {
             const msg = JSON.parse(e.data);
             if (msg.type === "ready") {
-              // Wire ScriptProcessor → send raw PCM to server
               const source = audioContext.createMediaStreamSource(stream);
               audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
               source.connect(audioProcessor);
@@ -633,10 +576,9 @@ document.addEventListener("DOMContentLoaded", function () {
               audioProcessor.onaudioprocess = function (ev) {
                 if (!voiceWs || voiceWs.readyState !== WebSocket.OPEN) return;
                 const float32 = ev.inputBuffer.getChannelData(0);
-                const int16 = new Int16Array(float32.length); // zeros by default
+                const int16 = new Int16Array(float32.length);
 
                 if (ttsPlaying) {
-                  // Compute RMS to detect if user is speaking over TTS
                   let rms = 0;
                   for (let i = 0; i < float32.length; i++) rms += float32[i] * float32[i];
                   rms = Math.sqrt(rms / float32.length);
@@ -648,7 +590,6 @@ document.addEventListener("DOMContentLoaded", function () {
                   }
 
                   if (bargeinChunks >= 1) {
-                    // One loud chunk (~85 ms) = user speaking — auto barge-in immediately
                     console.log("[voice] auto barge-in rms=" + rms.toFixed(4));
                     bargeinChunks = 0;
                     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
@@ -657,15 +598,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
                       voiceWs.send(JSON.stringify({ type: "barge_in" }));
                     }
-                    // Fall through: send this chunk as real audio below
                   } else {
-                    // Send silence — keeps Deepgram connection alive without transcribing TTS
                     voiceWs.send(int16.buffer);
                     return;
                   }
                 }
 
-                // Real mic audio (either ttsPlaying just ended via barge-in, or normal flow)
                 bargeinChunks = 0;
                 for (let i = 0; i < float32.length; i++) {
                   const s = Math.max(-1, Math.min(1, float32[i]));
@@ -713,7 +651,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function stopVoiceSession() {
-      // Tell server to stop, then tear down audio
       if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
         voiceWs.send(JSON.stringify({ type: "stop_session" }));
         voiceWs.close(1000);
@@ -733,8 +670,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
 
-    // Wire mic button — needs access to page chat addYou/addAI
-    // These are set by initPageChat via window._pageChat
     const micBtn = document.getElementById("page-chat-mic");
     if (micBtn) {
       micBtn.addEventListener("click", function () {
@@ -744,7 +679,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   })();
 });
-</script>
+    </script>
 
   </body>
 </html>
