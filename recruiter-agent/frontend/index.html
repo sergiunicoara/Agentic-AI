@@ -538,7 +538,7 @@ document.addEventListener("DOMContentLoaded", function () {
       currentAudio = new Audio(url);
       currentAudio.onplay = function () {
         ttsPlaying = true;
-        console.log("[voice] TTS playback started — mic muted");
+        console.log("[voice] TTS playback started — mic muted, chunks=" + audioChunks.length);
         showStopBtns(true);
       };
       currentAudio.onended = function () {
@@ -581,10 +581,12 @@ document.addEventListener("DOMContentLoaded", function () {
         voiceWs.onmessage = function (e) {
           if (e.data instanceof ArrayBuffer) {
             audioChunks.push(new Blob([e.data], { type: "audio/mpeg" }));
+            console.log("[voice] bytes chunk, total=" + audioChunks.length + " ttsPlaying=" + ttsPlaying);
             return;
           }
           try {
             const msg = JSON.parse(e.data);
+            if (msg.type !== "ready") console.log("[voice] msg type=" + msg.type + " ttsPlaying=" + ttsPlaying + " chunks=" + audioChunks.length);
             if (msg.type === "ready") {
               const source = audioContext.createMediaStreamSource(stream);
               audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
@@ -599,6 +601,10 @@ document.addEventListener("DOMContentLoaded", function () {
                   let rms = 0;
                   for (let i = 0; i < float32.length; i++) rms += float32[i] * float32[i];
                   rms = Math.sqrt(rms / float32.length);
+
+                  // Log RMS every ~24 chunks (~2s) so we can see if speech is detectable
+                  if (typeof window._rmsLog === "undefined") window._rmsLog = 0;
+                  if (++window._rmsLog % 24 === 0) console.log("[voice] rms=" + rms.toFixed(4) + " bargeinChunks=" + bargeinChunks);
 
                   if (rms > 0.010) {
                     bargeinChunks++;
