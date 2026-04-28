@@ -92,7 +92,12 @@ async def _tts_stream(
     text: str, ws: WebSocket, cancel: asyncio.Event | None = None
 ) -> None:
     """Stream TTS sentence-by-sentence.  Aborts mid-stream if *cancel* is set —
-    even while a synthesis task is in-flight — so barge-in is truly instant."""
+    even while a synthesis task is in-flight — so barge-in is truly instant.
+
+    Sends "audio_end" on normal completion, "audio_cancelled" on barge-in.
+    Client only calls playAudioChunks() on "audio_end", so stale bytes
+    from an interrupted stream are never played.
+    """
     sentences = _split_sentences(text)
     if not sentences:
         await ws.send_text(json.dumps({"type": "audio_end"}))
@@ -100,12 +105,14 @@ async def _tts_stream(
 
     # Kick off all synthesis tasks in parallel upfront
     tasks = [asyncio.create_task(_tts_bytes(s)) for s in sentences]
+    cancelled = False
 
     for task in tasks:
         if cancel and cancel.is_set():
             for t in tasks:
                 if not t.done():
                     t.cancel()
+            cancelled = True
             break
 
         if cancel:
@@ -124,6 +131,7 @@ async def _tts_stream(
                 for t in tasks:
                     if not t.done():
                         t.cancel()
+                cancelled = True
                 break
 
             try:
@@ -136,7 +144,10 @@ async def _tts_stream(
         if audio:
             await ws.send_bytes(audio)
 
-    await ws.send_text(json.dumps({"type": "audio_end"}))
+    if cancelled:
+        await ws.send_text(json.dumps({"type": "audio_cancelled"}))
+    else:
+        await ws.send_text(json.dumps({"type": "audio_end"}))
 
 
 async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000) -> None:
@@ -290,19 +301,7 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
                             break
                         elif ctrl.get("type") == "barge_in":
                             tts_cancel.set()
-                            # Drain transcripts that queued while TTS was playing —
-                            # otherwise stale commands (e.g. three "one"s) all fire at once.
-                            drained = 0
-                            while not transcript_queue.empty():
-                                try:
-                                    transcript_queue.get_nowait()
-                                    drained += 1
-                                except asyncio.QueueEmpty:
-                                    break
-                            logger.info(
-                                "barge_in: tts_cancel set, drained %d stale transcripts session=%s",
-                                drained, session_id,
-                            )
+                            logger.info("barge_in: tts_cancel set session=%s", session_id)
                     except Exception:
                         pass
         except WebSocketDisconnect:

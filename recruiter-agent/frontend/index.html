@@ -503,7 +503,7 @@ document.addEventListener("DOMContentLoaded", function () {
       btn.addEventListener("click", function () {
         if (currentAudio) { currentAudio.pause(); currentAudio = null; }
         audioChunks = [];
-        discardTTS = true;  // ignore bytes + audio_end still in-flight
+        // server will send audio_cancelled instead of audio_end — bytes are discarded there
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         ttsPlaying = false;
         showStopBtns(false);
@@ -562,7 +562,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     let ttsPlaying = false;
-    let discardTTS = false;   // true after barge-in until stale audio_end is consumed
     let bargeinChunks = 0;
 
     function startVoiceSession(addYou, addAI) {
@@ -581,8 +580,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         voiceWs.onmessage = function (e) {
           if (e.data instanceof ArrayBuffer) {
-            // Discard bytes that arrive in-flight after a barge-in
-            if (!discardTTS) audioChunks.push(new Blob([e.data], { type: "audio/mpeg" }));
+            audioChunks.push(new Blob([e.data], { type: "audio/mpeg" }));
             return;
           }
           try {
@@ -613,7 +611,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     bargeinChunks = 0;
                     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
                     audioChunks = [];
-                    discardTTS = true;  // ignore bytes + audio_end still in-flight
+                    // server will send audio_cancelled instead of audio_end — bytes are discarded there
                     ttsPlaying = false;
                     showStopBtns(false);
                     if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
@@ -639,16 +637,12 @@ document.addEventListener("DOMContentLoaded", function () {
               addYou(msg.text);
             } else if (msg.type === "reply") {
               addAI(msg.text);
-              discardTTS = false; // new agent response — accept the next TTS stream
             } else if (msg.type === "audio_end") {
-              if (discardTTS) {
-                // Stale audio_end from the interrupted response — consume and reset
-                audioChunks = [];
-                discardTTS = false;
-                console.log("[voice] discarded stale audio_end after barge-in");
-              } else {
-                playAudioChunks();
-              }
+              playAudioChunks();
+            } else if (msg.type === "audio_cancelled") {
+              // TTS was interrupted by barge-in — discard buffered bytes, don't play
+              audioChunks = [];
+              console.log("[voice] TTS cancelled, chunks discarded");
             } else if (msg.type === "error") {
               addAI("⚠️ Voice error: " + msg.message);
               stopVoiceSession();
