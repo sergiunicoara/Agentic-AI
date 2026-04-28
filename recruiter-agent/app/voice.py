@@ -282,7 +282,19 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
                             break
                         elif ctrl.get("type") == "barge_in":
                             tts_cancel.set()
-                            logger.info("barge_in: tts_cancel set session=%s", session_id)
+                            # Drain transcripts that queued while TTS was playing —
+                            # otherwise stale commands (e.g. three "one"s) all fire at once.
+                            drained = 0
+                            while not transcript_queue.empty():
+                                try:
+                                    transcript_queue.get_nowait()
+                                    drained += 1
+                                except asyncio.QueueEmpty:
+                                    break
+                            logger.info(
+                                "barge_in: tts_cancel set, drained %d stale transcripts session=%s",
+                                drained, session_id,
+                            )
                     except Exception:
                         pass
         except WebSocketDisconnect:

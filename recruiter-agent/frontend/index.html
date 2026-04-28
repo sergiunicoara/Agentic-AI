@@ -598,7 +598,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   for (let i = 0; i < float32.length; i++) rms += float32[i] * float32[i];
                   rms = Math.sqrt(rms / float32.length);
 
-                  if (rms > 0.015) {
+                  if (rms > 0.010) {
                     bargeinChunks++;
                   } else {
                     bargeinChunks = 0;
