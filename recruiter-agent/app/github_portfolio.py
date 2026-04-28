@@ -157,12 +157,26 @@ def _parse_markdown_to_project(
     if not summary:
         summary = f"Project in repo `{repo}` from file `{md_name}`."
 
-    # --- Impacts: all bullet lines (trimmed) ---
+    # --- Impacts: bullet lines that look like human-readable outcomes ---
     impacts: List[str] = []
+    in_code_block = False
     for line in lines:
         s = line.strip()
-        if s.startswith(("-", "*")) and len(s) > 2:
-            impacts.append(s.lstrip("-* ").strip())
+        if s.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+        if not s.startswith(("-", "*")) or len(s) <= 2:
+            continue
+        text = s.lstrip("-* ").strip()
+        # Skip shell flags, curl args, code fragments
+        if text.startswith(("-", "\\", "$", "H ", "d ", "F ", "X ")) or \
+           text.startswith(("http", "curl", "wget")) or \
+           text.startswith(("\"", "'")) or \
+           "Content-Type" in text or "application/json" in text:
+            continue
+        impacts.append(text)
     impacts = impacts[:6]  # keep it compact
 
     # --- Tags: simple keyword search ---

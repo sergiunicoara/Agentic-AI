@@ -622,13 +622,35 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
         role = state.role
         criteria = state.criteria
 
+        # If the user restates a role (e.g. "AI engineer") while already in a session,
+        # treat it as wanting to start over with a new role — not a menu command.
+        _NAV_WORDS = {"1", "one", "won", "deep", "dive", "another", "next", "more",
+                      "yes", "y", "continue", "go", "show", "ok", "okay"}
+        _ATS_WORDS = {"2", "two", "to", "too", "ats", "summary", "ats summary"}
+        restated_role = extract_role(msg)
+        if restated_role and low not in _NAV_WORDS and \
+                low not in _ATS_WORDS and \
+                not _is_job_description(msg) and not _looks_like_cv_question(msg):
+            remember(state, "change_role", {"old_role": state.role})
+            state.role = restated_role
+            state.criteria = []
+            state.extra.pop("projects", None)
+            state.extra.pop("deep_dive_index", None)
+            return {
+                "reply": (
+                    f"Switching to **{restated_role}**.\n\n"
+                    "What are your top 1–3 evaluation criteria?\n"
+                    "Examples: **production RAG, ownership, voice AI, communication**.\n\n"
+                    "You can list them comma-separated."
+                ),
+                "state": state,
+            }
+
         projects, deep_idx = _get_projects_for_state(state)
 
         # OPTION 1: deep dive / another / yes / next
         # Also match short phrases containing a nav word (e.g. "next one", "show next")
-        # "won" = common Deepgram transcription of "one" (homophone)
-        _NAV = {"1", "one", "won", "deep", "dive", "another", "next", "more",
-                "yes", "y", "continue", "go", "show", "ok", "okay"}
+        _NAV = _NAV_WORDS | {"another"}
         _low_words = low.split()
         if low in _NAV or any(w in _NAV for w in _low_words):
             total = len(projects)

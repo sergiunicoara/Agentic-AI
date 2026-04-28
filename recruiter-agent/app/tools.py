@@ -18,6 +18,53 @@ logger = logging.getLogger(__name__)
 
 STATIC_PROJECTS: List[Dict[str, Any]] = [
     {
+        "id": "ai-engineering-toolkit",
+        "title": "AI Engineering Workflow Toolkit",
+        "summary": (
+            "Production-grade CI/CD quality gate for AI-assisted codebases: every git diff runs "
+            "through a deterministic tool pipeline (AST analysis, test coverage, dependency audit) "
+            "before any LLM judgement fires. FastAPI backend with live WebSocket streaming, "
+            "React dashboard with approve-rate stats and eval regression scores, and a "
+            "multi-metric LLM judge that blocks merges if quality regresses."
+        ),
+        "impact": [
+            "Enforces deterministic tool checks before LLM evaluation — eliminates hallucinated verdicts",
+            "Real-time WebSocket streams pipeline results to dashboard as each stage completes",
+            "Multi-metric judge scores faithfulness, relevancy, and factuality per review",
+            "Approve-rate and regression trend charts visible across all PRs in the dashboard",
+            "One-command deploy: Docker Compose brings up API, judge, and React frontend",
+        ],
+        "tags": [
+            "agents", "llm", "evaluation", "observability", "ci-cd", "websocket",
+            "production", "fastapi", "react", "python", "agentic",
+        ],
+        "link": "https://github.com/sergiunicoara/Agentic-AI/tree/main/AIEngineering%20workflow%20toolkit",
+        "source_repo": "Agentic-AI",
+    },
+    {
+        "id": "ai-native-data-platform",
+        "title": "AI-Native Data Platform",
+        "summary": (
+            "Production-grade RAG platform scaffold demonstrating the engineering patterns used "
+            "in real AI-native systems: multi-stage retrieval, multimodal ingestion, runtime "
+            "reliability contracts, DSPy-optimized NL→SQL, and a full Prometheus + Grafana "
+            "observability stack."
+        ),
+        "impact": [
+            "Multi-stage retrieval pipeline: embedding → re-rank → NL→SQL with DSPy optimisation",
+            "Multimodal ingestion handles text, tables, and images in a unified pipeline",
+            "Runtime reliability contracts (SLOs) enforce retrieval quality at inference time",
+            "Prometheus + Grafana observability stack: latency, recall, and error-rate dashboards",
+            "Modular scaffold: swap vector store, LLM, or retriever without changing the pipeline contract",
+        ],
+        "tags": [
+            "rag", "production_rag", "retrieval", "embeddings", "observability",
+            "multimodal", "nlp", "production", "pipeline", "llm", "python",
+        ],
+        "link": "https://github.com/sergiunicoara/Agentic-AI/tree/main/ai-native-data-platform",
+        "source_repo": "Agentic-AI",
+    },
+    {
         "id": "recruiter-agent:voice-pipeline",
         "title": "Production Voice AI Pipeline",
         "summary": (
@@ -25,7 +72,7 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "deterministic agentic orchestrator → Google Neural2-D TTS with sentence-level "
             "streaming. Continuous conversation loop with barge-in (RMS VAD), silence keepalive, "
             "and SQLite session state. OTel-traced, critic agent (A2A), LLM-as-Judge evaluation "
-            "harness, MCP tool endpoints, and CI golden dataset tests. ~170ms agent + TTS first-audio latency."
+            "harness, MCP tool endpoints, and CI golden dataset tests. ~600ms time-to-first-audio."
         ),
         "impact": [
             "Sub-200ms agent latency end-to-end on Cloud Run",
