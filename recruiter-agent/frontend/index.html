@@ -502,6 +502,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!btn) return;
       btn.addEventListener("click", function () {
         if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+        audioChunks = []; // discard buffered bytes so playAudioChunks() plays nothing
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         ttsPlaying = false;
         showStopBtns(false);
@@ -608,6 +609,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     console.log("[voice] auto barge-in rms=" + rms.toFixed(4));
                     bargeinChunks = 0;
                     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+                    audioChunks = []; // discard buffered TTS bytes so playAudioChunks() plays nothing
                     ttsPlaying = false;
                     showStopBtns(false);
                     if (voiceWs && voiceWs.readyState === WebSocket.OPEN) {
