@@ -462,6 +462,21 @@ document.addEventListener("DOMContentLoaded", function () {
       return el.textContent || el.innerText || "";
     }
 
+    function stripMarkdown(text) {
+      return text
+        .replace(/#{1,6}\s*/g, "")          // ### headings
+        .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")  // **bold** / *italic*
+        .replace(/`([^`]+)`/g, "$1")         // `code`
+        .replace(/`{3}[\s\S]*?`{3}/g, "")   // ```code blocks```
+        .replace(/[-*_]{3,}/g, "")           // --- or *** dividers
+        .replace(/^\s*[-*+]\s+/gm, "")       // bullet list markers
+        .replace(/^\s*\d+\.\s+/gm, "")       // numbered list markers
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // [links](url)
+        .replace(/\n{2,}/g, ". ")            // double newlines → pause
+        .replace(/\n/g, " ")
+        .trim();
+    }
+
     function showStopBtns(show) {
       ["page-stop", "widget-stop"].forEach(function (id) {
         const b = document.getElementById(id);
@@ -472,7 +487,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window._voiceSpeak = function (htmlText) {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(stripHtml(htmlText));
+      const utter = new SpeechSynthesisUtterance(stripMarkdown(stripHtml(htmlText)));
       utter.rate = 1.05;
       utter.onstart = function () { showStopBtns(true); };
       utter.onend = function () { showStopBtns(false); };
