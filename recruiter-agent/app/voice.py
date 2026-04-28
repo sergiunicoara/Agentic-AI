@@ -268,6 +268,18 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
                     with tracer.start_as_current_span("voice.tts"):
                         await _tts_stream(reply, ws, cancel=tts_cancel)
 
+                    # After TTS completes (or is cancelled), drop any commands that
+                    # stacked up while we were speaking — keep only the freshest one.
+                    stacked = 0
+                    while transcript_queue.qsize() > 1:
+                        try:
+                            transcript_queue.get_nowait()
+                            stacked += 1
+                        except asyncio.QueueEmpty:
+                            break
+                    if stacked:
+                        logger.info("dropped %d stacked transcripts after TTS session=%s", stacked, session_id)
+
                 except Exception as exc:
                     logger.error("process() turn error session=%s: %s", session_id, exc, exc_info=True)
                     try:
