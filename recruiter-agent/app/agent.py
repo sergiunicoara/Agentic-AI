@@ -296,7 +296,7 @@ def format_project_deep_dive(
         f"**Impact (concrete outcomes)**\n{impacts}\n\n"
         f"**Why this fits the role & criteria**\n{fit_text}\n\n"
         f"📎 Repo: {project.get('link', '(link unavailable)')}\n\n"
-        "Reply with `another` for the next project or `2` for an ATS-style summary.\n"
+        "Say **next** or **another** for the next project · **2** or **ats** for a summary.\n"
     )
 
 
@@ -478,8 +478,8 @@ def _format_criteria_confirmation(
 
     lines.append(
         "\nFrom here you can:\n"
-        "1) Ask for a project deep dive (`1`, `another`)\n"
-        "2) Get an ATS-style summary + recruiter email (`2`, `ats`)\n\n"
+        "1) Project deep dive — say **next** or **another** (or type `1`)\n"
+        "2) ATS summary + recruiter email — say **summary** or **ats** (or type `2`)\n\n"
         "You can also paste a job description for additional context."
     )
 
@@ -626,7 +626,9 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
 
         # OPTION 1: deep dive / another / yes / next
         # Also match short phrases containing a nav word (e.g. "next one", "show next")
-        _NAV = {"1", "one", "deep", "dive", "another", "next", "more", "yes", "y"}
+        # "won" = common Deepgram transcription of "one" (homophone)
+        _NAV = {"1", "one", "won", "deep", "dive", "another", "next", "more",
+                "yes", "y", "continue", "go", "show", "ok", "okay"}
         _low_words = low.split()
         if low in _NAV or (len(_low_words) <= 3 and any(w in _NAV for w in _low_words)):
             total = len(projects)
