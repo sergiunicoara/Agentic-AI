@@ -489,9 +489,18 @@ document.addEventListener("DOMContentLoaded", function () {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(stripMarkdown(stripHtml(htmlText)));
       utter.rate = 1.05;
-      utter.onstart = function () { showStopBtns(true); };
-      utter.onend = function () { showStopBtns(false); };
-      utter.onerror = function () { showStopBtns(false); };
+      utter.onstart = function () {
+        ttsPlaying = true;   // mute mic so speaker output isn't transcribed
+        showStopBtns(true);
+      };
+      utter.onend = function () {
+        ttsPlaying = false;
+        showStopBtns(false);
+      };
+      utter.onerror = function () {
+        ttsPlaying = false;
+        showStopBtns(false);
+      };
       window.speechSynthesis.speak(utter);
     };
 
@@ -606,13 +615,13 @@ document.addEventListener("DOMContentLoaded", function () {
                   if (typeof window._rmsLog === "undefined") window._rmsLog = 0;
                   if (++window._rmsLog % 24 === 0) console.log("[voice] rms=" + rms.toFixed(4) + " bargeinChunks=" + bargeinChunks);
 
-                  if (rms > 0.010) {
+                  if (rms > 0.050) {
                     bargeinChunks++;
                   } else {
                     bargeinChunks = 0;
                   }
 
-                  if (bargeinChunks >= 1) {
+                  if (bargeinChunks >= 2) {
                     console.log("[voice] auto barge-in rms=" + rms.toFixed(4));
                     bargeinChunks = 0;
                     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
