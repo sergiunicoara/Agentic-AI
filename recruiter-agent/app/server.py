@@ -159,12 +159,17 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
     except Exception as exc:
         logger.warning("session save failed session=%s error=%s", session_id, exc)
 
+    # Strip project objects from client payload — they're large and cause the
+    # round-trip state to bloat / get dropped, resetting deep_dive_index to 0.
+    # The index is preserved; projects are reloaded from cache on the next turn.
+    # SQLite gets the full state (projects included) for voice session recovery.
+    client_extra = {k: v for k, v in new_state.extra.items() if k != "projects"}
     safe_state = {
         "source": new_state.source,
         "role": new_state.role,
         "criteria": new_state.criteria,
         "memory": new_state.memory,
-        "extra": new_state.extra,
+        "extra": client_extra,
     }
 
     return ChatResponse(

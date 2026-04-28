@@ -330,8 +330,12 @@ def _get_projects_for_state(state: State) -> Tuple[List[Dict[str, Any]], int]:
             projects = get_all_projects()
 
         state.extra["projects"] = projects
-        state.extra["deep_dive_index"] = 0
-        deep_idx = 0
+        # Preserve index if it already exists — projects may have been stripped from
+        # the client payload but the index survived the round-trip. Only reset on
+        # a genuine first load (role/criteria just set, no prior index).
+        if "deep_dive_index" not in state.extra:
+            state.extra["deep_dive_index"] = 0
+            deep_idx = 0
 
     return projects, deep_idx
 
