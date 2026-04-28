@@ -259,6 +259,14 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
 
                 except Exception as exc:
                     logger.error("process() turn error session=%s: %s", session_id, exc, exc_info=True)
+                    try:
+                        await ws.send_text(json.dumps({
+                            "type": "reply",
+                            "text": f"⚠️ Something went wrong processing your request. Please try again.",
+                        }))
+                        await ws.send_text(json.dumps({"type": "audio_end"}))
+                    except Exception:
+                        pass
 
         proc_task = asyncio.create_task(process())
 

@@ -502,7 +502,7 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
     msg = user_message.strip()
     # Deepgram punctuate:true appends periods ("Two." "Another.") — strip trailing
     # punctuation so short-command matching works regardless of STT punctuation.
-    low = msg.lower().strip(".,!?;:")
+    low = msg.lower().strip(".,!?;:").strip()
 
     # --------------------------------------------------------
     # Global commands
@@ -630,7 +630,7 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
         _NAV = {"1", "one", "won", "deep", "dive", "another", "next", "more",
                 "yes", "y", "continue", "go", "show", "ok", "okay"}
         _low_words = low.split()
-        if low in _NAV or (len(_low_words) <= 3 and any(w in _NAV for w in _low_words)):
+        if low in _NAV or any(w in _NAV for w in _low_words):
             total = len(projects)
             if total == 0:
                 # ultra-defensive, should never happen
