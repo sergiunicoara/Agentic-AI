@@ -17,6 +17,7 @@ from .critic_agent import get_critic_session_summary, validate_turn
 from .mcp import call_mcp_tool, list_mcp_tools
 from .models import ChatRequest, ChatResponse, State
 from .quality import StepKind, Trajectory
+from .session_store import load_session, save_session
 from .telemetry.logging import configure_logging
 from .telemetry.tracing import configure_tracer
 
@@ -95,7 +96,8 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
         span.set_attribute("source", req.source or "")
         span.set_attribute("message_length", len(req.message))
 
-        # Restore state
+        # Restore state — client payload takes priority; SQLite is the fallback.
+        # This means a page-refresh or lost client state never resets the session.
         if req.state:
             incoming = req.state if isinstance(req.state, dict) else dict(req.state)
             state = State(
@@ -106,7 +108,7 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
                 extra=incoming.get("extra", {}),
             )
         else:
-            state = State(source=req.source)
+            state = load_session(session_id) or State(source=req.source)
 
         # Trajectory: log user turn
         trajectory = Trajectory(session_id=session_id)
@@ -150,6 +152,12 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
             trajectory.to_dict()["turn_count"],
             extra={"json_fields": trajectory.to_dict()},
         )
+
+    # Persist to SQLite so voice and future turns can recover even if client loses state
+    try:
+        save_session(session_id, new_state)
+    except Exception as exc:
+        logger.warning("session save failed session=%s error=%s", session_id, exc)
 
     safe_state = {
         "source": new_state.source,
