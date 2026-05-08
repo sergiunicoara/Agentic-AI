@@ -6,7 +6,7 @@ export const restClient = axios.create({
   baseURL: `${ENVOY_BASE}/api/v1`,
 });
 
-// Attach JWT from localStorage to every request
+// Attach session token from localStorage to every request
 restClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
   if (token) {
@@ -15,19 +15,53 @@ restClient.interceptors.request.use((config) => {
   return config;
 });
 
-// --- Auth ---
+// --- OIDC PKCE helpers ---
 
-export async function login(email: string, password: string): Promise<string> {
-  const { data } = await restClient.post<{ access_token: string }>("/auth/login", {
-    email,
-    password,
+function base64url(buf: Uint8Array): string {
+  return btoa(String.fromCharCode(...buf))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
+export async function generatePKCE(): Promise<{ verifier: string; challenge: string }> {
+  const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = base64url(verifierBytes);
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const challenge = base64url(new Uint8Array(hash));
+  return { verifier, challenge };
+}
+
+export async function initiateOIDCLogin(): Promise<void> {
+  const { verifier, challenge } = await generatePKCE();
+
+  const { data } = await restClient.get<{ authorization_url: string; state: string }>(
+    `/auth/authorize?code_challenge=${encodeURIComponent(challenge)}`
+  );
+
+  sessionStorage.setItem(`pkce_verifier:${data.state}`, verifier);
+  sessionStorage.setItem("oidc_state", data.state);
+
+  window.location.href = data.authorization_url;
+}
+
+export async function exchangeOIDCCode(code: string, state: string): Promise<string> {
+  const verifier = sessionStorage.getItem(`pkce_verifier:${state}`) ?? "";
+  sessionStorage.removeItem(`pkce_verifier:${state}`);
+  sessionStorage.removeItem("oidc_state");
+
+  const { data } = await restClient.post<{ access_token: string }>("/auth/callback", {
+    code,
+    state,
+    code_verifier: verifier,
   });
+
   localStorage.setItem("access_token", data.access_token);
   return data.access_token;
 }
 
 export async function logout(): Promise<void> {
-  await restClient.post("/auth/logout");
+  await restClient.post("/auth/logout").catch(() => {});
   localStorage.removeItem("access_token");
 }
 

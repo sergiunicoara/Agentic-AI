@@ -1,44 +1,147 @@
+"""OIDC Authorization Code Flow with PKCE.
+
+GET  /auth/authorize          → generate PKCE pair, store verifier in Redis,
+                                return redirect URL to OIDC provider
+POST /auth/callback           → exchange code + verifier, validate ID token,
+                                JIT-provision user, return session token
+POST /auth/logout             → revoke session token
+"""
+from __future__ import annotations
+
+import logging
+import secrets
+import uuid
+
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
+from app.models.user import User
 from app.services.auth_service import (
-    authenticate_user,
-    create_access_token,
+    create_session_token,
     decode_token,
+    get_redis,
     revoke_token,
+)
+from app.services.oidc_service import (
+    exchange_code,
+    get_authorization_url,
+    validate_id_token,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer()
 
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
+_PKCE_TTL = 300  # seconds — PKCE verifier validity window
 
 
-class TokenResponse(BaseModel):
+# ---------------------------------------------------------------------------
+# Step 1: initiate OIDC flow
+# ---------------------------------------------------------------------------
+
+class AuthorizeResponse(BaseModel):
+    authorization_url: str
+    state: str
+
+
+@router.get("/authorize", response_model=AuthorizeResponse)
+async def authorize(code_challenge: str):
+    """Return the OIDC authorization URL.
+
+    The frontend generates the PKCE pair and sends the challenge here.
+    The backend stores the state for CSRF validation; the frontend retains
+    the verifier and sends it back in /callback.
+    """
+    state = secrets.token_urlsafe(16)
+    r = get_redis()
+    await r.set(f"state:{state}", "valid", ex=_PKCE_TTL)
+
+    url = await get_authorization_url(state=state, code_challenge=code_challenge)
+    return AuthorizeResponse(authorization_url=url, state=state)
+
+
+# ---------------------------------------------------------------------------
+# Step 2: handle callback — exchange code for session token
+# ---------------------------------------------------------------------------
+
+class CallbackRequest(BaseModel):
+    code: str
+    state: str
+    code_verifier: str  # frontend sends back the verifier it generated
+
+
+class SessionTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
 
-@router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    user = await authenticate_user(body.email, body.password, db)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-    token = create_access_token(user)
-    return TokenResponse(access_token=token)
+@router.post("/callback", response_model=SessionTokenResponse)
+async def callback(body: CallbackRequest, db: AsyncSession = Depends(get_db)):
+    """Exchange OIDC authorization code for an internal session token."""
+    r = get_redis()
+    if not await r.get(f"state:{body.state}"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state")
+    await r.delete(f"state:{body.state}")
 
+    code_verifier = body.code_verifier
+    if not code_verifier:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code_verifier")
+
+    try:
+        token_response = await exchange_code(code=body.code, code_verifier=code_verifier)
+        claims = await validate_id_token(
+            token_response["id_token"],
+            access_token=token_response.get("access_token", ""),
+        )
+    except Exception as exc:
+        logger.error("OIDC callback failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
+
+    oidc_sub: str = claims["sub"]
+    email: str = claims.get("email", "")
+
+    # JIT provision: create user on first login, or fetch existing
+    result = await db.execute(select(User).where(User.oidc_sub == oidc_sub))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        # Also check by email in case user was pre-created (seed admin, etc.)
+        result2 = await db.execute(select(User).where(User.email == email))
+        user = result2.scalar_one_or_none()
+
+    if user is None:
+        user = User(
+            id=str(uuid.uuid4()),
+            email=email,
+            oidc_sub=oidc_sub,
+            role="viewer",
+            clearance_level=0,
+        )
+        db.add(user)
+    else:
+        # Bind OIDC sub to existing user
+        user.oidc_sub = oidc_sub
+
+    await db.commit()
+    await db.refresh(user)
+
+    return SessionTokenResponse(access_token=create_session_token(user))
+
+
+# ---------------------------------------------------------------------------
+# Logout
+# ---------------------------------------------------------------------------
 
 @router.post("/logout")
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
-    payload = decode_token(credentials.credentials)
-    await revoke_token(payload["jti"])
+    try:
+        payload = decode_token(credentials.credentials)
+        await revoke_token(payload["jti"])
+    except Exception:
+        pass
     return {"detail": "Logged out"}

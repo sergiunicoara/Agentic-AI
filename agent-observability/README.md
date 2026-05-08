@@ -9,9 +9,13 @@ Browser (React + TS)
   ├── gRPC-Web ──► Envoy :8080 ──► gRPC Server :50051 ┐
   └── REST     ──► Envoy :8080 ──► FastAPI     :8000  ┘ (same Python process)
 
+Auth:
+  OIDC (Authorization Code Flow + PKCE) → any standard provider (Google, Keycloak, Auth0)
+  Internal session tokens (JWT, HS256) issued after OIDC validation
+
 Data layer:
-  Postgres :5432  → persistent trace/span/eval/user storage
-  Redis    :6379  → JWT revocation, session state
+  Postgres :5432  → persistent trace/span/eval/user/audit storage
+  Redis    :6379  → OIDC state/PKCE verifiers, session token revocation
 
 Observability:
   OTel Collector :4317 → receives OTLP traces from backend
@@ -23,25 +27,38 @@ SDK (pip install):
 ## Quick Start
 
 ```bash
-# 1. Copy environment config
+# 1. Copy environment config and fill in OIDC credentials
 cp .env.example .env
 
 # 2. Start everything
 docker compose up --build
 
-# 3. Open the dashboard
+# 3. Apply DB migrations (first run only)
+docker compose exec backend sh -c "export PYTHONPATH=/app && cd /app && alembic stamp 0001 && alembic upgrade head"
+# If columns already exist (app created them via init_db): stamp directly
+# docker compose exec backend sh -c "export PYTHONPATH=/app && cd /app && alembic stamp 0002"
+
+# 4. Open the dashboard
 open http://localhost:5173
-# Login: admin@example.com / password
-
-# 4. Generate proto stubs for SDK (required before running the example)
-pip install grpcio-tools
-python scripts/generate_proto.py
-
-# 5. Install the SDK and run the example agent
-pip install -e ./sdk
-python sdk/examples/simple_agent.py
-# → Watch live traces appear in the dashboard
+# Click "Sign in with OIDC" → authenticates via your configured provider
 ```
+
+## OIDC Configuration
+
+Add to `.env.example` (or `.env`):
+
+```env
+OIDC_ISSUER_URL=https://accounts.google.com          # or Keycloak/Auth0 issuer
+OIDC_CLIENT_ID=your-client-id
+OIDC_CLIENT_SECRET=your-client-secret                # leave empty for public clients
+OIDC_REDIRECT_URI=http://localhost:5173/auth/callback
+```
+
+**Google OAuth2:** Create credentials at console.cloud.google.com → OAuth 2.0 Client ID → Web application. Add `http://localhost:5173/auth/callback` as an authorised redirect URI.
+
+**Keycloak (local):** Add to `docker-compose.yml`, create a realm + client, set issuer to `http://host.docker.internal:8081/realms/<realm>`.
+
+Users are **JIT-provisioned** on first login (default role: `viewer`). Promote via SQL or the Admin panel.
 
 ## Services
 
@@ -65,15 +82,16 @@ agent-observability/
 │   │   ├── grpc_server.py    # AgentEventServicer (EmitEvent, SubscribeEvents)
 │   │   ├── models/           # SQLAlchemy models (traces, spans, evals, users)
 │   │   ├── routers/          # FastAPI routers (auth, traces, evals, admin)
-│   │   ├── services/         # event_bus, trace_service, auth_service, otel_setup
+│   │   ├── services/         # event_bus, trace_service, auth_service, oidc_service, abac
 │   │   └── middleware/       # Audit log middleware
 │   └── alembic/              # Database migrations
 ├── frontend/
 │   └── src/
 │       ├── components/       # TraceViewer, TokenUsageChart, LatencyChart, TaskOutcomes
-│       ├── hooks/            # useEventStream (gRPC-Web), useAuth
+│       ├── hooks/            # useEventStream (gRPC-Web), useAuth (OIDC PKCE)
+│       ├── pages/            # LoginPage, OIDCCallbackPage, TracesPage, EvalsPage, AdminPage
 │       ├── store/            # Zustand trace store
-│       └── api/              # grpcClient, restClient
+│       └── api/              # grpcClient, restClient (PKCE helpers)
 ├── sdk/
 │   ├── agent_observability/  # AgentTracer, AsyncSpan, GrpcEmitter, OtelBridge
 │   └── examples/simple_agent.py
@@ -90,12 +108,13 @@ Base URL: `http://localhost:8080/api/v1` (via Envoy) or `http://localhost:8000/a
 
 Swagger UI: `http://localhost:8000/api/v1/docs`
 
-| Method | Path | Role | Description |
+| Method | Path | Access | Description |
 |---|---|---|---|
-| POST | /auth/login | — | Get JWT token |
-| POST | /auth/logout | any | Revoke token |
-| GET | /traces | viewer+ | List agent traces |
-| GET | /traces/{id} | viewer+ | Get trace with spans |
+| GET | /auth/authorize | — | Initiate OIDC flow (returns redirect URL + state) |
+| POST | /auth/callback | — | Exchange OIDC code + PKCE verifier for session token |
+| POST | /auth/logout | any | Revoke session token |
+| GET | /traces | viewer+ | List agent traces (ABAC filtered) |
+| GET | /traces/{id} | viewer+ | Trace detail — spans filtered by clearance_level |
 | GET | /evals | viewer+ | List eval runs |
 | POST | /evals | developer+ | Create eval run |
 | POST | /evals/{id}/results | developer+ | Add eval result |
@@ -104,7 +123,7 @@ Swagger UI: `http://localhost:8000/api/v1/docs`
 | PATCH | /admin/users/{id}/role | admin | Update user role |
 | GET | /admin/audit | admin | Audit log |
 
-Unversioned: `GET /api/health` — for load balancer health checks (always available regardless of API version).
+Unversioned: `GET /api/health` — for load balancer health checks.
 
 ## gRPC API
 
@@ -123,6 +142,47 @@ service AgentEventService {
 
 Envoy routes `agent_events.v1.AgentEventService/*` → gRPC backend :50051.
 
+## ABAC (Attribute-Based Access Control)
+
+Span access is controlled by attributes on the subject (user) and resource (span):
+
+**Subject attributes** (stored in user record, embedded in session token):
+
+| Attribute | Values | Effect |
+|---|---|---|
+| `role` | `viewer` / `developer` / `admin` | Base permissions |
+| `clearance_level` | `0` / `1` / `2` | Data sensitivity access |
+| `department` | e.g. `security` | Bypass clearance for confidential |
+
+**Resource attributes** (set on spans via `attributes` dict):
+
+| Attribute | Values | Required clearance |
+|---|---|---|
+| `data_sensitivity` | `public` | 0 (all users) |
+| `data_sensitivity` | `internal` | 1 (developer+) |
+| `data_sensitivity` | `confidential` | 2 (admin or security dept) |
+| `owner_email` | user email | owner always reads own spans |
+
+**Tagging spans from the SDK:**
+
+```python
+async with trace.span("llm_call") as span:
+    span.set_attribute("data_sensitivity", "confidential")
+    span.set_attribute("owner_email", "user@example.com")
+```
+
+**Promoting a user (SQL):**
+
+```sql
+-- Grant full access
+UPDATE users SET role='admin', clearance_level=2 WHERE email='user@example.com';
+
+-- Grant confidential read via department
+UPDATE users SET department='security' WHERE email='analyst@example.com';
+```
+
+After any change sign out and back in — the session token is reissued with updated attributes.
+
 ## SDK Usage
 
 ```python
@@ -134,6 +194,7 @@ async def main():
             async with trace.span("llm_call", model="claude-sonnet-4-6") as span:
                 result = await call_llm(prompt)
                 span.record_tokens(input=512, output=128)
+                span.set_attribute("data_sensitivity", "internal")
 
             async with trace.span("tool_call") as span:
                 span.set_attribute("tool", "web_search")
@@ -141,14 +202,6 @@ async def main():
 
             trace.set_outcome("success")
 ```
-
-## RBAC
-
-| Role | Permissions |
-|---|---|
-| `viewer` | Read traces, read evals, subscribe to live stream |
-| `developer` | All viewer permissions + create/delete eval runs |
-| `admin` | All developer permissions + user management + audit log |
 
 ## Proto Generation
 

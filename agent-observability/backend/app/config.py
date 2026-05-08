@@ -16,10 +16,16 @@ class Settings(BaseSettings):
     # REST
     rest_port: int = 8000
 
-    # JWT
+    # JWT (internal session tokens issued after OIDC auth)
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
+
+    # OIDC
+    oidc_issuer_url: str = "https://accounts.google.com"   # override in .env
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""                            # empty = public client
+    oidc_redirect_uri: str = "http://localhost:5173/auth/callback"
 
     # OTel
     otel_endpoint: str = "http://localhost:4317"

@@ -1,48 +1,60 @@
 import { useState } from "react";
-import { login as apiLogin, logout as apiLogout } from "../api/restClient";
+import { initiateOIDCLogin, exchangeOIDCCode, logout as apiLogout } from "../api/restClient";
 
 interface AuthState {
   token: string | null;
   role: string | null;
   email: string | null;
+  department: string | null;
+  clearanceLevel: number;
 }
 
-function parseToken(token: string): { role: string; email: string } {
+function parseSessionToken(token: string): Omit<AuthState, "token"> {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
-    return { role: payload.role ?? "viewer", email: payload.email ?? "" };
+    return {
+      role: payload.role ?? "viewer",
+      email: payload.email ?? "",
+      department: payload.department ?? null,
+      clearanceLevel: payload.clearance_level ?? 0,
+    };
   } catch {
-    return { role: "viewer", email: "" };
+    return { role: "viewer", email: "", department: null, clearanceLevel: 0 };
   }
 }
 
+function loadStored(): AuthState {
+  const token = localStorage.getItem("access_token");
+  if (!token) return { token: null, role: null, email: null, department: null, clearanceLevel: 0 };
+  return { token, ...parseSessionToken(token) };
+}
+
 export function useAuth() {
-  const stored = localStorage.getItem("access_token");
-  const parsed = stored ? parseToken(stored) : null;
+  const [auth, setAuth] = useState<AuthState>(loadStored);
 
-  const [auth, setAuth] = useState<AuthState>({
-    token: stored,
-    role: parsed?.role ?? null,
-    email: parsed?.email ?? null,
-  });
+  async function loginWithOIDC() {
+    await initiateOIDCLogin(); // redirects — execution stops here
+  }
 
-  async function login(email: string, password: string) {
-    const token = await apiLogin(email, password);
-    const { role } = parseToken(token);
-    setAuth({ token, role, email });
+  async function handleOIDCCallback(code: string, state: string) {
+    const token = await exchangeOIDCCode(code, state);
+    setAuth({ token, ...parseSessionToken(token) });
   }
 
   async function logout() {
     await apiLogout();
-    setAuth({ token: null, role: null, email: null });
+    setAuth({ token: null, role: null, email: null, department: null, clearanceLevel: 0 });
   }
 
   return {
     token: auth.token,
     role: auth.role,
     email: auth.email,
+    department: auth.department,
+    clearanceLevel: auth.clearanceLevel,
     isAuthenticated: !!auth.token,
-    login,
+    loginWithOIDC,
+    handleOIDCCallback,
     logout,
   };
 }

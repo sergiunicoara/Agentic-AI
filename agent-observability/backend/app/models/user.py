@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -11,10 +12,15 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     email: Mapped[str] = mapped_column(String(256), unique=True, index=True)
-    hashed_password: Mapped[str] = mapped_column(String(256))
+    hashed_password: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     role: Mapped[str] = mapped_column(String(32), default="viewer")  # admin | developer | viewer
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # OIDC + ABAC fields
+    oidc_sub: Mapped[Optional[str]] = mapped_column(String(256), nullable=True, index=True)
+    department: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    clearance_level: Mapped[int] = mapped_column(Integer, default=0)  # 0=public 1=internal 2=confidential
 
 
 class AuditLog(Base):

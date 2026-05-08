@@ -8,15 +8,20 @@ import { TracesPage } from "./pages/TracesPage";
 import { EvalsPage } from "./pages/EvalsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { LoginPage } from "./pages/LoginPage";
+import { OIDCCallbackPage } from "./pages/OIDCCallbackPage";
 
 export default function App() {
   const auth = useAuth();
 
-  // Open the live gRPC-Web stream as soon as we have a token
   useEventStream(auth.token);
 
+  // OIDC callback route is always accessible (token not yet present)
+  if (window.location.pathname === "/auth/callback") {
+    return <OIDCCallbackPage onCallback={auth.handleOIDCCallback} />;
+  }
+
   if (!auth.isAuthenticated) {
-    return <LoginPage onLogin={auth.login} />;
+    return <LoginPage onLogin={auth.loginWithOIDC} />;
   }
 
   return (
@@ -30,6 +35,7 @@ export default function App() {
             <Route path="/traces" element={<TracesPage />} />
             <Route path="/evals" element={<EvalsPage />} />
             <Route path="/admin" element={<AdminPage role={auth.role} />} />
+            <Route path="/auth/callback" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
