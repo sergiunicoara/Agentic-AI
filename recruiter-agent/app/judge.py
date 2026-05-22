@@ -12,19 +12,38 @@ GEN_MODEL = "gemini-2.5-flash"
 
 _client: "genai.Client | None" = None
 
-# Langfuse — optional, degrades gracefully
+# Langfuse v4 — optional, degrades gracefully
 try:
-    from langfuse.decorators import observe, langfuse_context
+    from langfuse import observe, get_client as _lf_get_client
     _HAS_LANGFUSE = True
 except ImportError:
     _HAS_LANGFUSE = False
     def observe(*a, **kw):          # type: ignore[misc]
         return lambda f: f
-    class langfuse_context:         # type: ignore[no-redef]
-        @staticmethod
-        def update_current_observation(**_): pass
-        @staticmethod
-        def score_current_trace(**_): pass
+    def _lf_get_client():           # type: ignore[misc]
+        return None
+
+
+def _lf_update(**kwargs) -> None:
+    if not _HAS_LANGFUSE:
+        return
+    try:
+        lf = _lf_get_client()
+        if lf:
+            lf.update_current_generation(**kwargs)
+    except Exception:
+        pass
+
+
+def _lf_score(name: str, value: float, comment: str = "") -> None:
+    if not _HAS_LANGFUSE:
+        return
+    try:
+        lf = _lf_get_client()
+        if lf:
+            lf.score_current_trace(name=name, value=value, comment=comment)
+    except Exception:
+        pass
 
 
 def _ensure_client_configured() -> None:
@@ -102,11 +121,7 @@ Respond ONLY as JSON with this exact schema:
 """.strip()
 
     # Tell Langfuse what we sent / what model we used
-    langfuse_context.update_current_observation(
-        model=GEN_MODEL,
-        input=prompt,
-        metadata={"role": role, "criteria": criteria or []},
-    )
+    _lf_update(model=GEN_MODEL, input=prompt, metadata={"role": role, "criteria": criteria or []})
 
     try:
         resp = _client.models.generate_content(model=GEN_MODEL, contents=prompt)  # type: ignore[union-attr]
@@ -159,12 +174,8 @@ Respond ONLY as JSON with this exact schema:
         data[dim] = max(0.0, min(1.0, float(data[dim])))
 
     # Log output + per-dimension scores to Langfuse
-    langfuse_context.update_current_observation(output=data)
+    _lf_update(output=data)
     for metric in ("faithfulness", "relevancy", "factuality"):
-        langfuse_context.score_current_trace(
-            name=metric,
-            value=float(data[metric]),
-            comment=data.get("reasoning", ""),
-        )
+        _lf_score(metric, float(data[metric]), data.get("reasoning", ""))
 
     return data

@@ -14,7 +14,7 @@ requests
 python-dotenv
 
 # Langfuse — LLM observability (traces, scores, evals)
-langfuse>=2.0.0
+langfuse>=4.0.0
 
 # Observability / OpenTelemetry
 opentelemetry-api

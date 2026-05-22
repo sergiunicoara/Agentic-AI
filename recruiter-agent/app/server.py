@@ -18,7 +18,7 @@ from .mcp import call_mcp_tool, list_mcp_tools
 from .models import ChatRequest, ChatResponse, State
 from .quality import StepKind, Trajectory
 from .session_store import load_session, save_session
-from .telemetry.langfuse_setup import flush as langfuse_flush, get_langfuse
+from .telemetry.langfuse_setup import flush as langfuse_flush, init_langfuse
 from .telemetry.logging import configure_logging
 from .telemetry.tracing import configure_tracer
 
@@ -49,7 +49,7 @@ async def startup_event() -> None:
         SERVICE_NAME,
         otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
     )
-    get_langfuse()  # initialise early so first request isn't slow
+    init_langfuse()  # initialise early so first request isn't slow
     logger.info("Recruiter Agent started | service=%s", SERVICE_NAME)
 
 

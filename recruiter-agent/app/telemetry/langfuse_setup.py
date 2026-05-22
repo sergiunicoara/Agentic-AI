@@ -1,53 +1,50 @@
 # app/telemetry/langfuse_setup.py
 """
-Langfuse initialisation — single place for the SDK client.
+Langfuse v4 initialisation.
 
-Enabled when LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY are set.
-Everything degrades silently to no-ops when the keys are absent,
-so the agent works identically with or without Langfuse.
+In v4, the SDK auto-reads LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST
+from env vars. Calling Langfuse() explicitly sets the global client used by
+@observe decorators throughout the app.
+
+Degrades silently to no-ops when keys are absent.
 """
 from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-_client: Optional[object] = None
 _initialised = False
 
 
-def get_langfuse():
-    """Return a live Langfuse client or None."""
-    global _client, _initialised
+def init_langfuse() -> None:
+    """Call once at startup. No-op if keys are missing."""
+    global _initialised
     if _initialised:
-        return _client
-
+        return
     _initialised = True
+
     pk = os.getenv("LANGFUSE_PUBLIC_KEY", "").strip()
     sk = os.getenv("LANGFUSE_SECRET_KEY", "").strip()
-    host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com").strip()
 
     if not pk or not sk:
         logger.info("Langfuse disabled — LANGFUSE_PUBLIC_KEY / SECRET_KEY not set")
-        return None
+        return
 
     try:
         from langfuse import Langfuse
-        _client = Langfuse(public_key=pk, secret_key=sk, host=host)
-        logger.info("Langfuse enabled → %s", host)
+        host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com").strip()
+        Langfuse(public_key=pk, secret_key=sk, host=host)
+        logger.info("Langfuse v4 enabled → %s", host)
     except Exception as exc:
         logger.warning("Langfuse init failed: %s", exc)
-
-    return _client
 
 
 def flush() -> None:
     """Flush pending events — call on shutdown."""
-    lf = get_langfuse()
-    if lf:
-        try:
-            lf.flush()  # type: ignore[attr-defined]
-        except Exception:
-            pass
+    try:
+        from langfuse import get_client
+        get_client().flush()
+    except Exception:
+        pass

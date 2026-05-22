@@ -14,17 +14,27 @@ from .tools import (
 from .utils.normalize import normalize_criteria, VALID_CRITERIA
 from .cv_rag import get_cv_rag  # <-- CV RAG integration
 
-# Langfuse — optional, degrades gracefully
+# Langfuse v4 — optional, degrades gracefully
 try:
-    from langfuse.decorators import observe, langfuse_context as lf_ctx
+    from langfuse import observe, get_client as _lf_get_client
     _HAS_LANGFUSE = True
 except ImportError:
     _HAS_LANGFUSE = False
-    def observe(*a, **kw):      # type: ignore[misc]
+    def observe(*a, **kw):          # type: ignore[misc]
         return lambda f: f
-    class lf_ctx:               # type: ignore[no-redef]
-        @staticmethod
-        def update_current_observation(**_): pass
+    def _lf_get_client():           # type: ignore[misc]
+        return None
+
+
+def _lf_update_span(**kwargs) -> None:
+    if not _HAS_LANGFUSE:
+        return
+    try:
+        lf = _lf_get_client()
+        if lf:
+            lf.update_current_span(**kwargs)
+    except Exception:
+        pass
 
 
 # ------------------------------------------------------------
@@ -517,14 +527,10 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
     # punctuation so short-command matching works regardless of STT punctuation.
     low = msg.lower().strip(".,!?;:").strip()
 
-    # Langfuse: tag the trace with session metadata
-    lf_ctx.update_current_observation(
+    # Langfuse: tag the span with session metadata
+    _lf_update_span(
         input=user_message,
-        metadata={
-            "role": state.role,
-            "criteria": state.criteria,
-            "source": state.source,
-        },
+        metadata={"role": state.role, "criteria": state.criteria, "source": state.source},
     )
 
     # --------------------------------------------------------
