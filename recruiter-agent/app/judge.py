@@ -12,6 +12,20 @@ GEN_MODEL = "gemini-2.5-flash"
 
 _client: "genai.Client | None" = None
 
+# Langfuse — optional, degrades gracefully
+try:
+    from langfuse.decorators import observe, langfuse_context
+    _HAS_LANGFUSE = True
+except ImportError:
+    _HAS_LANGFUSE = False
+    def observe(*a, **kw):          # type: ignore[misc]
+        return lambda f: f
+    class langfuse_context:         # type: ignore[no-redef]
+        @staticmethod
+        def update_current_observation(**_): pass
+        @staticmethod
+        def score_current_trace(**_): pass
+
 
 def _ensure_client_configured() -> None:
     """Create Gemini client once per process."""
@@ -26,6 +40,7 @@ def _ensure_client_configured() -> None:
     _client = genai.Client(api_key=api_key)
 
 
+@observe(as_type="generation", name="llm_judge")
 def evaluate_agent_turn(
     role: Optional[str],
     criteria: Optional[List[str]],
@@ -86,6 +101,13 @@ Respond ONLY as JSON with this exact schema:
 }}
 """.strip()
 
+    # Tell Langfuse what we sent / what model we used
+    langfuse_context.update_current_observation(
+        model=GEN_MODEL,
+        input=prompt,
+        metadata={"role": role, "criteria": criteria or []},
+    )
+
     try:
         resp = _client.models.generate_content(model=GEN_MODEL, contents=prompt)  # type: ignore[union-attr]
         text = getattr(resp, "text", "") or str(resp)
@@ -135,5 +157,14 @@ Respond ONLY as JSON with this exact schema:
     data["score"] = max(1, min(5, float(data["score"])))
     for dim in ("faithfulness", "relevancy", "factuality"):
         data[dim] = max(0.0, min(1.0, float(data[dim])))
+
+    # Log output + per-dimension scores to Langfuse
+    langfuse_context.update_current_observation(output=data)
+    for metric in ("faithfulness", "relevancy", "factuality"):
+        langfuse_context.score_current_trace(
+            name=metric,
+            value=float(data[metric]),
+            comment=data.get("reasoning", ""),
+        )
 
     return data

@@ -14,6 +14,18 @@ from .tools import (
 from .utils.normalize import normalize_criteria, VALID_CRITERIA
 from .cv_rag import get_cv_rag  # <-- CV RAG integration
 
+# Langfuse — optional, degrades gracefully
+try:
+    from langfuse.decorators import observe, langfuse_context as lf_ctx
+    _HAS_LANGFUSE = True
+except ImportError:
+    _HAS_LANGFUSE = False
+    def observe(*a, **kw):      # type: ignore[misc]
+        return lambda f: f
+    class lf_ctx:               # type: ignore[no-redef]
+        @staticmethod
+        def update_current_observation(**_): pass
+
 
 # ------------------------------------------------------------
 # Role extraction
@@ -490,6 +502,7 @@ def _format_criteria_confirmation(
 # Main agent logic
 # ------------------------------------------------------------
 
+@observe(name="agent_turn")
 def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
     """
     Core orchestrator: implements the role → criteria → project selection → ATS loop,
@@ -503,6 +516,16 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
     # Deepgram punctuate:true appends periods ("Two." "Another.") — strip trailing
     # punctuation so short-command matching works regardless of STT punctuation.
     low = msg.lower().strip(".,!?;:").strip()
+
+    # Langfuse: tag the trace with session metadata
+    lf_ctx.update_current_observation(
+        input=user_message,
+        metadata={
+            "role": state.role,
+            "criteria": state.criteria,
+            "source": state.source,
+        },
+    )
 
     # --------------------------------------------------------
     # Global commands
