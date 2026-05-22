@@ -17,10 +17,30 @@ import click
 
 _REPO_ROOT = Path(__file__).parent
 
+# Load .env from the project root (no-op if python-dotenv is not installed or file absent)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(_REPO_ROOT / ".env")
+except ImportError:
+    pass
+
 
 @click.group()
 def cli():
-    """AI Engineering Workflow Toolkit — Governed Code Review Infrastructure."""
+    """
+    AI Engineering Workflow Toolkit — Governed Code Review Infrastructure.
+
+    A 5-layer review pipeline that combines deterministic static analysis (ruff,
+    mypy, bandit) with LLM-based review and an evaluation harness. Designed to
+    run as a Claude Code hook, a standalone CLI, or an MCP server.
+
+    Commands:
+      review  — Run the full pipeline on a diff, staged changes, or a file.
+      eval    — Score pipeline output against the golden dataset.
+      serve   — Expose the MCP tools over stdio or SSE for Claude Code.
+      queue   — Drain the post-file-write review queue written by the hook.
+      ui      — Serve the React dashboard + FastAPI backend.
+    """
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -74,6 +94,8 @@ def _resolve_diff(diff_file, source_file, staged) -> str:
             cwd=str(_REPO_ROOT),
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
         )
         diff = result.stdout.strip()
         if not diff:

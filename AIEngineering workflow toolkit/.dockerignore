@@ -1,0 +1,12 @@
+ui/node_modules/
+ui/dist/
+__pycache__/
+*.pyc
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.env
+.aiwt_reviews.db
+eval/regression_log.jsonl
+.git/
+*.md

@@ -7,3 +7,4 @@ eval/regression_log.jsonl
 .aiwt_reviews.db
 ui/node_modules/
 ui/dist/
+.env

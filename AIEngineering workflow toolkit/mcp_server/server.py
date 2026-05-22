@@ -1,3 +1,4 @@
+# Governed MCP server — exposes ruff, mypy, bandit as tools
 """
 Layer 3a: MCP Server — Deterministic Tools
 
@@ -85,6 +86,8 @@ def _run_subprocess(cmd: list[str], cwd: Path) -> tuple[str, str, int]:
         cwd=str(cwd),
         capture_output=True,
         text=True,
+        encoding='utf-8',
+        errors='replace',
         timeout=60,
     )
     return result.stdout, result.stderr, result.returncode

@@ -47,10 +47,9 @@ def _post_to_api(diff: str, file_path: str) -> bool:
         with urllib.request.urlopen(req, timeout=2) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             review_id = data.get("id", "")
-            print(
-                f"[AIWT] ✓ Live review started → "
-                f"{_AIWT_API}/reviews/{review_id}  ({Path(file_path).name})"
-            )
+            msg = f"[AIWT] Live review started -> {_AIWT_API}/reviews/{review_id}  ({Path(file_path).name})\n"
+            sys.stdout.buffer.write(msg.encode("utf-8", errors="replace"))
+            sys.stdout.flush()
             return True
     except (urllib.error.URLError, OSError):
         return False  # Server not running — fall through to file queue
@@ -64,7 +63,8 @@ def _queue_to_file(diff: str, file_path: str) -> None:
     entry = {"file": str(file_path), "diff": diff}
     with open(_REVIEW_QUEUE, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
-    print(f"[AIWT] Queued review for {Path(file_path).name} (server offline)")
+    sys.stdout.buffer.write(f"[AIWT] Queued review for {Path(file_path).name} (server offline)\n".encode("utf-8", errors="replace"))
+    sys.stdout.flush()
 
 
 def main() -> None:
@@ -96,6 +96,8 @@ def main() -> None:
             cwd=str(_REPO_ROOT),
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
         )
         diff = result.stdout.strip()
 

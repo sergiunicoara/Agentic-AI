@@ -1,0 +1,44 @@
+{
+  "_comment": "CCA-F D3.1: PROJECT-level settings. Team standards go HERE, not in ~/.claude/settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(python:*)",
+      "Bash(uvicorn:*)",
+      "Bash(pytest:*)",
+      "mcp__filesystem__*",
+      "mcp__github__read_file",
+      "mcp__github__list_commits",
+      "mcp__postgres__query"
+    ],
+    "deny": [
+      "Bash(pip install:*)",
+      "mcp__postgres__drop_table",
+      "mcp__postgres__truncate"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/pre_tool_use.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/post_tool_use.py"
+          }
+        ]
+      }
+    ]
+  }
+}

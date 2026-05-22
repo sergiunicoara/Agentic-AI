@@ -224,7 +224,10 @@ async def _run_pipeline(review_id: str, diff: str) -> None:
         fail_review(review_id, err)
 
     finally:
-        await asyncio.sleep(300)
+        try:
+            await asyncio.sleep(300)
+        except asyncio.CancelledError:
+            pass  # Server shutting down — clean up immediately
         _event_log.pop(review_id, None)
         _subscribers.pop(review_id, None)
 
@@ -233,14 +236,36 @@ async def _run_pipeline(review_id: str, diff: str) -> None:
 
 _UI_DIST = _REPO_ROOT / "ui" / "dist"
 
-if _UI_DIST.exists():
-    _ASSETS = _UI_DIST / "assets"
-    if _ASSETS.exists():
-        app.mount("/assets", StaticFiles(directory=str(_ASSETS)), name="assets")
+# Mount static assets if dist exists (mount must happen at module load time)
+_ASSETS = _UI_DIST / "assets"
+if _ASSETS.exists():
+    app.mount("/assets", StaticFiles(directory=str(_ASSETS)), name="assets")
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str):
-        target = _UI_DIST / full_path
-        if target.exists() and target.is_file():
-            return FileResponse(str(target))
-        return FileResponse(str(_UI_DIST / "index.html"))
+
+def _spa_response(full_path: str):
+    """Return the requested static file or fall back to index.html for SPA routing."""
+    if not _UI_DIST.exists():
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            {"detail": "UI not built. Run: cd ui && npm run build"},
+            status_code=503,
+        )
+    # Resolve and confine to _UI_DIST to prevent path-traversal attacks
+    dist_resolved = _UI_DIST.resolve()
+    target = (dist_resolved / full_path).resolve() if full_path else dist_resolved / "index.html"
+    if not str(target).startswith(str(dist_resolved)):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    if target.exists() and target.is_file():
+        return FileResponse(str(target))
+    return FileResponse(str(dist_resolved / "index.html"))
+
+
+@app.get("/", include_in_schema=False)
+async def serve_root():
+    return _spa_response("")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_spa(full_path: str):
+    return _spa_response(full_path)

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:tutorialsdojo.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.the-ai-corner.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:claudecertifications.com)",
+      "WebFetch(domain:www.lowcode.agency)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

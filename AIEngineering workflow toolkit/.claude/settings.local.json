@@ -19,7 +19,31 @@
       "Bash(node -e \"process.chdir\\(''$SKILL_DIR''\\); require\\(''docx''\\); console.log\\(''ok''\\)\")",
       "Bash(node -e \"require\\(''docx''\\); console.log\\(''ok''\\)\")",
       "Bash(node \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\build_cv.js\")",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''no secrets''''\\)\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''no secrets''''\\)\")",
+      "Read(//c/Users/Sergiu/Desktop/**)",
+      "Bash(python3)",
+      "Bash(pandoc \"Innovorg_AI_and_Automation_Developer_role_description.docx\" -t plain)",
+      "Bash(unzip -q \"Innovorg_AI_and_Automation_Developer_role_description.docx\" -d docx_extracted)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://127.0.0.1:8000/api/stats\" -UseBasicParsing)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://127.0.0.1:8000/\" -UseBasicParsing | Select-Object StatusCode, @{N='bytes';E={$_.Content.Length}})",
+      "PowerShell(Stop-Process -Id 23028 -Force -ErrorAction SilentlyContinue)",
+      "Bash(Select-String \"\\\\.gitignore\")",
+      "Bash(uv pip *)",
+      "Bash(curl -s http://localhost:8000/api/reviews)",
+      "Bash(curl -s http://localhost:8000/api/stats)",
+      "Bash(curl -s http://localhost:8000/api/docs)",
+      "Bash(curl -sv http://localhost:8000/openapi.json)",
+      "Bash(echo '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"C:\\\\\\\\Users\\\\\\\\Sergiu\\\\\\\\Desktop\\\\\\\\Projects\\\\\\\\Agentic-AI\\\\\\\\AIEngineering workflow toolkit\\\\\\\\mcp_server\\\\\\\\server.py\"},\"tool_response\":{}}')",
+      "Bash(py -3 .claude/hooks/post_tool_use.py)",
+      "Bash(which python *)",
+      "Bash(ls /c/Users/Sergiu/Desktop/Projects/Agentic-AI/.venv/Scripts/python*)",
+      "Bash(/c/Users/Sergiu/Desktop/Projects/Agentic-AI/.venv/Scripts/python.exe .claude/hooks/post_tool_use.py)",
+      "Bash(/c/Users/Sergiu/Desktop/Projects/Agentic-AI/.venv/Scripts/python.exe -c ' *)",
+      "Bash(npm run *)",
+      "Bash(.venv/Scripts/python.exe -c \"from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter; print\\('OTLP OK'\\)\")",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash('..\\\\.venvScriptspython.exe' -c ' *)",
+      "Bash('C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Agentic-AI\\\\.venv\\\\Scripts\\\\python.exe' -c ' *)"
     ]
   }
 }

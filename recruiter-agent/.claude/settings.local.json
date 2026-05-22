@@ -63,7 +63,16 @@
       "Bash(start \"\" \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Oferta\\\\Oferta ELIM PROINSTALL.pdf\")",
       "Bash(start \"\" \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Oferta\\\\Oferta ELIM PROINSTALL_new.pdf\")",
       "Bash(python -c ' *)",
-      "Bash(start \"\" \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Oferta\\\\Oferta_test.pdf\")"
+      "Bash(start \"\" \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Oferta\\\\Oferta_test.pdf\")",
+      "Bash(git commit -m ' *)",
+      "Bash(python -c \"from app.agent import agent_turn; from app.models.state import State; s = State\\(role='Ai Engineer', criteria=['communication']\\); r = agent_turn\\(s, 'AI engineer'\\); print\\(r['reply'][:200]\\)\")",
+      "Bash(python eval/run_eval_table.py)",
+      "PowerShell(cd \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Agentic-AI\\\\recruiter-agent\"; gcloud run deploy recruiter-agent --source . --region europe-west1 --project \\(gcloud config get-value project\\) 2>&1)",
+      "Bash(git commit *)",
+      "Bash(pip show *)",
+      "Bash(python -c \"from langfuse.decorators import observe, langfuse_context; print\\('v2/v3 imports OK'\\)\")",
+      "Bash(python -c \"from langfuse import observe, get_client; print\\('v4 imports OK'\\); help\\(observe\\)\")",
+      "Bash(\"C:/Users/Sergiu/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud\" run deploy recruiter-agent --source . --region europe-west1)"
     ]
   }
 }

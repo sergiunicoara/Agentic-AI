@@ -39,6 +39,8 @@ def main() -> None:
         cwd=str(_REPO_ROOT),
         capture_output=True,
         text=True,
+        encoding='utf-8',
+        errors='replace',
     )
     diff = result.stdout.strip()
 

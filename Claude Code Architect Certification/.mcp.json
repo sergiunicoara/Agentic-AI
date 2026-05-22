@@ -1,0 +1,28 @@
+{
+  "_comment": "CCA-F D2.4: PROJECT-level MCP config. Committed to repo — shared with team.",
+  "_note": "User-level MCP tools go in ~/.claude/mcp.json — NOT here.",
+  "mcpServers": {
+    "filesystem": {
+      "command": "python",
+      "args": ["-m", "mcp.servers.filesystem_server"],
+      "description": "Read incident logs and data files from the project data/ directory"
+    },
+    "postgres": {
+      "command": "python",
+      "args": ["-m", "mcp.servers.postgres_server"],
+      "env": {
+        "DATABASE_URL": "${DATABASE_URL}"
+      },
+      "description": "Query the incidents Postgres database (read-only)"
+    },
+    "github": {
+      "command": "python",
+      "args": ["-m", "mcp.servers.github_server"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "GITHUB_REPO": "${GITHUB_REPO}"
+      },
+      "description": "Read files and commits from the incident-related GitHub repository"
+    }
+  }
+}

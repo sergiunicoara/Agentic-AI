@@ -186,6 +186,18 @@ export default function ReviewDetail() {
       if (r.status === 'complete' || r.status === 'error') {
         setDone(true)
         if (r.status === 'error') setHasError(true)
+        // Review already finished — no live WS events will arrive.
+        // Synthetically mark all layers complete so the viz isn't stuck idle.
+        const layers: Array<{ layer: string; name: string }> = [
+          { layer: '1',  name: 'Skills' },
+          { layer: '2',  name: 'Orchestrator' },
+          { layer: '3a', name: 'MCP Tools' },
+          { layer: '3b', name: 'Subagents' },
+          { layer: '4',  name: 'Review Agent' },
+        ]
+        layers.forEach(({ layer, name }) =>
+          dispatch({ type: 'layer_complete', layer, name, detail: 'Complete' })
+        )
       }
     })
 
@@ -227,7 +239,7 @@ export default function ReviewDetail() {
   }, {})
 
   // OTel traces deep-link (agent-observability dashboard)
-  const tracesUrl = `http://localhost:3000`
+  const tracesUrl = `http://localhost:16686`
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">

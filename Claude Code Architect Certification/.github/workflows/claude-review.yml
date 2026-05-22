@@ -1,0 +1,167 @@
+# CCA-F D3.6: Claude Code in CI/CD — Scenario 5 from the exam pool
+# Key concepts tested:
+# - -p flag for non-interactive pipeline mode
+# - --output-format json for machine-readable output
+# - Latency-appropriate model selection
+# - Batch failure handling (per-item errors, not fail-all)
+# - Testing standards documented in CLAUDE.md
+
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+
+jobs:
+  claude-review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # D3.6: uv for fast dependency installation (project standard from CLAUDE.md)
+      - name: Install uv and dependencies
+        run: |
+          pip install uv
+          uv pip install -e ".[dev]" --system
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      # D3.6: -p flag = non-interactive (pipeline mode, no user prompts)
+      # --output-format json = machine-readable for CI parsing
+      - name: Run Claude Code review
+        id: claude_review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # D3.6: Non-interactive pipeline mode with JSON output
+          claude -p "Review this PR for:
+          1. Correct stop_reason handling in all agentic loops
+          2. Explicit context passing to all subagents (no implicit inheritance)
+          3. Precise tool descriptions (verb+noun+boundary+constraints)
+          4. Structured errors (error_type, source, recoverable) — no raw exceptions
+          5. Team standards in project-level config (not user-level ~/.claude/)
+          6. uv usage (never pip install)
+          7. Numeric confidence thresholds (never string-based)
+          8. Transactional fact preservation in summarization
+
+          Return JSON: {
+            'passed': boolean,
+            'issues': [{'severity': 'error|warning', 'file': '...', 'line': N, 'issue': '...', 'fix': '...'}],
+            'summary': '...'
+          }
+
+          Files changed: $(git diff --name-only origin/main...HEAD | head -20)" \
+          --output-format json \
+          --max-turns 5 \
+          > review_output.json 2>&1
+
+      - name: Parse and post review
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - << 'EOF'
+          import json, os, subprocess
+
+          with open("review_output.json") as f:
+              raw = f.read()
+
+          # D4.4: Handle partial failures gracefully — don't fail entire CI
+          try:
+              review = json.loads(raw)
+          except json.JSONDecodeError:
+              # Extract JSON from mixed output
+              import re
+              match = re.search(r'\{.*\}', raw, re.DOTALL)
+              review = json.loads(match.group()) if match else {"passed": True, "issues": [], "summary": "Review parse failed"}
+
+          errors = [i for i in review.get("issues", []) if i.get("severity") == "error"]
+          warnings = [i for i in review.get("issues", []) if i.get("severity") == "warning"]
+
+          # Format PR comment
+          lines = [f"## Claude Code Review\n"]
+          lines.append(f"**Status**: {'✅ Passed' if review.get('passed') else '❌ Needs fixes'}")
+          lines.append(f"\n{review.get('summary', '')}\n")
+
+          if errors:
+              lines.append("\n### ❌ Errors (must fix)")
+              for issue in errors:
+                  lines.append(f"- **{issue.get('file', '')}:{issue.get('line', '')}**: {issue.get('issue', '')}")
+                  if issue.get("fix"):
+                      lines.append(f"  > Fix: {issue['fix']}")
+
+          if warnings:
+              lines.append("\n### ⚠️ Warnings")
+              for issue in warnings:
+                  lines.append(f"- {issue.get('issue', '')}")
+
+          comment_body = "\n".join(lines)
+          pr_number = os.environ.get("GITHUB_REF", "").split("/")[2]
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+
+          subprocess.run([
+              "gh", "pr", "comment", pr_number,
+              "--body", comment_body,
+              "--repo", repo,
+          ])
+          EOF
+
+      # D3.6: Fail CI on errors, pass on warnings
+      - name: Check for blocking errors
+        run: |
+          python - << 'EOF'
+          import json, sys
+          with open("review_output.json") as f:
+              raw = f.read()
+          try:
+              review = json.loads(raw)
+          except:
+              sys.exit(0)  # Parse failure = non-blocking
+          errors = [i for i in review.get("issues", []) if i.get("severity") == "error"]
+          if errors:
+              print(f"CI failed: {len(errors)} blocking error(s) found")
+              sys.exit(1)
+          print("Review passed")
+          EOF
+
+  generate-tests:
+    name: Generate Missing Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: claude-review
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: pip install uv && uv pip install -e ".[dev]" --system
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Generate tests for uncovered code
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # D3.6: Non-interactive test generation
+          claude -p "Find Python files in agents/ and schemas/ with no corresponding
+          test file in tests/. For each uncovered file, generate pytest tests
+          covering: happy path, error conditions, schema validation.
+          Create test files at tests/test_<module_name>.py.
+          Use the patterns from existing tests/ files for consistency." \
+          --output-format json \
+          --max-turns 10

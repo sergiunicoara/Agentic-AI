@@ -1,9 +1,12 @@
 """SQLite persistence layer for review history."""
 import json
+import os
 import sqlite3
 from pathlib import Path
 
-_DB_PATH = Path(__file__).parent.parent / ".aiwt_reviews.db"
+# Allow overriding the data directory via env var (useful in Docker)
+_DATA_DIR = Path(os.environ.get("AIWT_DATA_DIR", str(Path(__file__).parent.parent)))
+_DB_PATH = _DATA_DIR / ".aiwt_reviews.db"
 
 
 def _connect() -> sqlite3.Connection:
