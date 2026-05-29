@@ -75,7 +75,7 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "harness, MCP tool endpoints, and CI golden dataset tests. ~600ms time-to-first-audio."
         ),
         "impact": [
-            "Sub-200ms agent latency end-to-end on Cloud Run",
+            "~600ms time-to-first-audio E2E on Cloud Run (~35ms agent + ~400ms TTS synthesis + network)",
             "Barge-in via RMS VAD — user interrupts TTS mid-sentence instantly",
             "Silence keepalive prevents Deepgram timeout during TTS playback",
             "OTel span per voice turn: transcript len, reply len, session_id",

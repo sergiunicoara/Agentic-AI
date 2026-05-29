@@ -28,11 +28,11 @@ SERVICE_NAME = "recruiter-agent"
 
 app = FastAPI(title="Recruiter Agent API", version="1.0.0")
 
-# CORS
+# CORS — allow_credentials requires explicit origins; keep open for this public demo
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -76,8 +76,11 @@ async def serve_frontend_root():
 
 @app.get("/{path:path}", include_in_schema=False)
 async def serve_frontend_assets(path: str):
-    file_path = FRONTEND_DIR / path
-    if file_path.exists() and file_path.is_file():
+    # Resolve fully and verify the result stays inside FRONTEND_DIR to prevent
+    # path-traversal requests such as /../app/cv.txt from escaping the frontend.
+    resolved_base = FRONTEND_DIR.resolve()
+    file_path = (FRONTEND_DIR / path).resolve()
+    if resolved_base in file_path.parents and file_path.is_file():
         return FileResponse(file_path)
     return FileResponse(FRONTEND_DIR / "index.html")
 

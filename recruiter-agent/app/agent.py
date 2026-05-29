@@ -275,8 +275,8 @@ def _match_criteria_to_project(
                 )
             elif c_low == "low_latency":
                 reasons.append(
-                    "- **Low Latency**: ~170ms agent + first-audio on Cloud Run; "
-                    "sentence-level TTS streaming and async WebSocket architecture."
+                    "- **Low Latency**: ~600ms TTFA on Cloud Run (~35ms deterministic agent, "
+                    "~400ms Google Neural2-D TTS); sentence-level parallel synthesis and async WebSocket."
                 )
             continue
 
@@ -945,94 +945,4 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
     }
 
 
-# ============================================================
-# Legacy /match endpoint adapter
-# ============================================================
-
-
-
-def analyze_match(match_request: Any) -> MatchResponse:
-    """Compatibility layer for the older /match endpoint.
-
-    It uses the same CV RAG backend to produce a lightweight,
-    structured summary without introducing new LLM dependencies.
-    """
-    job = getattr(match_request, "job", None)
-    job_text = getattr(job, "text", "") if job is not None else ""
-
-    # Very simple, deterministic scoring based on keywords
-    text_low = job_text.lower()
-    strengths: List[str] = []
-    risks: List[str] = []
-
-    if any(k in text_low for k in ["ml", "machine learning", "llm", "rag", "genai", "gemini"]):
-        strengths.append("Direct experience with ML/LLM and production RAG systems.")
-    if "senior" in text_low:
-        strengths.append("Multiple years owning end-to-end ML products and infra.")
-    if "lead" in text_low or "manager" in text_low:
-        strengths.append("Track record of technical leadership and mentoring.")
-
-    if "frontend" in text_low or "mobile" in text_low:
-        risks.append("Primary experience is ML/LLM; pure frontend/mobile roles may be a weaker fit.")
-    if "embedded" in text_low or "firmware" in text_low:
-        risks.append("Little focus on low-level or embedded systems in recent work.")
-
-    if not strengths:
-        strengths.append("Solid background in ML/LLM engineering, RAG, and production systems.")
-    if not risks:
-        risks.append("Role fit depends on how much ML/LLM and RAG work is required.")
-
-    # Try to enrich using CV RAG, but never fail if it errors.
-    extra_points: List[str] = []
-    try:
-        rag = get_cv_rag()
-        answer = rag.query(
-            "In bullet points, list the most relevant achievements for this job description: "
-            + job_text
-        )
-        for line in str(answer).splitlines():
-            line = line.strip()
-            if line:
-                extra_points.append(line)
-    except Exception:
-        # Ignore RAG errors and keep deterministic output
-        pass
-
-    overall = "Strong match for ML/LLM-focused roles."
-    if "frontend" in text_low or "mobile" in text_low or "embedded" in text_low:
-        overall = "Potential match, but role seems less ML/LLM-focused."
-
-    summary = Summary(
-        overall_fit=overall,
-        strengths=strengths,
-        risks=risks,
-        recommended_talking_points=extra_points[:5],
-    )
-
-    return MatchResponse(
-        job=job,
-        summary=summary,
-        insights=[],
-        judge_passed=True,
-        judge_reason="Rule-based recruiter agent evaluation.",
-    )
-
-# ---------------------------------------------------------------------------
-# Legacy fallback models added to replace removed Summary / MatchResponse
-# ---------------------------------------------------------------------------
-from pydantic import BaseModel
-from typing import List, Any
-
-class Summary(BaseModel):
-    overall_fit: str
-    strengths: List[str]
-    risks: List[str]
-    recommended_talking_points: List[str]
-
-class MatchResponse(BaseModel):
-    job: Any
-    summary: Summary
-    insights: List[Any]
-    judge_passed: bool
-    judge_reason: str
 
