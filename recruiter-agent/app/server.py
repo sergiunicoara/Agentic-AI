@@ -12,6 +12,7 @@ from opentelemetry import trace
 from pydantic import BaseModel
 
 from .agent import agent_turn
+from .guardrails import check_topic, redact_pii
 from .outbound import get_campaign_manager, outbound_callback_handler, outbound_twiml_handler
 from .phone import phone_stream_handler, phone_twiml_handler
 from .voice import voice_bench_handler, voice_handler
@@ -20,7 +21,7 @@ from .critic_agent import get_critic_session_summary, validate_turn
 from .mcp import call_mcp_tool, list_mcp_tools
 from .models import ChatRequest, ChatResponse, State
 from .quality import StepKind, Trajectory
-from .session_store import load_session, save_session
+from .session_store import load_session, save_session, session_store_info
 from .telemetry.langfuse_setup import flush as langfuse_flush, init_langfuse
 from .telemetry.logging import configure_logging
 from .telemetry.tracing import configure_tracer
@@ -109,6 +110,15 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
         span.set_attribute("source", req.source or "")
         span.set_attribute("message_length", len(req.message))
 
+        # P4 — Topic enforcement: deflect off-topic messages before they reach the agent
+        is_on_topic, deflection = check_topic(req.message)
+        if not is_on_topic:
+            return ChatResponse(
+                reply=deflection,
+                state=req.state or {},
+                session_id=session_id,
+            )
+
         # Restore state — client payload takes priority; SQLite is the fallback.
         # This means a page-refresh or lost client state never resets the session.
         if req.state:
@@ -123,11 +133,12 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
         else:
             state = load_session(session_id) or State(source=req.source)
 
-        # Trajectory: log user turn
+        # Trajectory: log user turn — PII redacted before writing to traces/logs
+        safe_message = redact_pii(req.message)
         trajectory = Trajectory(session_id=session_id)
         trajectory.add(
             StepKind.user,
-            req.message,
+            safe_message,
             meta={"source": req.source, "session_id": session_id},
         )
 
@@ -447,3 +458,64 @@ async def a2a_summary_endpoint(session_id: str) -> Dict[str, Any]:
     Useful for tracking quality trends across a full recruiter conversation.
     """
     return get_critic_session_summary(session_id)
+
+
+# ------------------------------------------------------------------
+# /session/{session_id}/summary — P2: post-call interview summary
+# ------------------------------------------------------------------
+
+@app.get("/session/{session_id}/summary")
+async def session_summary_endpoint(session_id: str) -> Dict[str, Any]:
+    """
+    Post-call structured interview summary for a completed voice session.
+
+    Automatically generated at session end and cached in session state.
+    If not yet generated (e.g. session ended before this was deployed),
+    generates on-demand and caches the result.
+
+    Returns:
+      role_fit_score    int 1-5 | null
+      strengths         list[str]
+      concerns          list[str]
+      recommendation    "Strong Yes" | "Yes" | "Maybe" | "No"
+      summary           str  (2-3 sentences for the recruiter)
+      generated         bool (False = Gemini unavailable, used fallback)
+    """
+    state = load_session(session_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+
+    # Return cached summary if available
+    cached = state.extra.get("session_summary")
+    if cached:
+        return cached
+
+    # Generate on-demand and persist
+    from .session_summary import generate_session_summary
+    summary = generate_session_summary(
+        session_id=session_id,
+        memory=state.memory,
+        role=state.role,
+        criteria=state.criteria,
+    )
+    state.extra["session_summary"] = summary
+    try:
+        save_session(session_id, state)
+    except Exception as exc:
+        logger.warning("session_summary: could not persist for %s: %s", session_id, exc)
+
+    return summary
+
+
+# ------------------------------------------------------------------
+# /health — liveness + backend info
+# ------------------------------------------------------------------
+
+@app.get("/health")
+async def health_endpoint() -> Dict[str, Any]:
+    """Service health check with session store backend info."""
+    return {
+        "status": "ok",
+        "service": SERVICE_NAME,
+        "session_store": session_store_info(),
+    }

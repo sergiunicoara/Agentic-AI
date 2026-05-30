@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+import asyncio
+import threading
+from typing import AsyncGenerator, List, Optional
 import os
 import re
 
@@ -499,7 +501,78 @@ Instructions:
             return "I couldn't find this information in Sergiu’s CV."
         except Exception:
             # Strict fallback: do not leak raw CV chunks
-            return "I couldn't find this information in Sergiu’s CV."
+            return "I couldn’t find this information in Sergiu’s CV."
+
+    async def query_stream(self, question: str) -> AsyncGenerator[str, None]:
+        """
+        Async generator version of query().
+
+        For direct-fact questions (phone, email, certs…): yields the full answer
+        as a single chunk immediately (no Gemini call needed, no streaming benefit).
+
+        For open questions backed by Gemini: streams token chunks as they arrive
+        from generate_content_stream(), enabling sentence-level parallel TTS to
+        fire before the full answer is assembled.
+
+        Yields raw answer text (no "Here’s what I found…" prefix — the caller
+        adds that framing so cv_rag stays format-agnostic).
+        """
+        # 1) Direct fact extraction — yield immediately, no streaming
+        direct = self._direct_facts_answer(question)
+        if direct is not None:
+            yield direct
+            return
+
+        # 2) Vector retrieval
+        relevant_chunks = self._retrieve_top_k(question, k=3)
+        if not relevant_chunks:
+            yield "I couldn’t find this information in Sergiu’s CV."
+            return
+
+        if not _try_configure_client():
+            yield "I couldn’t find this information in Sergiu’s CV."
+            return
+
+        context = "\n\n---\n\n".join(relevant_chunks)
+        prompt = f"""You are helping a recruiter understand a candidate’s fit based ONLY on their CV.
+
+CV content:
+{context}
+
+Question:
+{question}
+
+Instructions:
+- Answer concisely and directly.
+- Use ONLY facts from the CV content above.
+- If the CV does not contain the answer, say: "I couldn’t find this information in Sergiu’s CV."
+""".strip()
+
+        # 3) Stream Gemini tokens via a thread-safe Queue bridge
+        #    (google-genai SDK’s generate_content_stream is sync-only)
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
+
+        def _stream_worker() -> None:
+            try:
+                for chunk in _client.models.generate_content_stream(  # type: ignore[union-attr]
+                    model=GEN_MODEL, contents=prompt
+                ):
+                    text = getattr(chunk, "text", None)
+                    if text:
+                        loop.call_soon_threadsafe(queue.put_nowait, text)
+            except Exception:
+                pass
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel
+
+        threading.Thread(target=_stream_worker, daemon=True).start()
+
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
 
 
 # ---------------------------

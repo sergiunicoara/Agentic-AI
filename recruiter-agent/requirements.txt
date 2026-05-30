@@ -41,3 +41,7 @@ twilio>=9.0.0
 # WebRTC — direct browser peer connections (SDP/ICE negotiation, opus audio, DTLS/SRTP)
 # Requires system libs: libsrtp2-dev libopus-dev pkg-config  (see Dockerfile)
 aiortc>=1.9.0
+
+# Session store — Redis backend (optional; falls back to SQLite if REDIS_URL not set)
+# hiredis is the C-extension parser (4x faster); plain redis works without it
+redis>=5.0.0

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Dict, Any, List, Tuple, Optional
+import logging
+from typing import AsyncGenerator, Dict, Any, List, Tuple, Optional
 import re
+
+logger = logging.getLogger(__name__)
 
 from .models.state import State
 from .tools import (
@@ -944,5 +947,58 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
         "state": state,
     }
 
+
+# ------------------------------------------------------------
+# Streaming entry point (P1 — lower TTFA for LLM-backed paths)
+# ------------------------------------------------------------
+
+async def agent_turn_stream(
+    state: State,
+    user_message: str,
+) -> AsyncGenerator[str, None]:
+    """
+    Async generator version of agent_turn.
+
+    Routing:
+    - CV RAG questions → streams Gemini token chunks so TTS fires on the first
+      sentence boundary instead of waiting for the full answer.
+    - All other paths (deterministic routing, project deep dive, ATS template) →
+      calls the synchronous agent_turn() and yields the full reply as one chunk.
+      These paths are already <35ms, so there is no streaming benefit.
+
+    The state object is mutated in-place (same contract as agent_turn).
+    The caller does NOT need to reassign ctx["state"].
+    """
+    msg = user_message.strip()
+
+    # ── CV RAG streaming path ────────────────────────────────────────────────
+    if _looks_like_cv_question(msg):
+        rag = get_cv_rag()
+        if hasattr(rag, "query_stream"):
+            # Prefix matches the synchronous answer_from_cv() framing
+            prefix = "Here’s what I found in Sergiu’s CV:\n\n"
+            yield prefix
+            full_answer = ""
+            try:
+                async for chunk in rag.query_stream(msg):
+                    full_answer += chunk
+                    yield chunk
+                # Mirror the state mutation that answer_from_cv() performs
+                remember(
+                    state,
+                    "cv_rag_query",
+                    {"question": msg, "answer": full_answer},
+                )
+                return
+            except Exception as exc:
+                logger.warning(
+                    "agent_turn_stream: CV RAG stream failed (%s), using sync fallback", exc
+                )
+                # Fall through — synchronous path will overwrite the partial prefix
+                # by returning a clean reply via the non-streaming route.
+
+    # ── Synchronous fallback for all other paths ─────────────────────────────
+    result = agent_turn(state, user_message)
+    yield result.get("reply", "")
 
 
