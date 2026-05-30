@@ -14,6 +14,7 @@ from opentelemetry import trace
 from .agent import agent_turn
 from .models.state import State
 from .session_store import load_session, save_session
+from .turn_state import TurnStateMachine
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,7 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
     transcript_queue: asyncio.Queue[str] = asyncio.Queue()
     session_done = asyncio.Event()
     tts_cancel = asyncio.Event()  # set by barge_in to abort the current TTS stream
+    fsm = TurnStateMachine(session_id)
 
     deepgram = DeepgramClient(deepgram_key)
     dg_connection = deepgram.listen.asyncwebsocket.v("1")
@@ -254,6 +256,7 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
                     with tracer.start_as_current_span("voice.turn") as span:
                         span.set_attribute("session_id", session_id)
                         span.set_attribute("transcript_len", len(transcript))
+                        fsm.on_transcript(transcript, span=span)
                         with tracer.start_as_current_span("voice.agent_turn"):
                             result = agent_turn(ctx["state"], transcript)
                         reply = result.get("reply", "")
@@ -265,8 +268,13 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
                     await ws.send_text(json.dumps({"type": "reply", "text": reply}))
 
                     tts_cancel.clear()
+                    fsm.on_tts_start(span=span)
                     with tracer.start_as_current_span("voice.tts"):
                         await _tts_stream(reply, ws, cancel=tts_cancel)
+                    if tts_cancel.is_set():
+                        fsm.on_barge_in(span=span)
+                    else:
+                        fsm.on_tts_end(span=span)
 
                     # After TTS completes (or is cancelled), drop any commands that
                     # stacked up while we were speaking — keep only the freshest one.
@@ -322,6 +330,7 @@ async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000
             logger.warning("relay error after %d chunks: %s session=%s", chunk_count, exc, session_id)
 
         session_done.set()
+        logger.info("voice_session_end | %s", json.dumps(fsm.summary()))
         await dg_connection.finish()
         try:
             await asyncio.wait_for(proc_task, timeout=30.0)

@@ -5,13 +5,14 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from opentelemetry import trace
 from pydantic import BaseModel
 
 from .agent import agent_turn
+from .phone import phone_stream_handler, phone_twiml_handler
 from .voice import voice_bench_handler, voice_handler
 from .critic_agent import get_critic_session_summary, validate_turn
 from .mcp import call_mcp_tool, list_mcp_tools
@@ -277,6 +278,33 @@ async def a2a_validate_endpoint(req: A2AValidateRequest) -> Dict[str, Any]:
 # ------------------------------------------------------------------
 # /a2a/summary — Critic session aggregate metrics
 # ------------------------------------------------------------------
+
+# ------------------------------------------------------------------
+# /phone/twiml  — Twilio webhook: returns TwiML directing call to /phone/stream
+# /phone/stream — Twilio Media Streams WebSocket: PSTN → mulaw → Deepgram → TTS
+# ------------------------------------------------------------------
+
+@app.post("/phone/twiml", include_in_schema=True)
+async def phone_twiml_endpoint(request: Request) -> Response:
+    """
+    Twilio calls this when an inbound call is received.
+    Configure in Twilio Console: Phone Number → Voice → A CALL COMES IN → Webhook (POST).
+    Returns TwiML that connects the call to the Media Streams WebSocket.
+    """
+    xml = await phone_twiml_handler(request)
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.websocket("/phone/stream")
+async def phone_stream_endpoint(ws: WebSocket, session_id: str = "phone-default") -> None:
+    """
+    Twilio Media Streams WebSocket.
+    Receives mulaw 8 kHz audio frames, transcribes via Deepgram, runs agent_turn(),
+    synthesises reply as mulaw 8 kHz via Google Neural2-D, streams back to Twilio.
+    Supports barge-in via Deepgram SpeechStarted + Twilio 'clear' event.
+    """
+    await phone_stream_handler(ws, session_id)
+
 
 @app.websocket("/voice")
 async def voice_endpoint(ws: WebSocket, session_id: str = "default", sample_rate: int = 48000):

@@ -33,3 +33,7 @@ google-cloud-trace
 # Voice pipeline
 deepgram-sdk==3.10.0  # v3 API: DeepgramClient + LiveOptions + LiveTranscriptionEvents
 google-cloud-texttospeech
+
+# Telephony bridge — Twilio Media Streams (PSTN/SIP → mulaw WebSocket)
+# RequestValidator enables webhook signature verification (optional but recommended in prod)
+twilio>=9.0.0
