@@ -9,10 +9,14 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # Install build dependencies
+# libsrtp2-dev + libopus-dev + pkg-config required by aiortc (WebRTC DTLS/SRTP + opus codec)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
     libffi-dev \
+    libsrtp2-dev \
+    libopus-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies

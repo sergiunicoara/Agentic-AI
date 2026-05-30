@@ -37,3 +37,7 @@ google-cloud-texttospeech
 # Telephony bridge — Twilio Media Streams (PSTN/SIP → mulaw WebSocket)
 # RequestValidator enables webhook signature verification (optional but recommended in prod)
 twilio>=9.0.0
+
+# WebRTC — direct browser peer connections (SDP/ICE negotiation, opus audio, DTLS/SRTP)
+# Requires system libs: libsrtp2-dev libopus-dev pkg-config  (see Dockerfile)
+aiortc>=1.9.0

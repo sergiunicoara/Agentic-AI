@@ -12,8 +12,10 @@ from opentelemetry import trace
 from pydantic import BaseModel
 
 from .agent import agent_turn
+from .outbound import get_campaign_manager, outbound_callback_handler, outbound_twiml_handler
 from .phone import phone_stream_handler, phone_twiml_handler
 from .voice import voice_bench_handler, voice_handler
+from .webrtc import webrtc_cleanup_handler, webrtc_offer_handler
 from .critic_agent import get_critic_session_summary, validate_turn
 from .mcp import call_mcp_tool, list_mcp_tools
 from .models import ChatRequest, ChatResponse, State
@@ -278,6 +280,128 @@ async def a2a_validate_endpoint(req: A2AValidateRequest) -> Dict[str, Any]:
 # ------------------------------------------------------------------
 # /a2a/summary — Critic session aggregate metrics
 # ------------------------------------------------------------------
+
+# ------------------------------------------------------------------
+# /webrtc — Direct browser WebRTC (no Twilio, SDP/ICE negotiation via aiortc)
+# ------------------------------------------------------------------
+
+class WebRTCOfferRequest(BaseModel):
+    sdp: str
+    type: str           # "offer"
+    session_id: str = "default"
+
+
+@app.post("/webrtc/offer")
+async def webrtc_offer_endpoint(req: WebRTCOfferRequest) -> Dict[str, Any]:
+    """
+    WebRTC SDP offer → answer (full ICE, non-trickle).
+
+    Browser flow:
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      pc.addTrack(stream.getAudioTracks()[0], stream);
+      const dc = pc.createDataChannel('agent');
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const res = await fetch('/webrtc/offer', { method: 'POST',
+        body: JSON.stringify({ sdp: pc.localDescription.sdp,
+                               type: pc.localDescription.type, session_id: 'xyz' }) });
+      const answer = await res.json();
+      await pc.setRemoteDescription(answer);
+      // data channel 'agent' carries JSON events + binary TTS MP3 chunks
+    """
+    return await webrtc_offer_handler(req.sdp, req.type, req.session_id)
+
+
+@app.delete("/webrtc/{pc_id}")
+async def webrtc_cleanup_endpoint(pc_id: str) -> Dict[str, Any]:
+    """Explicit peer connection cleanup. Call on page unload / session end."""
+    return await webrtc_cleanup_handler(pc_id)
+
+
+# ------------------------------------------------------------------
+# /outbound — Outbound call campaign manager (PSTN via Twilio)
+# ------------------------------------------------------------------
+
+class CampaignCreateRequest(BaseModel):
+    name: str
+    numbers: List[str]
+    role: str
+    criteria: List[str] = []
+    max_concurrent: int = 3
+
+
+@app.post("/outbound/campaign")
+async def create_campaign_endpoint(req: CampaignCreateRequest) -> Dict[str, Any]:
+    """
+    Create an outbound call campaign.
+    Numbers must be E.164 format (e.g. +12125551234).
+    Compliance: opt-out list and TCPA calling hours enforced automatically.
+    """
+    mgr = get_campaign_manager()
+    campaign = mgr.create_campaign(
+        name=req.name,
+        numbers=req.numbers,
+        role=req.role,
+        criteria=req.criteria,
+        max_concurrent=req.max_concurrent,
+    )
+    return campaign.aggregate()
+
+
+@app.post("/outbound/campaign/{campaign_id}/start")
+async def start_campaign_endpoint(campaign_id: str) -> Dict[str, Any]:
+    """Start dialing — respects max_concurrent gate and calling-hours compliance."""
+    return await get_campaign_manager().start_campaign(campaign_id)
+
+
+@app.post("/outbound/campaign/{campaign_id}/pause")
+async def pause_campaign_endpoint(campaign_id: str) -> Dict[str, Any]:
+    ok = get_campaign_manager().pause_campaign(campaign_id)
+    return {"paused": ok, "campaign_id": campaign_id}
+
+
+@app.get("/outbound/campaign/{campaign_id}")
+async def get_campaign_endpoint(campaign_id: str) -> Dict[str, Any]:
+    mgr = get_campaign_manager()
+    campaign = mgr.get_campaign(campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail=f"Campaign {campaign_id!r} not found")
+    return campaign.aggregate()
+
+
+@app.post("/outbound/opt-out")
+async def opt_out_endpoint(phone_number: str) -> Dict[str, Any]:
+    """Add a number to the permanent opt-out list. No further calls will be attempted."""
+    get_campaign_manager().add_opt_out(phone_number)
+    return {"opted_out": True, "phone_number": phone_number}
+
+
+@app.post("/outbound/callback")
+async def outbound_callback_endpoint(request: Request) -> Dict[str, Any]:
+    """
+    Twilio status callback — updates call records (ringing/answered/completed/failed).
+    Configure in Twilio: status_callback_url = https://your-service/outbound/callback
+    """
+    form = await request.form()
+    return await outbound_callback_handler(dict(form))
+
+
+@app.post("/phone/twiml/outbound")
+async def outbound_twiml_endpoint(request: Request, session_id: str = "outbound") -> Response:
+    """
+    TwiML for outbound calls — includes GDPR/TCPA compliance disclosure
+    before connecting to the Media Streams agent WebSocket.
+    """
+    xml = await outbound_twiml_handler(request, session_id)
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/outbound/status")
+async def outbound_status_endpoint() -> Dict[str, Any]:
+    """Live concurrency stats + per-campaign aggregates."""
+    return get_campaign_manager().status()
+
 
 # ------------------------------------------------------------------
 # /phone/twiml  — Twilio webhook: returns TwiML directing call to /phone/stream
