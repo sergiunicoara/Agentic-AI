@@ -25,7 +25,7 @@ from typing import List, Dict, Any
 # -----------------------------
 # CONFIG
 # -----------------------------
-BACKEND = "https://recruiter-agent-190861422358.europe-west1.run.app"   # <-- change this
+BACKEND = "https://recruiter-agent-969006882005.europe-west1.run.app"
 SESSION_STORE = "http://localhost:8000/admin/session"  # optional local session debug
 
 
