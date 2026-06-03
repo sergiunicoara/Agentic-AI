@@ -15,6 +15,39 @@ from app.chunking import chunk_text
 from app.providers.embeddings import embed
 
 _jobs: "queue.Queue[str]" = queue.Queue()
+
+
+def _opensearch_dual_write(
+    *,
+    chunk_id: str,
+    document_id: str,
+    workspace_id: str,
+    chunk_index: int,
+    content: str,
+    embedding: list[float],
+    source: str,
+    embedding_version: str,
+) -> None:
+    """Best-effort dual-write to OpenSearch. Never raises — failures are logged only."""
+    if not settings.opensearch_dual_write or not settings.opensearch_url:
+        return
+    try:
+        from app.opensearch.client import is_available
+        from app.opensearch.ingest import upsert_chunk
+        if not is_available():
+            return
+        upsert_chunk(
+            chunk_id=chunk_id,
+            document_id=document_id,
+            workspace_id=workspace_id,
+            chunk_index=chunk_index,
+            content=content,
+            embedding=embedding,
+            source=source,
+            embedding_version=embedding_version,
+        )
+    except Exception as e:
+        emit_event("opensearch_dual_write_failed", {"chunk_id": chunk_id, "error": str(e)})
 _started = False
 
 
@@ -84,9 +117,11 @@ def process_document(document_id: str) -> None:
                 chunks = chunk_text(doc["text"])
 
                 ws = str(doc.get("workspace_id"))
+                source = str(doc.get("source_name", "upload"))
                 for idx, ch in enumerate(chunks):
                     chash = _hash_text(ch)
                     v = embed(ch)
+                    chunk_id = str(uuid.uuid4())
                     db.execute(
                         text(
                             """
@@ -96,7 +131,7 @@ def process_document(document_id: str) -> None:
                             """
                         ),
                         {
-                            "id": str(uuid.uuid4()),
+                            "id": chunk_id,
                             "document_id": document_id,
                             "workspace_id": ws,
                             "chunk_index": idx,
@@ -105,6 +140,17 @@ def process_document(document_id: str) -> None:
                             "embedding": _vec_literal(v),
                             "embedding_version": settings.embedding_version,
                         },
+                    )
+                    # Dual-write to OpenSearch — fire-and-forget, never blocks Postgres tx
+                    _opensearch_dual_write(
+                        chunk_id=chunk_id,
+                        document_id=document_id,
+                        workspace_id=ws,
+                        chunk_index=idx,
+                        content=ch,
+                        embedding=v,
+                        source=source,
+                        embedding_version=settings.embedding_version,
                     )
 
                 db.execute(

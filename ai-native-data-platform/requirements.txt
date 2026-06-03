@@ -29,3 +29,4 @@ datasets                # required by ragas
 
 # NL→SQL prompt optimization
 dspy-ai                 # BootstrapFewShot optimizer for intent extractor (run scripts/optimize_nl_intent.py)
+opensearch-py==2.6.0    # OpenSearch Python client (kNN + BM25 + bulk indexing)

@@ -14,6 +14,19 @@ from app.retrieval.retrievers.multimodal import MultimodalDenseRetriever
 from app.retrieval.rerankers.mmr import MMRReranker
 from app.retrieval.rerankers.cross_encoder_stub import CrossEncoderStubReranker
 
+# OpenSearch retrievers — imported lazily so the app starts without opensearch-py
+def _os_bm25():
+    from app.retrieval.retrievers.opensearch_retriever import OpenSearchBM25Retriever
+    return OpenSearchBM25Retriever()
+
+def _os_vector():
+    from app.retrieval.retrievers.opensearch_retriever import OpenSearchVectorRetriever
+    return OpenSearchVectorRetriever()
+
+def _os_hybrid():
+    from app.retrieval.retrievers.opensearch_retriever import OpenSearchHybridRetriever
+    return OpenSearchHybridRetriever()
+
 
 def _load_experiment_config(experiment: str) -> dict[str, Any]:
     # Accept explicit file path, otherwise look in app/eval/experiments.
@@ -59,12 +72,25 @@ def build_pipeline(experiment: str | None = None) -> RetrievalPipeline:
 
     retrievers = []
     if mode == "multimodal":
-        # Unified dense retrieval across text + image chunks.
         retrievers = [MultimodalDenseRetriever()]
     elif mode == "dense":
         retrievers = [DenseRetriever()]
     elif mode == "lexical":
         retrievers = [LexicalRetriever()]
+    # ── OpenSearch backends ─────────────────────────────────────────────────
+    elif mode == "opensearch_bm25":
+        retrievers = [_os_bm25()]
+    elif mode == "opensearch_vector":
+        retrievers = [_os_vector()]
+    elif mode == "opensearch_hybrid":
+        # Single retriever handles internal BM25+vector+RRF; pipeline fusion is concat.
+        retrievers = [_os_hybrid()]
+        fusion = "concat"   # RRF already applied inside the retriever
+    elif mode == "opensearch_hybrid_rerank":
+        # Expose BM25 and vector as separate stages so the pipeline's RRF runs on top,
+        # then optionally reranks. Gives the outer pipeline full control over fusion.
+        retrievers = [_os_bm25(), _os_vector()]
+    # ───────────────────────────────────────────────────────────────────────
     else:
         # hybrid: use multimodal dense when MULTIMODAL_RETRIEVAL=true, else standard dense.
         dense = MultimodalDenseRetriever() if settings.multimodal_retrieval else DenseRetriever()

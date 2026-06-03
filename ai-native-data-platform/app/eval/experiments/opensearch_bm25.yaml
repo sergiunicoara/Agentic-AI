@@ -1,0 +1,21 @@
+name: opensearch_bm25
+description: >
+  OpenSearch BM25 lexical retrieval. Baseline for comparing lexical-only
+  performance against pgvector dense and hybrid backends.
+retrieval:
+  mode: opensearch_bm25
+  k: 10
+  rerank_candidates: 25
+  rerank: none
+metrics:
+  - recall_at_k
+  - mrr
+  - precision_at_k
+  - groundedness
+  - pass_rate
+gates:
+  pass_rate: 0.70
+  rubric_pass_rate: 0.70
+  generation_failure_rate: 0.10
+  hard_negative_hit_rate: 0.15
+  latency_p95_ms: 400

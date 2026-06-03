@@ -155,6 +155,36 @@ class Settings(BaseSettings):
         description="When true, dense retrieval queries both document_chunk and image_chunk tables.",
     )
 
+    # --- OpenSearch (alternative retrieval backend)
+    opensearch_url: str = Field(
+        default="",
+        description="OpenSearch base URL, e.g. http://localhost:9200. When empty, OpenSearch features are disabled.",
+    )
+    opensearch_index: str = Field(
+        default="ai_platform_chunks",
+        description="OpenSearch index name for chunk documents.",
+    )
+    opensearch_dual_write: bool = Field(
+        default=True,
+        description="When True, ingestion writes chunks to both PostgreSQL and OpenSearch.",
+    )
+    opensearch_bm25_boost: float = Field(
+        default=1.0,
+        description="BM25 score boost applied during RRF fusion in OpenSearch hybrid retrieval.",
+    )
+    opensearch_vector_boost: float = Field(
+        default=1.0,
+        description="Vector score boost applied during RRF fusion in OpenSearch hybrid retrieval.",
+    )
+    opensearch_timeout_s: float = Field(
+        default=5.0,
+        description="Per-request timeout for OpenSearch queries (seconds).",
+    )
+    opensearch_rrf_k: int = Field(
+        default=60,
+        description="RRF k constant for fusing BM25 and vector results inside OpenSearch hybrid retriever.",
+    )
+
     # --- Admin / ops
     admin_token: str = Field(default="", description="Shared secret for privileged operational endpoints.")
     allow_embedding_override: bool = Field(default=False, description="If true, allow admin canary reads with an explicit embedding_version override.")

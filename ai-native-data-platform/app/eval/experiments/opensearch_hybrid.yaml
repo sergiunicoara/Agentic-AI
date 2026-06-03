@@ -1,0 +1,25 @@
+name: opensearch_hybrid
+description: >
+  OpenSearch hybrid retrieval: BM25 + kNN vector search fused with RRF
+  (k=60), followed by cross-encoder reranking. Primary challenger against
+  the pgvector baseline for enterprise deployment decisions.
+retrieval:
+  mode: opensearch_hybrid
+  fusion: rrf
+  rrf_k: 60
+  k: 10
+  rerank_candidates: 25
+  rerank: cross
+  cross_alpha: 0.70
+metrics:
+  - recall_at_k
+  - mrr
+  - precision_at_k
+  - groundedness
+  - pass_rate
+gates:
+  pass_rate: 0.80
+  rubric_pass_rate: 0.80
+  generation_failure_rate: 0.05
+  hard_negative_hit_rate: 0.20
+  latency_p95_ms: 800

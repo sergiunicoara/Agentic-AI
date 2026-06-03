@@ -1,0 +1,35 @@
+{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 128,
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    }
+  },
+  "mappings": {
+    "properties": {
+      "workspace_id":      { "type": "keyword" },
+      "document_id":       { "type": "keyword" },
+      "chunk_id":          { "type": "keyword" },
+      "chunk_index":       { "type": "integer" },
+      "content":           { "type": "text", "analyzer": "english" },
+      "source":            { "type": "keyword" },
+      "embedding_version": { "type": "keyword" },
+      "metadata":          { "type": "object", "dynamic": true },
+      "embedding": {
+        "type": "knn_vector",
+        "dimension": 384,
+        "method": {
+          "name": "hnsw",
+          "space_type": "cosinesimil",
+          "engine": "lucene",
+          "parameters": {
+            "m": 16,
+            "ef_construction": 128
+          }
+        }
+      }
+    }
+  }
+}
