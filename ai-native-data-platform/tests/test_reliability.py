@@ -89,6 +89,18 @@ class TestRollingWindowSLO:
         assert snap["p95_latency_ms"] == 0.0
         assert snap["error_rate"] == 0.0
         assert snap["unknown_rate"] == 0.0
+        assert snap["samples"] == 0.0
+
+    def test_samples_count_grows_and_caps_at_max_events(self):
+        """remediation_controller gates on snapshot()["samples"] vs
+        min_samples — without this field the gate never opens."""
+        slo = self._make(max_events=5)
+        for _ in range(3):
+            slo.observe(100.0, is_error=False, is_unknown=False)
+        assert slo.snapshot()["samples"] == 3.0
+        for _ in range(10):
+            slo.observe(100.0, is_error=False, is_unknown=False)
+        assert slo.snapshot()["samples"] == 5.0
 
     def test_p95_single_value(self):
         slo = self._make()

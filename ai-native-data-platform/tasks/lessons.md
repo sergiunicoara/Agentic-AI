@@ -20,6 +20,16 @@ Patterns captured from real bugs and audit findings in this repo. Review at sess
   JVM). Rule: any "is the dependency up?" singleton needs a cooldown re-probe so
   startup-order outages self-heal without a process restart.
 
+## Reliability / SLO (2026-06)
+
+- **A consumer reading a key the producer never sets is silent dead code.**
+  `remediation_controller.py` gated on `snap.get("samples", 0) < min_samples`,
+  but `RollingWindowSLO.snapshot()` never returned a `"samples"` key — so the
+  gate was always `0 < 200` → always `True` → the remediation logic after it
+  never ran, with no error anywhere. Rule: when a `.get(key, default)` exists,
+  grep for where that dict is *built*, not just where it's read, and confirm
+  the key is actually populated.
+
 ## Testing
 
 - **Patch the usage site, not the definition site.** `from X import generate`

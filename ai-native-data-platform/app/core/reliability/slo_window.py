@@ -74,6 +74,7 @@ class RollingWindowSLO:
             "p95_latency_ms": float(self._last_p95),
             "error_rate": float(self._last_err_rate),
             "unknown_rate": float(self._last_unknown_rate),
+            "samples": float(len(self._events)),
         }
 
 
