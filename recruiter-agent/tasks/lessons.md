@@ -21,6 +21,17 @@ Patterns from corrections in past sessions. Review at session start.
    service has no `REDIS_URL` set, so the fallback (SQLite) is what actually
    runs. Flag this gap whenever copy and deployment diverge.
 
+3a. **A latency table needs a re-runnable script behind every cell.** README's
+    "35ms agent routing / ~400ms TTS / ~600ms TTFA / 700ms-1.1s full loop" table
+    didn't match `benchmark_voice_results.json` at all — "~600ms" turned out to
+    be `median(measured) + 200ms` (a hard-coded Deepgram guess), and "35ms" /
+    "~400ms" had no measurement behind them anywhere in the repo. Fixed by
+    re-running `benchmark_voice.py` against the live Cloud Run URL and replacing
+    every cell with the actual p50/range from that run, with estimates clearly
+    labeled as estimates. Before publishing any latency/perf number, find the
+    script that produces it and run it — don't trust a number that "sounds
+    derived from" a benchmark.
+
 4. **Verify char counts with a script before presenting length-constrained
    text.** First CV bullet attempt was +31/+33 chars over target. Run
    `python -c "print(len(...))"` on every artifact before showing it.
@@ -52,3 +63,12 @@ Patterns from corrections in past sessions. Review at session start.
 
 10. **Read a file before Edit.** The Edit tool rejects edits to unread files —
     read first, every time, even for "obvious" one-liners.
+
+11. **No project-local Python on this machine; `py` launcher isn't on PATH.**
+    `py -3.11 benchmark_voice.py ...` from the script's own docstring fails.
+    Use the venv at `C:\Users\Sergiu\Desktop\Projects\Vetto\venv\Scripts\python`
+    (has httpx + websockets) via the Bash tool. It lacks
+    `google-cloud-texttospeech` / `google-cloud-secretmanager` — Stage 1
+    (Deepgram) and Stage 3b (Google TTS direct) get skipped, but Stage 2
+    (`/chat`) and Stage 4 (`/voice/bench` E2E, real production TTS) still run
+    and are the most relevant numbers anyway.

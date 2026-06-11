@@ -9,8 +9,8 @@ AI Recruiter is an autonomous voice-first agent that represents a candidate's po
 
 ## Core Capabilities
 
-- **Deterministic orchestrator** — role extraction → criteria parsing → project ranking → CV Q&A with no LLM in the routing loop (35ms agent turn)
-- **Real-time voice pipeline** — Deepgram nova-2 STT over WebSocket → agent → Google Neural2-D TTS with sentence-level streaming. Barge-in via RMS VAD. ~600ms time-to-first-audio.
+- **Deterministic orchestrator** — role extraction → criteria parsing → project ranking → CV Q&A with no LLM in the routing loop (routing logic itself runs in low single-digit ms; see Latency section)
+- **Real-time voice pipeline** — Deepgram nova-2 STT over WebSocket → agent → Google Neural2-D TTS with sentence-level streaming. Barge-in via RMS VAD. ~430ms measured agent+TTS first-audio (~600–730ms full voice turn incl. STT endpointing, see Latency section).
 - **Streaming LLM→TTS** — Gemini-backed replies (CV RAG) stream token chunks; TTS fires per sentence *as text arrives*, before the full reply is assembled
 - **PSTN/SIP telephony** — Twilio Media Streams bridge (`/phone/twiml` + `/phone/stream`): mulaw 8kHz full-duplex, barge-in via Deepgram SpeechStarted + Twilio `clear`
 - **WebRTC** — direct browser peer connections via aiortc (`/webrtc/offer`): SDP/ICE negotiation, opus audio, TTS over RTCDataChannel
@@ -134,16 +134,19 @@ Browser (index.html)
 
 ---
 
-## Latency (benchmarked, `/voice/bench` endpoint)
+## Latency (measured live, `benchmark_voice.py`, n=3)
 
-| Stage | Measured |
-|---|---|
-| Agent routing (deterministic) | **35ms avg** |
-| Google Neural2-D TTS first audio | **~400ms** |
-| Time-to-first-audio E2E (incl. Deepgram endpointing) | **~600ms** |
-| Full TTS loop avg | **700ms – 1.1s** |
+| Stage | p50 | range |
+|---|---|---|
+| Agent turn (`POST /chat`, full HTTP round trip) | 321ms | 318 – 589ms |
+| Agent + TTS first-audio (`/voice/bench`, Google Neural2-D, Deepgram excluded) | 428ms | 236 – 474ms |
+| Agent + TTS full stream complete | 444ms | 327 – 479ms |
 
-Agent routing is fast because there is no LLM in the orchestration path — routing is pure Python regex + keyword matching. LLM calls only happen inside tools (CV RAG, ATS generation, LLM judge).
+Deepgram nova-2 streaming endpointing isn't included above (requires `DEEPGRAM_API_KEY` to benchmark); Deepgram's published nova-2 streaming latency is ~150–300ms, putting a full voice-turn estimate (STT + agent + TTS first-audio) at roughly **580–730ms**.
+
+The deterministic orchestrator itself (role extraction → criteria parsing → project ranking — regex/keyword matching, no LLM call) runs in low single-digit milliseconds in-process. The 300ms+ `/chat` round trip above is dominated by network + Cloud Run request overhead, not the routing logic.
+
+Re-run: `python benchmark_voice.py <cloud-run-url>` (writes `benchmark_voice_results.json`).
 
 ---
 
