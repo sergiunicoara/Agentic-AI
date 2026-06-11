@@ -8,23 +8,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.models.user import AuditLog, User
-from app.services.auth_service import hash_password, require_role
+from app.services.auth_service import require_role, revoke_user_sessions
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _admin_dep = Depends(require_role("admin"))
 
+_VALID_ROLES = ("admin", "developer", "viewer")
+_VALID_CLEARANCE = (0, 1, 2)
+
 
 class UserCreate(BaseModel):
+    """Pre-provision a user before their first OIDC login.
+
+    No password — identity is proven by the OIDC provider; the account is
+    matched by email and bound to the provider's sub claim on first login.
+    """
     email: str
-    password: str
     role: str = "viewer"
+    clearance_level: int = 0
+    department: Optional[str] = None
+
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = None
+    clearance_level: Optional[int] = None
+    department: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class UserOut(BaseModel):
     id: str
     email: str
     role: str
+    clearance_level: int
+    department: Optional[str]
     is_active: bool
 
     class Config:
@@ -59,13 +77,16 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     _user: dict = _admin_dep,
 ):
-    if body.role not in ("admin", "developer", "viewer"):
+    if body.role not in _VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
+    if body.clearance_level not in _VALID_CLEARANCE:
+        raise HTTPException(status_code=400, detail="Invalid clearance level")
     user = User(
         id=str(uuid.uuid4()),
         email=body.email,
-        hashed_password=hash_password(body.password),
         role=body.role,
+        clearance_level=body.clearance_level,
+        department=body.department,
     )
     db.add(user)
     await db.commit()
@@ -73,22 +94,48 @@ async def create_user(
     return user
 
 
-@router.patch("/users/{user_id}/role")
-async def update_role(
+@router.patch("/users/{user_id}", response_model=UserOut)
+async def update_user(
     user_id: str,
-    role: str,
+    body: UserUpdate,
     db: AsyncSession = Depends(get_db),
     _user: dict = _admin_dep,
 ):
-    if role not in ("admin", "developer", "viewer"):
+    """Update ABAC attributes. All active sessions of the user are revoked so
+    the change takes effect immediately instead of at token expiry."""
+    if body.role is not None and body.role not in _VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
+    if body.clearance_level is not None and body.clearance_level not in _VALID_CLEARANCE:
+        raise HTTPException(status_code=400, detail="Invalid clearance level")
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user.role = role
+
+    if body.role is not None:
+        user.role = body.role
+    if body.clearance_level is not None:
+        user.clearance_level = body.clearance_level
+    if body.department is not None:
+        user.department = body.department or None
+    if body.is_active is not None:
+        user.is_active = body.is_active
+
     await db.commit()
-    return {"id": user_id, "role": role}
+    await db.refresh(user)
+    await revoke_user_sessions(user_id)
+    return user
+
+
+@router.post("/users/{user_id}/revoke-sessions")
+async def revoke_sessions(
+    user_id: str,
+    _user: dict = _admin_dep,
+):
+    """Force-logout: revoke every active session token of a user."""
+    count = await revoke_user_sessions(user_id)
+    return {"user_id": user_id, "revoked_sessions": count}
 
 
 @router.get("/audit", response_model=list[AuditLogOut])

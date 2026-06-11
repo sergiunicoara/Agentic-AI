@@ -14,10 +14,8 @@ alembic==1.14.0
 # Redis
 redis[hiredis]==5.2.1
 
-# Auth
+# Auth (OIDC — password hashing removed with the custom login)
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-bcrypt==3.2.2
 python-multipart==0.0.20
 
 # Config

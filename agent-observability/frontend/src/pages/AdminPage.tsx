@@ -48,7 +48,7 @@ export function AdminPage({ role }: Props) {
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-900 border-b border-gray-700">
               <tr>
-                {["Email", "Role", "Active"].map((h) => (
+                {["Email", "Role", "Clearance", "Department", "Active"].map((h) => (
                   <th key={h} className="py-2 px-3 text-[10px] uppercase tracking-wider text-gray-500 font-medium">{h}</th>
                 ))}
               </tr>
@@ -66,6 +66,10 @@ export function AdminPage({ role }: Props) {
                       {u.role}
                     </span>
                   </td>
+                  <td className="py-2 px-3 text-gray-300 font-mono">
+                    {["public", "internal", "confidential"][u.clearance_level] ?? u.clearance_level}
+                  </td>
+                  <td className="py-2 px-3 text-gray-400">{u.department ?? "—"}</td>
                   <td className="py-2 px-3">
                     <span className={u.is_active ? "text-green-400" : "text-gray-600"}>
                       {u.is_active ? "Yes" : "No"}

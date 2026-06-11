@@ -1,4 +1,4 @@
-import time, uuid, sys
+import os, time, uuid, sys
 sys.path.insert(0, "backend")
 
 import grpc
@@ -6,6 +6,7 @@ from app.generated import agent_events_pb2, agent_events_pb2_grpc
 
 channel = grpc.insecure_channel("localhost:50051")
 stub = agent_events_pb2_grpc.AgentEventServiceStub(channel)
+METADATA = (("x-api-key", os.getenv("EMIT_API_KEY", "dev-emit-key")),)
 
 agents = ["recruiter-agent", "cv-screener", "jd-matcher"]
 
@@ -33,7 +34,7 @@ for agent in agents:
             outcome       = "success",
             status        = "ok",
             attributes    = {"data_sensitivity": sensitivity},
-        ))
+        ), metadata=METADATA)
         print(f"{'OK' if resp.accepted else 'FAIL'}  {agent:20s}  {event_type}")
 
 channel.close()

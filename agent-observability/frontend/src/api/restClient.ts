@@ -6,7 +6,11 @@ export const restClient = axios.create({
   baseURL: `${ENVOY_BASE}/api/v1`,
 });
 
-// Attach session token from localStorage to every request
+// Attach session token from localStorage to every request.
+// DECISION: localStorage is XSS-readable; httpOnly cookies would be safer but
+// the gRPC-Web stream needs the token in the request payload (cookies don't
+// flow through Envoy's gRPC-Web transcoding), so both paths share one store.
+// Mitigations: 60-min expiry, server-side revocation, no inline scripts.
 restClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
   if (token) {
@@ -139,6 +143,8 @@ export interface UserOut {
   id: string;
   email: string;
   role: string;
+  clearance_level: number;
+  department: string | null;
   is_active: boolean;
 }
 

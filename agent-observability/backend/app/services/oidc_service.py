@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+import time
 from typing import Any, Dict, Optional, Tuple
 
 import httpx
@@ -11,8 +12,11 @@ from jose import JWTError, jwt
 
 from app.config import settings
 
+_JWKS_TTL_SECONDS = 3600  # providers rotate keys; never cache forever
+
 _discovery_cache: Optional[Dict[str, Any]] = None
 _jwks_cache: Optional[Dict[str, Any]] = None
+_jwks_fetched_at: float = 0.0
 
 
 async def _discovery() -> Dict[str, Any]:
@@ -26,14 +30,16 @@ async def _discovery() -> Dict[str, Any]:
     return _discovery_cache
 
 
-async def get_jwks() -> Dict[str, Any]:
-    global _jwks_cache
-    if _jwks_cache is None:
+async def get_jwks(force_refresh: bool = False) -> Dict[str, Any]:
+    global _jwks_cache, _jwks_fetched_at
+    expired = (time.monotonic() - _jwks_fetched_at) > _JWKS_TTL_SECONDS
+    if _jwks_cache is None or expired or force_refresh:
         doc = await _discovery()
         async with httpx.AsyncClient() as client:
             r = await client.get(doc["jwks_uri"])
             r.raise_for_status()
             _jwks_cache = r.json()
+            _jwks_fetched_at = time.monotonic()
     return _jwks_cache
 
 
@@ -79,17 +85,29 @@ async def exchange_code(code: str, code_verifier: str) -> Dict[str, Any]:
         return r.json()
 
 
+def _decode(id_token: str, jwks: Dict[str, Any], access_token: str) -> Dict[str, Any]:
+    return jwt.decode(
+        id_token,
+        jwks,
+        algorithms=["RS256", "ES256"],
+        audience=settings.oidc_client_id,
+        issuer=settings.oidc_issuer_url,
+        access_token=access_token or None,
+    )
+
+
 async def validate_id_token(id_token: str, access_token: str = "") -> Dict[str, Any]:
-    """Validate OIDC ID token signature via provider JWKS; return claims."""
+    """Validate OIDC ID token signature via provider JWKS; return claims.
+
+    Retries once with a force-refreshed JWKS so a provider key rotation
+    mid-cache doesn't fail logins until restart.
+    """
     jwks = await get_jwks()
     try:
-        return jwt.decode(
-            id_token,
-            jwks,
-            algorithms=["RS256", "ES256"],
-            audience=settings.oidc_client_id,
-            issuer=settings.oidc_issuer_url,
-            access_token=access_token or None,
-        )
-    except JWTError as exc:
-        raise ValueError(f"Invalid ID token: {exc}") from exc
+        return _decode(id_token, jwks, access_token)
+    except JWTError:
+        jwks = await get_jwks(force_refresh=True)
+        try:
+            return _decode(id_token, jwks, access_token)
+        except JWTError as exc:
+            raise ValueError(f"Invalid ID token: {exc}") from exc

@@ -52,6 +52,8 @@ OIDC_ISSUER_URL=https://accounts.google.com          # or Keycloak/Auth0 issuer
 OIDC_CLIENT_ID=your-client-id
 OIDC_CLIENT_SECRET=your-client-secret                # leave empty for public clients
 OIDC_REDIRECT_URI=http://localhost:5173/auth/callback
+EMIT_API_KEY=dev-emit-key                            # gRPC EmitEvent auth — change in prod
+FRONTEND_ORIGIN=http://localhost:5173                # exact CORS origin
 ```
 
 **Google OAuth2:** Create credentials at console.cloud.google.com → OAuth 2.0 Client ID → Web application. Add `http://localhost:5173/auth/callback` as an authorised redirect URI.
@@ -110,17 +112,18 @@ Swagger UI: `http://localhost:8000/api/v1/docs`
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | /auth/authorize | — | Initiate OIDC flow (returns redirect URL + state) |
+| GET | /auth/authorize | — | Initiate OIDC flow (rate-limited 10/min/IP) |
 | POST | /auth/callback | — | Exchange OIDC code + PKCE verifier for session token |
 | POST | /auth/logout | any | Revoke session token |
-| GET | /traces | viewer+ | List agent traces (ABAC filtered) |
+| GET | /traces | viewer+ | List agent traces (metadata only — treated as public) |
 | GET | /traces/{id} | viewer+ | Trace detail — spans filtered by clearance_level |
 | GET | /evals | viewer+ | List eval runs |
 | POST | /evals | developer+ | Create eval run |
 | POST | /evals/{id}/results | developer+ | Add eval result |
 | GET | /admin/users | admin | List users |
-| POST | /admin/users | admin | Create user |
-| PATCH | /admin/users/{id}/role | admin | Update user role |
+| POST | /admin/users | admin | Pre-provision OIDC user (email, role, clearance, dept) |
+| PATCH | /admin/users/{id} | admin | Update attributes — revokes the user's active sessions |
+| POST | /admin/users/{id}/revoke-sessions | admin | Force-logout a user |
 | GET | /admin/audit | admin | Audit log |
 
 Unversioned: `GET /api/health` — for load balancer health checks.
@@ -141,6 +144,11 @@ service AgentEventService {
 ```
 
 Envoy routes `agent_events.v1.AgentEventService/*` → gRPC backend :50051.
+
+**Auth:** `EmitEvent` requires the `EMIT_API_KEY` value in `x-api-key` gRPC metadata
+(the SDK sends it automatically). `SubscribeEvents` requires a valid session token
+and applies the same per-span ABAC filtering as the REST trace-detail endpoint —
+the live stream cannot leak spans the user couldn't read from history.
 
 ## ABAC (Attribute-Based Access Control)
 
@@ -171,17 +179,10 @@ async with trace.span("llm_call") as span:
     span.set_attribute("owner_email", "user@example.com")
 ```
 
-**Promoting a user (SQL):**
-
-```sql
--- Grant full access
-UPDATE users SET role='admin', clearance_level=2 WHERE email='user@example.com';
-
--- Grant confidential read via department
-UPDATE users SET department='security' WHERE email='analyst@example.com';
-```
-
-After any change sign out and back in — the session token is reissued with updated attributes.
+**Promoting a user:** `PATCH /api/v1/admin/users/{id}` with `{"role": "admin", "clearance_level": 2}` —
+this also revokes the user's active sessions, so the change applies on their next login
+instead of waiting out the 60-minute token lifetime. (Direct SQL works too, but then
+call `POST /admin/users/{id}/revoke-sessions` yourself.)
 
 ## SDK Usage
 

@@ -14,7 +14,7 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -23,9 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.models.user import User
 from app.services.auth_service import (
-    create_session_token,
     decode_token,
     get_redis,
+    issue_session_token,
     revoke_token,
 )
 from app.services.oidc_service import (
@@ -37,7 +37,25 @@ from app.services.oidc_service import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer()
 
-_PKCE_TTL = 300  # seconds — PKCE verifier validity window
+_PKCE_TTL = 300          # seconds — PKCE verifier validity window
+_AUTHORIZE_RATE = 10     # max /authorize calls per IP per minute
+
+
+async def _rate_limit(request: Request, bucket: str, limit: int) -> None:
+    """Fixed-window per-IP rate limit backed by Redis."""
+    ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+        request.client.host if request.client else "unknown"
+    )
+    r = get_redis()
+    key = f"rl:{bucket}:{ip}"
+    count = await r.incr(key)
+    if count == 1:
+        await r.expire(key, 60)
+    if count > limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests, slow down",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -50,13 +68,14 @@ class AuthorizeResponse(BaseModel):
 
 
 @router.get("/authorize", response_model=AuthorizeResponse)
-async def authorize(code_challenge: str):
+async def authorize(code_challenge: str, request: Request):
     """Return the OIDC authorization URL.
 
     The frontend generates the PKCE pair and sends the challenge here.
     The backend stores the state for CSRF validation; the frontend retains
     the verifier and sends it back in /callback.
     """
+    await _rate_limit(request, "authorize", _AUTHORIZE_RATE)
     state = secrets.token_urlsafe(16)
     r = get_redis()
     await r.set(f"state:{state}", "valid", ex=_PKCE_TTL)
@@ -130,7 +149,7 @@ async def callback(body: CallbackRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(user)
 
-    return SessionTokenResponse(access_token=create_session_token(user))
+    return SessionTokenResponse(access_token=await issue_session_token(user))
 
 
 # ---------------------------------------------------------------------------

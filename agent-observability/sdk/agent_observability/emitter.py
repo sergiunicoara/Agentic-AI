@@ -24,14 +24,15 @@ except ImportError as exc:
 class GrpcEmitter:
     """Thread-safe gRPC client that sends events to the observability backend."""
 
-    def __init__(self, server: str = "localhost:50051"):
+    def __init__(self, server: str = "localhost:50051", api_key: str = "dev-emit-key"):
         self._channel = grpc.insecure_channel(server)
         self._stub = agent_events_pb2_grpc.AgentEventServiceStub(self._channel)
+        self._metadata = (("x-api-key", api_key),)
 
     def emit(self, **kwargs) -> bool:
         event = agent_events_pb2.AgentEvent(**kwargs)
         try:
-            response = self._stub.EmitEvent(event, timeout=5.0)
+            response = self._stub.EmitEvent(event, timeout=5.0, metadata=self._metadata)
             return response.accepted
         except grpc.RpcError:
             return False
@@ -49,12 +50,13 @@ class GrpcEmitter:
 class AsyncGrpcEmitter:
     """Async gRPC emitter using grpcio-aio."""
 
-    def __init__(self, server: str = "localhost:50051"):
+    def __init__(self, server: str = "localhost:50051", api_key: str = "dev-emit-key"):
         import grpc.aio as aio
 
         self._channel: Optional[aio.Channel] = None
         self._server = server
         self._stub: Optional[agent_events_pb2_grpc.AgentEventServiceStub] = None
+        self._metadata = (("x-api-key", api_key),)
 
     async def connect(self) -> None:
         import grpc.aio as aio
@@ -65,7 +67,7 @@ class AsyncGrpcEmitter:
     async def emit(self, **kwargs) -> bool:
         event = agent_events_pb2.AgentEvent(**kwargs)
         try:
-            response = await self._stub.EmitEvent(event, timeout=5.0)
+            response = await self._stub.EmitEvent(event, timeout=5.0, metadata=self._metadata)
             return response.accepted
         except grpc.RpcError:
             return False

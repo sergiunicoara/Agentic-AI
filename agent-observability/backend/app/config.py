@@ -27,13 +27,15 @@ class Settings(BaseSettings):
     oidc_client_secret: str = ""                            # empty = public client
     oidc_redirect_uri: str = "http://localhost:5173/auth/callback"
 
+    # gRPC emit auth — SDK agents must send this in x-api-key metadata
+    emit_api_key: str = "dev-emit-key"
+
+    # CORS — exact frontend origin (no wildcard with credentials)
+    frontend_origin: str = "http://localhost:5173"
+
     # OTel
     otel_endpoint: str = "http://localhost:4317"
     otel_service_name: str = "agent-observability-backend"
-
-    # Seed admin
-    seed_admin_email: str = "admin@example.com"
-    seed_admin_password: str = "password"
 
 
 settings = Settings()
