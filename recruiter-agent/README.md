@@ -11,14 +11,22 @@ An interactive AI recruiter agent that helps hiring managers understand Sergiu's
 
 - **Deterministic orchestrator** — role extraction → criteria parsing → project ranking → CV Q&A with no LLM in the routing loop (35ms agent turn)
 - **Real-time voice pipeline** — Deepgram nova-2 STT over WebSocket → agent → Google Neural2-D TTS with sentence-level streaming. Barge-in via RMS VAD. ~600ms time-to-first-audio.
+- **Streaming LLM→TTS** — Gemini-backed replies (CV RAG) stream token chunks; TTS fires per sentence *as text arrives*, before the full reply is assembled
+- **PSTN/SIP telephony** — Twilio Media Streams bridge (`/phone/twiml` + `/phone/stream`): mulaw 8kHz full-duplex, barge-in via Deepgram SpeechStarted + Twilio `clear`
+- **WebRTC** — direct browser peer connections via aiortc (`/webrtc/offer`): SDP/ICE negotiation, opus audio, TTS over RTCDataChannel
+- **Outbound campaigns** — concurrent dialer with TCPA calling-hours enforcement, GDPR verbal disclosure, opt-out list, exponential backoff retry
+- **Turn-taking FSM** — LISTENING → THINKING → SPEAKING → INTERRUPTED per session, with OTel span attributes and interrupt-rate metrics
 - **Continuous conversation** — one mic press opens a persistent session; Deepgram auto-detects utterance end, agent responds, TTS streams back. No push-to-talk.
 - **CV RAG** — Gemini `text-embedding-004` embeddings over the candidate CV for recruiter Q&A (phone, certifications, location, skills)
 - **ATS outputs** — role-matched project deep dives, ATS-style summaries, recruiter email drafts
+- **Post-call summaries** — structured interview summary per session (`role_fit_score`, strengths, concerns, recommendation) via `GET /session/{id}/summary`
+- **Guardrails** — PII redaction (email/phone/SSN/card) on the logging path + topic enforcement that deflects off-topic messages before they reach the agent
 - **LLM-as-Judge** — multi-metric eval per turn: faithfulness, relevancy, factuality (0.0–1.0 each). 6 golden test cases, 100% pass rate, 5.0/5 avg score.
 - **Critic Agent (A2A)** — autonomous critic calls the judge via MCP tool interface, issues PASS/FAIL verdicts, tracks session-level quality
 - **MCP tool registry** — agent capabilities exposed as named JSON-schema tools via `/mcp/tools` + `/mcp/call`
 - **Langfuse tracing** — every agent turn and judge call traced with input/output/scores in Langfuse dashboard
 - **OTel tracing** — every `/chat`, `/voice`, `/mcp/call`, `/a2a/validate` request has a span wired to Cloud Trace
+- **Redis session state** — shared store across Cloud Run instances (`REDIS_URL`, 24h TTL) with automatic SQLite fallback
 
 ---
 
@@ -178,9 +186,11 @@ python eval/run_eval_table.py
 | **LLM Observability** | Langfuse (traces, scores, generations) |
 | **Infra Observability** | OpenTelemetry → Cloud Trace + structured logs |
 | **A2A / MCP** | Critic Agent + MCP tool registry (4 named tools) |
-| **Session state** | SQLite (`/tmp/sessions.db`) |
+| **Telephony** | Twilio Media Streams (PSTN/SIP, mulaw 8kHz) + WebRTC via aiortc |
+| **Guardrails** | PII redaction + topic enforcement (`guardrails.py`) |
+| **Session state** | Redis (`REDIS_URL`, 24h TTL) → SQLite fallback (`/tmp/sessions.db`) |
 | **Frontend** | Vanilla JS — text chat + WebSocket voice pipeline |
-| **Deployment** | Google Cloud Run (zero-cost optimized) |
+| **Deployment** | Google Cloud Run (`--timeout=3600 --min-instances=1` for WebSocket sessions) |
 
 ---
 
@@ -215,6 +225,27 @@ Browser Audio element
 **audio_cancelled protocol**: interrupted TTS sends `audio_cancelled` (not `audio_end`). Client only calls `playAudioChunks()` on `audio_end`, so stale bytes from cancelled streams are never played and never re-set `ttsPlaying=true`.
 
 ---
+
+## Telephony Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `POST /phone/twiml` | Twilio inbound-call webhook — returns TwiML connecting to `/phone/stream` |
+| `WS   /phone/stream` | Twilio Media Streams WebSocket (mulaw 8kHz, full duplex, barge-in) |
+| `POST /webrtc/offer` | WebRTC SDP offer → answer (aiortc, full ICE; needs UDP — not Cloud Run) |
+| `DELETE /webrtc/{pc_id}` | Explicit peer connection cleanup |
+| `POST /outbound/campaign` | Create outbound call campaign (E.164 numbers, concurrency cap) |
+| `POST /outbound/campaign/{id}/start` | Start dialing (TCPA hours + opt-out enforced) |
+| `POST /outbound/opt-out` | Permanent opt-out for a number |
+| `POST /outbound/callback` | Twilio status callback (ringing/answered/completed/failed) |
+| `GET  /outbound/status` | Live concurrency stats + per-campaign aggregates |
+
+## Session & Health Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /session/{session_id}/summary` | Post-call structured interview summary (cached, on-demand fallback) |
+| `GET /health` | Liveness + session store backend info (redis/sqlite) |
 
 ## A2A / MCP Endpoints
 
@@ -268,16 +299,23 @@ recruiter-agent/
 ├── requirements.txt
 │
 ├── app/
-│   ├── server.py                 FastAPI routes (/chat, /voice, /mcp/*, /a2a/*)
-│   ├── agent.py                  Deterministic orchestrator (@observe)
-│   ├── voice.py                  Voice pipeline (Deepgram STT + Google TTS + barge-in)
-│   ├── cv_rag.py                 CV vector search / RAG (Gemini embeddings)
+│   ├── server.py                 FastAPI routes (/chat, /voice, /phone/*, /webrtc/*, /outbound/*, /mcp/*, /a2a/*)
+│   ├── agent.py                  Deterministic orchestrator (@observe) + agent_turn_stream()
+│   ├── voice.py                  Voice pipeline (Deepgram STT + streaming TTS + barge-in)
+│   ├── phone.py                  Twilio Media Streams bridge (PSTN/SIP, mulaw 8kHz)
+│   ├── webrtc.py                 WebRTC peer connections (aiortc, SDP/ICE, data channel)
+│   ├── outbound.py               Outbound campaign manager (TCPA/GDPR, backoff retry)
+│   ├── turn_state.py             Turn-taking FSM (LISTENING/THINKING/SPEAKING/INTERRUPTED)
+│   ├── guardrails.py             PII redaction + topic enforcement
+│   ├── session_summary.py        Post-call structured interview summary (Gemini)
+│   ├── voice_livekit.py          LiveKit Agents adapter (optional, guarded import)
+│   ├── cv_rag.py                 CV vector search / RAG (Gemini embeddings + query_stream)
 │   ├── tools.py                  Project ranking, static projects, ATS generation
 │   ├── github_portfolio.py       Live GitHub portfolio loader (TTL-cached, depth ≤ 1)
 │   ├── critic_agent.py           Critic Agent (A2A validator, PASS/FAIL verdicts)
 │   ├── judge.py                  LLM-as-Judge (@observe as_type=generation)
 │   ├── mcp.py                    MCP tool registry + dispatcher
-│   ├── session_store.py          SQLite session state
+│   ├── session_store.py          Redis session state (SQLite fallback)
 │   ├── quality.py                Trajectory model (steps + timestamps)
 │   ├── utils/
 │   │   └── normalize.py          Criteria normalization + VALID_CRITERIA registry
@@ -287,7 +325,9 @@ recruiter-agent/
 │       └── langfuse_setup.py     Langfuse client init + flush
 │
 ├── eval/
-│   └── run_eval_table.py         Golden dataset runner (6 cases, color-coded table)
+│   ├── run_eval_table.py         Golden dataset runner (6 cases, color-coded table)
+│   ├── run_wer_eval.py           WER harness (Google TTS → Deepgram → word error rate)
+│   └── compare_versions.py       A/B eval between two Cloud Run revisions (delta table)
 │
 └── frontend/
     └── index.html                Chat UI + WebSocket voice pipeline
@@ -313,17 +353,26 @@ Open `http://localhost:8080`.
 ## Deployment
 
 ```bash
-gcloud run deploy recruiter-agent --source . --region europe-west1
+gcloud run deploy recruiter-agent --source . --region europe-west1 \
+  --allow-unauthenticated --timeout=3600 --min-instances=1
 ```
+
+`--timeout=3600` keeps long voice WebSocket sessions alive; `--min-instances=1` avoids cold-start latency on the first call.
 
 **Required secrets:**
 - `GOOGLE_API_KEY` — Gemini API key
 - `DEEPGRAM_API_KEY` — Deepgram STT
 - `GOOGLE_APPLICATION_CREDENTIALS` — service account JSON for Google Cloud TTS
 - `LANGFUSE_PUBLIC_KEY` + `LANGFUSE_SECRET_KEY` — Langfuse (optional, traces disabled if absent)
+- `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM_NUMBER` — telephony (optional, phone endpoints inactive without them)
+- `REDIS_URL` — Redis session store (optional, falls back to SQLite if absent)
+
+**Known limits:**
+- WebRTC (`/webrtc/offer`) will not establish media on Cloud Run — UDP is blocked, so ICE fails. Use LiveKit Cloud, a GCE VM, or Fly.io for WebRTC. The Twilio bridge works fine (TCP WebSocket).
+- Outbound campaign state is in-memory — lost on instance restart/scale-out. Production fix: Firestore or Cloud SQL.
 
 **Cost:**
-- Cloud Run: scales to zero, no idle billing
+- Cloud Run: `--min-instances=1` keeps one warm instance billed; drop to 0 for zero-cost idle
 - Google Cloud TTS Neural2: 1M characters/month free
 - Deepgram: $200 free credit on signup
 - Langfuse: free tier (50k observations/month)
