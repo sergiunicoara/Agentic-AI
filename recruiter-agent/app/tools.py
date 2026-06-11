@@ -71,11 +71,12 @@ STATIC_PROJECTS: List[Dict[str, Any]] = [
             "Real-time voice agent on Cloud Run: Deepgram nova-2 STT over WebSocket → "
             "deterministic agentic orchestrator → Google Neural2-D TTS with sentence-level "
             "streaming. Continuous conversation loop with barge-in (RMS VAD), silence keepalive, "
-            "and SQLite session state. OTel-traced, critic agent (A2A), LLM-as-Judge evaluation "
-            "harness, MCP tool endpoints, and CI golden dataset tests. ~600ms time-to-first-audio."
+            "and Redis session state (SQLite fallback). OTel-traced, critic agent (A2A), LLM-as-Judge "
+            "evaluation harness, MCP tool endpoints, and CI golden dataset tests. "
+            "~430ms measured agent+TTS time-to-first-audio."
         ),
         "impact": [
-            "~600ms time-to-first-audio E2E on Cloud Run (~35ms agent + ~400ms TTS synthesis + network)",
+            "~430ms measured agent+TTS time-to-first-audio on Cloud Run (~600-730ms full voice turn incl. Deepgram STT endpointing)",
             "Barge-in via RMS VAD — user interrupts TTS mid-sentence instantly",
             "Silence keepalive prevents Deepgram timeout during TTS playback",
             "OTel span per voice turn: transcript len, reply len, session_id",
