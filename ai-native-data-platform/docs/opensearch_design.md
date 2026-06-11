@@ -46,19 +46,33 @@ but adds operational complexity (model loading, segment files).
 additional dependencies, standard JVM GC, and the same query interface as BM25.
 For a dev/portfolio environment with < 1M vectors, Lucene is the right choice.
 
-### 3. Dual-write is best-effort (fire-and-forget)
+### 3. Dual-write is best-effort, post-commit, and insert-gated
 
 **Problem:** Making OpenSearch writes synchronous with Postgres commits creates a
 distributed transaction problem — if OpenSearch is down, do we roll back Postgres?
+And if the write happens inside the transaction, a slow OpenSearch holds a
+Postgres connection open and OpenSearch can receive chunks from a transaction
+that later rolls back.
 
-**Decision:** Dual-write happens after the Postgres transaction commits, wrapped in
-`try/except`. Failures are logged as `opensearch_dual_write_failed` events but
-never propagate to the API response.
+**Decision:** The ingestion loop collects payloads for rows Postgres *actually
+inserted* (`INSERT ... ON CONFLICT DO NOTHING RETURNING id` — on conflict,
+RETURNING yields nothing and the chunk is skipped, since OpenSearch already has
+it from the earlier run). After the transaction commits, the batch is pushed via
+one `bulk_upsert`, wrapped in `try/except`. Failures are logged as
+`opensearch_dual_write_failed` events but never propagate to the API response.
+
+Additionally, the OpenSearch `_id` is deterministic —
+`{document_id}:{chunk_index}:{embedding_version}` — matching the Postgres
+conflict key, so even a redundant write overwrites in place instead of
+duplicating. The `_source.chunk_id` field carries the Postgres uuid so retrieval
+results reference the same ids as the pgvector backend.
 
 **Trade-off:** Temporary inconsistency between Postgres and OpenSearch during
-OpenSearch downtime. Resolved by running `scripts/opensearch_backfill.py` (future
-work) after OpenSearch recovers. This is the same pattern used by most
-dual-database write paths in production (write primary, async mirror).
+OpenSearch downtime. The client re-probes a down cluster every 30s
+(`PROBE_COOLDOWN_S`), so dual-write self-heals after recovery; chunks missed
+during the outage are repaired by backfill (`bulk_upsert` over a Postgres scan),
+not by failing ingestion. This is the same pattern used by most dual-database
+write paths in production (write primary, async mirror).
 
 ### 4. Workspace scoping as a filter, not index-level isolation
 
@@ -74,17 +88,16 @@ computed across all workspaces, which can affect BM25 relevance for very small
 workspaces. Separate indices would fix this but multiply operational complexity
 linearly with tenant count. At portfolio scale, shared index is correct.
 
-### 5. ef_search=128 at index level
+### 5. HNSW build parameters: m=16, ef_construction=128
 
-**Problem:** ef_search controls the HNSW search-time candidate list size. Higher
-values = better recall, higher latency.
+**Problem:** HNSW graph quality is fixed at index time (m, ef_construction);
+search-time breadth determines the recall/latency trade-off per query.
 
-**Decision:** ef_search=128 set as an index-level default. Individual queries can
-override this via query parameters if needed.
-
-**Measured trade-off:** At ef_search=128, HNSW achieves ~99% recall@10 on
-standard ANN benchmarks for 384-dim cosine vectors, with < 5ms P99 for 100K
-vectors on a single node.
+**Decision:** m=16, ef_construction=128 — the standard defaults that hit ~99%
+recall@10 for 384-dim cosine vectors at < 5ms P99 on 100K vectors, single node.
+Note the nmslib-only index setting `knn.algo_param.ef_search` is intentionally
+absent: with the lucene engine, search-time candidate breadth follows the
+query-level `k`, so the setting would be inert.
 
 ## Retrieval mode reference
 

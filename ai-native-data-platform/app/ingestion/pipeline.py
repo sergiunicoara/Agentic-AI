@@ -17,37 +17,29 @@ from app.providers.embeddings import embed
 _jobs: "queue.Queue[str]" = queue.Queue()
 
 
-def _opensearch_dual_write(
-    *,
-    chunk_id: str,
-    document_id: str,
-    workspace_id: str,
-    chunk_index: int,
-    content: str,
-    embedding: list[float],
-    source: str,
-    embedding_version: str,
-) -> None:
-    """Best-effort dual-write to OpenSearch. Never raises — failures are logged only."""
+def _opensearch_dual_write_batch(chunk_payloads: list[dict]) -> None:
+    """Best-effort batched dual-write to OpenSearch.
+
+    Called AFTER the Postgres transaction commits, so OpenSearch never sees
+    chunks from a rolled-back transaction and a slow OpenSearch never holds
+    a Postgres connection open. Never raises — failures are logged only;
+    divergence is repaired by backfill, not by failing ingestion.
+    """
+    if not chunk_payloads:
+        return
     if not settings.opensearch_dual_write or not settings.opensearch_url:
         return
     try:
         from app.opensearch.client import is_available
-        from app.opensearch.ingest import upsert_chunk
+        from app.opensearch.ingest import bulk_upsert
         if not is_available():
             return
-        upsert_chunk(
-            chunk_id=chunk_id,
-            document_id=document_id,
-            workspace_id=workspace_id,
-            chunk_index=chunk_index,
-            content=content,
-            embedding=embedding,
-            source=source,
-            embedding_version=embedding_version,
-        )
+        bulk_upsert(chunk_payloads)
     except Exception as e:
-        emit_event("opensearch_dual_write_failed", {"chunk_id": chunk_id, "error": str(e)})
+        emit_event(
+            "opensearch_dual_write_failed",
+            {"chunks": len(chunk_payloads), "error": str(e)},
+        )
 _started = False
 
 
@@ -106,9 +98,10 @@ def process_document(document_id: str) -> None:
 
     with timer(INGEST_LATENCY):
         try:
+            os_payloads: list[dict] = []
             with write_session_scope() as db:
                 doc = db.execute(
-                    text("SELECT id::text, workspace_id, text FROM document WHERE id=:id"),
+                    text("SELECT id::text, workspace_id, source_name, text FROM document WHERE id=:id"),
                     {"id": document_id},
                 ).mappings().first()
                 if not doc:
@@ -117,21 +110,25 @@ def process_document(document_id: str) -> None:
                 chunks = chunk_text(doc["text"])
 
                 ws = str(doc.get("workspace_id"))
-                source = str(doc.get("source_name", "upload"))
+                source = str(doc.get("source_name") or "upload")
                 for idx, ch in enumerate(chunks):
                     chash = _hash_text(ch)
                     v = embed(ch)
-                    chunk_id = str(uuid.uuid4())
-                    db.execute(
+                    # RETURNING tells us whether this row was actually inserted.
+                    # On conflict (re-ingestion) Postgres keeps the existing row
+                    # and its existing id — we must NOT push a new id to
+                    # OpenSearch, or the two stores diverge.
+                    inserted = db.execute(
                         text(
                             """
                             INSERT INTO document_chunk (id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding, embedding_version)
                             VALUES (:id, :document_id, :workspace_id, :chunk_index, :chunk_text, :chunk_hash, CAST(:embedding AS vector), :embedding_version)
                             ON CONFLICT (document_id, chunk_index, embedding_version) DO NOTHING
+                            RETURNING id::text
                             """
                         ),
                         {
-                            "id": chunk_id,
+                            "id": str(uuid.uuid4()),
                             "document_id": document_id,
                             "workspace_id": ws,
                             "chunk_index": idx,
@@ -140,23 +137,26 @@ def process_document(document_id: str) -> None:
                             "embedding": _vec_literal(v),
                             "embedding_version": settings.embedding_version,
                         },
-                    )
-                    # Dual-write to OpenSearch — fire-and-forget, never blocks Postgres tx
-                    _opensearch_dual_write(
-                        chunk_id=chunk_id,
-                        document_id=document_id,
-                        workspace_id=ws,
-                        chunk_index=idx,
-                        content=ch,
-                        embedding=v,
-                        source=source,
-                        embedding_version=settings.embedding_version,
-                    )
+                    ).first()
+                    if inserted:
+                        os_payloads.append({
+                            "chunk_id": inserted[0],
+                            "document_id": document_id,
+                            "workspace_id": ws,
+                            "chunk_index": idx,
+                            "content": ch,
+                            "embedding": v,
+                            "source": source,
+                            "embedding_version": settings.embedding_version,
+                        })
 
                 db.execute(
                     text("UPDATE ingestion_run SET status='success', finished_at=now() WHERE id=:id"),
                     {"id": run_id},
                 )
+
+            # Dual-write only after the Postgres transaction has committed.
+            _opensearch_dual_write_batch(os_payloads)
 
             INGEST_JOBS.labels(status="success").inc()
 

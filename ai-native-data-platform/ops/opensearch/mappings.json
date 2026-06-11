@@ -2,7 +2,6 @@
   "settings": {
     "index": {
       "knn": true,
-      "knn.algo_param.ef_search": 128,
       "number_of_shards": 1,
       "number_of_replicas": 0
     }

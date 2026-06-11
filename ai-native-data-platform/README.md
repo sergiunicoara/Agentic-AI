@@ -203,7 +203,7 @@ flowchart LR
 
 **RRF in Python for OpenSearch hybrid.** OpenSearch's native hybrid search requires ML Commons pipeline setup. Running RRF in Python keeps the implementation portable across OpenSearch versions, fully testable without a running cluster, and easy to tune (bm25_boost, vector_boost, rrf_k all configurable).
 
-**Dual-write is best-effort.** OpenSearch writes happen after the Postgres transaction commits, wrapped in try/except. Failures are logged but never propagate to the API response — same pattern used in most production dual-database write paths.
+**Dual-write is best-effort, post-commit, and insert-gated.** The ingestion loop collects only rows Postgres actually inserted (`ON CONFLICT ... RETURNING id`), then pushes them to OpenSearch in one bulk call after the transaction commits. OpenSearch `_id`s are deterministic (`document_id:chunk_index:embedding_version`), so re-ingestion overwrites instead of duplicating. Failures are logged but never propagate to the API response, and a 30s availability re-probe self-heals after OpenSearch outages.
 
 **Embedding version tags.** Every chunk carries an `embedding_version` field. Re-embedding after a model upgrade is a controlled migration — old and new vectors coexist until the backfill completes.
 
@@ -231,8 +231,8 @@ Prometheus scrapes `/metrics` every 10 seconds. Alertmanager rules are in `ops/p
 pytest tests/ -v
 ```
 
-184 tests covering:
-- **OpenSearch**: client singleton, index management, bulk ingest, BM25/vector/hybrid retrievers, RRF fusion, dual-write
+189 tests covering:
+- **OpenSearch**: client singleton + availability re-probe, index management, idempotent ingest (deterministic doc ids), BM25/vector/hybrid retrievers, RRF fusion, post-commit batched dual-write
 - **Safety**: prompt injection (5 taxonomies), PII redaction (6 types), toxicity filtering
 - **NL normalization**: table aliases, column aliases, operator aliases, SELECT * expansion, COUNT(*), idempotency
 - **SQL builder**: workspace scoping, all filter operators, ORDER BY, LIMIT, full query shapes

@@ -4,14 +4,19 @@ from __future__ import annotations
 
 Supports:
   - Single-chunk upsert (used by the main ingestion pipeline)
-  - Batch upsert (used by backfill scripts)
-  - Idempotent: uses chunk_id as document _id so re-ingestion is safe
-  - Retry: tenacity handles transient 429 / 503 from OpenSearch
+  - Batch upsert (used by the pipeline post-commit and backfill scripts)
+  - Idempotent: the OpenSearch _id is deterministic —
+    "{document_id}:{chunk_index}:{embedding_version}" — so re-ingesting a
+    document overwrites in place instead of duplicating. This mirrors the
+    Postgres conflict key ON CONFLICT (document_id, chunk_index,
+    embedding_version), not the chunk uuid (which changes on every run).
+  - Retry: tenacity handles transient 429 / 503 from OpenSearch.
 
-Design decision: we use _id = chunk_id so that re-indexing a chunk is an
-upsert, not a duplicate. This mirrors the ON CONFLICT behaviour in Postgres.
+The _source still carries the Postgres chunk uuid in `chunk_id`, so retrieval
+results reference the same ids as the pgvector backend.
 """
 
+import threading
 import time
 from typing import Any
 
@@ -19,6 +24,33 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 from app.core.observability import emit_event
+
+# One indices.exists round-trip per process, not per chunk.
+_index_ready = False
+_index_lock = threading.Lock()
+
+
+def _ensure_index(client) -> None:
+    global _index_ready
+    if _index_ready:
+        return
+    with _index_lock:
+        if _index_ready:
+            return
+        from app.opensearch.index import create_if_missing
+        create_if_missing(client)
+        _index_ready = True
+
+
+def reset_index_cache() -> None:
+    """Reset the index-exists cache — used in tests and reindex workflows."""
+    global _index_ready
+    _index_ready = False
+
+
+def doc_key(document_id: str, chunk_index: int, embedding_version: str) -> str:
+    """Deterministic OpenSearch _id matching the Postgres conflict key."""
+    return f"{document_id}:{chunk_index}:{embedding_version}"
 
 
 def _doc(
@@ -61,10 +93,9 @@ def upsert_chunk(
 ) -> None:
     """Upsert a single chunk into OpenSearch. Safe to call repeatedly."""
     from app.opensearch.client import get_client
-    from app.opensearch.index import create_if_missing
 
     client = get_client()
-    create_if_missing(client)
+    _ensure_index(client)
 
     ev = embedding_version or settings.embedding_version
     body = _doc(
@@ -80,7 +111,7 @@ def upsert_chunk(
     )
     client.index(
         index=settings.opensearch_index,
-        id=chunk_id,
+        id=doc_key(document_id, chunk_index, ev),
         body=body,
         refresh="false",   # async refresh — don't block ingestion
     )
@@ -95,28 +126,29 @@ def bulk_upsert(chunks: list[dict]) -> dict[str, int]:
 
     Returns {"indexed": N, "errors": M}.
     """
-    from opensearchpy.helpers import bulk  # type: ignore
-    from app.opensearch.client import get_client
-    from app.opensearch.index import create_if_missing
-
+    # Guard before any opensearchpy import so an empty call needs no library.
     if not chunks:
         return {"indexed": 0, "errors": 0}
 
+    from opensearchpy.helpers import bulk  # type: ignore
+    from app.opensearch.client import get_client
+
     client = get_client()
-    create_if_missing(client)
+    _ensure_index(client)
 
     actions = []
     for c in chunks:
         ev = c.get("embedding_version") or settings.embedding_version
+        idx = int(c.get("chunk_index", 0))
         actions.append({
             "_op_type": "index",
             "_index": settings.opensearch_index,
-            "_id": c["chunk_id"],
+            "_id": doc_key(c["document_id"], idx, ev),
             "_source": _doc(
                 chunk_id=c["chunk_id"],
                 document_id=c["document_id"],
                 workspace_id=c["workspace_id"],
-                chunk_index=int(c.get("chunk_index", 0)),
+                chunk_index=idx,
                 content=c["content"],
                 embedding=c["embedding"],
                 source=c.get("source", "upload"),

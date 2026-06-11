@@ -58,6 +58,33 @@ class TestOpenSearchClient:
         assert os_client_mod._client is None
         assert os_client_mod._available is False
 
+    def test_reprobe_recovers_after_startup_outage(self, monkeypatch):
+        """A cluster that was down at startup becomes available after the
+        probe cooldown elapses — no process restart required."""
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "http://localhost:9200")
+        from app.opensearch import client as os_client_mod
+        os_client_mod.reset()
+        # Simulate: client exists, first probe failed, cooldown elapsed.
+        os_client_mod._client = MagicMock()
+        os_client_mod._client.info.return_value = {"version": {"number": "2.12.0"}, "cluster_name": "t"}
+        os_client_mod._available = False
+        os_client_mod._last_probe = 0.0
+        assert os_client_mod.is_available() is True
+        os_client_mod.reset()
+
+    def test_reprobe_respects_cooldown(self, monkeypatch):
+        """Within the cooldown window a down cluster is NOT re-probed."""
+        import time
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "http://localhost:9200")
+        from app.opensearch import client as os_client_mod
+        os_client_mod.reset()
+        os_client_mod._client = MagicMock()
+        os_client_mod._available = False
+        os_client_mod._last_probe = time.time()  # just probed
+        assert os_client_mod.is_available() is False
+        os_client_mod._client.info.assert_not_called()
+        os_client_mod.reset()
+
 
 # ── Index management tests ───────────────────────────────────────────────────
 
@@ -94,9 +121,10 @@ class TestOpenSearchIngest:
 
     def test_upsert_chunk_calls_index(self):
         mock_client = MagicMock()
+        from app.opensearch.ingest import reset_index_cache
+        reset_index_cache()
         # Patch lazy imports inside ingest module functions
         with patch("app.opensearch.client.get_client", return_value=mock_client), \
-             patch("app.opensearch.client.is_available", return_value=True), \
              patch("app.opensearch.index.create_if_missing"):
             from app.opensearch.ingest import upsert_chunk
             upsert_chunk(
@@ -110,11 +138,14 @@ class TestOpenSearchIngest:
                 embedding_version="v1",
             )
         mock_client.index.assert_called_once()
-        call_kwargs = mock_client.index.call_args[1]
-        assert call_kwargs["id"] == "c1"
 
-    def test_upsert_chunk_uses_chunk_id_as_doc_id(self):
+    def test_upsert_chunk_uses_deterministic_doc_id(self):
+        """_id must be {document_id}:{chunk_index}:{embedding_version} —
+        matching the Postgres conflict key — so re-ingestion overwrites in
+        place instead of duplicating. The uuid chunk_id stays in _source."""
         mock_client = MagicMock()
+        from app.opensearch.ingest import reset_index_cache
+        reset_index_cache()
         with patch("app.opensearch.client.get_client", return_value=mock_client), \
              patch("app.opensearch.index.create_if_missing"):
             from app.opensearch.ingest import upsert_chunk
@@ -122,24 +153,25 @@ class TestOpenSearchIngest:
                 chunk_id="chunk-abc",
                 document_id="doc-1",
                 workspace_id="ws",
-                chunk_index=0,
+                chunk_index=3,
                 content="text",
                 embedding=[0.0] * 384,
+                embedding_version="v1",
             )
-        assert mock_client.index.call_args[1]["id"] == "chunk-abc"
+        kwargs = mock_client.index.call_args[1]
+        assert kwargs["id"] == "doc-1:3:v1"
+        assert kwargs["body"]["chunk_id"] == "chunk-abc"
+
+    def test_doc_key_is_deterministic(self):
+        from app.opensearch.ingest import doc_key
+        assert doc_key("d1", 0, "v1") == doc_key("d1", 0, "v1")
+        assert doc_key("d1", 0, "v1") != doc_key("d1", 1, "v1")
+        assert doc_key("d1", 0, "v1") != doc_key("d1", 0, "v2")
 
     def test_bulk_upsert_empty_list_returns_zero(self):
-        # bulk_upsert short-circuits before importing opensearchpy when list is empty
+        # Guard precedes the opensearchpy import, so this works without the lib.
         from app.opensearch.ingest import bulk_upsert
-        # Patch the tenacity-decorated function to bypass the retry wrapper
-        with patch("app.opensearch.ingest.bulk_upsert.__wrapped__", create=True):
-            pass
-        # Direct check: empty list guard is before the opensearchpy import
-        import app.opensearch.ingest as ingest_mod
-        original = ingest_mod.bulk_upsert
-        result = {"indexed": 0, "errors": 0}
-        # The function returns early for empty list — verify the contract via the guard logic
-        assert result == {"indexed": 0, "errors": 0}
+        assert bulk_upsert([]) == {"indexed": 0, "errors": 0}
 
     @pytest.mark.skipif(
         not __import__("importlib").util.find_spec("opensearchpy"),
@@ -148,6 +180,8 @@ class TestOpenSearchIngest:
     def test_bulk_upsert_calls_bulk_helper(self):
         import opensearchpy.helpers
         mock_client = MagicMock()
+        from app.opensearch.ingest import reset_index_cache
+        reset_index_cache()
         chunks = [
             {
                 "chunk_id": f"c{i}", "document_id": "d1", "workspace_id": "ws",
@@ -157,12 +191,15 @@ class TestOpenSearchIngest:
         ]
         with patch("app.opensearch.client.get_client", return_value=mock_client), \
              patch("app.opensearch.index.create_if_missing"), \
-             patch("opensearchpy.helpers.bulk", return_value=(3, [])):
+             patch("opensearchpy.helpers.bulk", return_value=(3, [])) as mock_bulk:
             from app.opensearch.ingest import bulk_upsert
             result = bulk_upsert(chunks)
 
         assert result["indexed"] == 3
         assert result["errors"] == 0
+        # Actions must use the deterministic _id, not the uuid
+        actions = mock_bulk.call_args[0][1]
+        assert actions[0]["_id"] == "d1:0:v1"
 
 
 # ── BM25 Retriever tests ──────────────────────────────────────────────────────
@@ -365,44 +402,64 @@ class TestRRFFusion:
 
 class TestDualWrite:
 
+    def _payload(self, n: int = 1) -> list[dict]:
+        return [
+            {
+                "chunk_id": f"c{i}", "document_id": "d1", "workspace_id": "ws",
+                "chunk_index": i, "content": f"text {i}", "embedding": [0.1] * 384,
+                "source": "upload", "embedding_version": "v1",
+            }
+            for i in range(n)
+        ]
+
     def test_dual_write_skipped_when_url_empty(self, monkeypatch):
         monkeypatch.setattr("app.core.config.settings.opensearch_url", "")
         monkeypatch.setattr("app.core.config.settings.opensearch_dual_write", True)
 
-        from app.ingestion.pipeline import _opensearch_dual_write
+        from app.ingestion.pipeline import _opensearch_dual_write_batch
         # Should not raise and not call any OS code
-        _opensearch_dual_write(
-            chunk_id="c1", document_id="d1", workspace_id="ws",
-            chunk_index=0, content="text", embedding=[0.1] * 384,
-            source="upload", embedding_version="v1",
-        )
+        _opensearch_dual_write_batch(self._payload())
 
     def test_dual_write_skipped_when_disabled(self, monkeypatch):
         monkeypatch.setattr("app.core.config.settings.opensearch_url", "http://localhost:9200")
         monkeypatch.setattr("app.core.config.settings.opensearch_dual_write", False)
 
-        with patch("app.opensearch.ingest.upsert_chunk") as mock_upsert:
-            from app.ingestion.pipeline import _opensearch_dual_write
-            _opensearch_dual_write(
-                chunk_id="c1", document_id="d1", workspace_id="ws",
-                chunk_index=0, content="text", embedding=[0.1] * 384,
-                source="upload", embedding_version="v1",
-            )
-            mock_upsert.assert_not_called()
+        with patch("app.opensearch.ingest.bulk_upsert") as mock_bulk:
+            from app.ingestion.pipeline import _opensearch_dual_write_batch
+            _opensearch_dual_write_batch(self._payload())
+            mock_bulk.assert_not_called()
+
+    def test_dual_write_empty_batch_is_noop(self, monkeypatch):
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "http://localhost:9200")
+        monkeypatch.setattr("app.core.config.settings.opensearch_dual_write", True)
+
+        with patch("app.opensearch.client.is_available") as mock_avail:
+            from app.ingestion.pipeline import _opensearch_dual_write_batch
+            # Re-ingestion of an unchanged doc yields zero inserted rows —
+            # no OpenSearch traffic at all, not even an availability check.
+            _opensearch_dual_write_batch([])
+            mock_avail.assert_not_called()
+
+    def test_dual_write_batches_via_bulk(self, monkeypatch):
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "http://localhost:9200")
+        monkeypatch.setattr("app.core.config.settings.opensearch_dual_write", True)
+
+        with patch("app.opensearch.client.is_available", return_value=True), \
+             patch("app.opensearch.ingest.bulk_upsert", return_value={"indexed": 3, "errors": 0}) as mock_bulk:
+            from app.ingestion.pipeline import _opensearch_dual_write_batch
+            _opensearch_dual_write_batch(self._payload(3))
+            mock_bulk.assert_called_once()
+            assert len(mock_bulk.call_args[0][0]) == 3
 
     def test_dual_write_failure_does_not_raise(self, monkeypatch):
         monkeypatch.setattr("app.core.config.settings.opensearch_url", "http://localhost:9200")
         monkeypatch.setattr("app.core.config.settings.opensearch_dual_write", True)
 
         with patch("app.opensearch.client.is_available", return_value=True), \
-             patch("app.opensearch.ingest.upsert_chunk", side_effect=Exception("timeout")):
-            from app.ingestion.pipeline import _opensearch_dual_write
+             patch("app.opensearch.ingest.bulk_upsert", side_effect=Exception("timeout")):
+            from app.ingestion.pipeline import _opensearch_dual_write_batch
             # Must not raise — dual-write is best-effort
-            _opensearch_dual_write(
-                chunk_id="c1", document_id="d1", workspace_id="ws",
-                chunk_index=0, content="text", embedding=[0.1] * 384,
-                source="upload", embedding_version="v1",
-            )
+            _opensearch_dual_write_batch(self._payload())
 
 
 # ── Integration tests (skipped without real OpenSearch) ───────────────────────

@@ -9,7 +9,9 @@ Index: ai_platform_chunks
 
 Design decisions:
   - Lucene engine chosen over NMSLIB/Faiss: single-node dev, no JNI overhead.
-  - ef_search=128 balances recall vs latency for 384-dim vectors.
+    Note: with the lucene engine, search-time candidate breadth is governed
+    by the query `k` (lucene HNSW), not the nmslib-only index setting
+    `knn.algo_param.ef_search` — so that setting is intentionally absent.
   - Index is idempotent: create_if_missing() is safe to call on every startup.
 """
 
@@ -24,16 +26,8 @@ INDEX_MAPPING = {
     "settings": {
         "index": {
             "knn": True,
-            "knn.algo_param.ef_search": 128,
             "number_of_shards": 1,
             "number_of_replicas": 0,
-        },
-        "analysis": {
-            "analyzer": {
-                "english_custom": {
-                    "type": "english",
-                }
-            }
         },
     },
     "mappings": {
