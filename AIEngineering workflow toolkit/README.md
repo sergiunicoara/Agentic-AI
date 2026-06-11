@@ -62,9 +62,11 @@ This also installs `ruff`, `mypy`, and `bandit` — the deterministic tools used
 
 ### 2. Set environment variables
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export OTEL_EXPORTER_ENDPOINT=localhost:4317  # optional, defaults to console
+Create a `.env` file in the project root (loaded automatically via `python-dotenv`):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+OTEL_EXPORTER_ENDPOINT=localhost:4317   # optional, defaults to console
 ```
 
 ### 3. Review a diff (CLI)
@@ -107,13 +109,38 @@ python main.py eval
 
 # Single case with verbose scores
 python main.py eval --case GC-001 --verbose
+
+# Show per-case score deltas (↑/↓) vs the previous logged run
+python main.py eval --compare
 ```
+
+Concurrency defaults to 5 parallel cases; override with `AIWT_EVAL_CONCURRENCY`.
 
 ### 6. Start MCP server (for Claude Code integration)
 
 ```bash
 python main.py serve
 ```
+
+### 7. Run with Docker
+
+```bash
+docker compose up --build
+# → http://localhost:8000  (review history persisted in the aiwt_db volume)
+```
+
+Multi-stage build: Node 20 compiles the React UI, Python 3.11 runs the server.
+`ANTHROPIC_API_KEY` is read from your shell or `.env`.
+
+### 8. View OTel traces in Jaeger
+
+```bash
+docker run -d --name jaeger -p 16686:16686 -p 4317:4317 jaegertracing/all-in-one
+```
+
+With `OTEL_EXPORTER_ENDPOINT=localhost:4317` set, every pipeline run exports spans under
+the service name `ai-engineering-workflow-toolkit`. UI: http://localhost:16686 (also linked
+from the review detail page).
 
 ---
 
@@ -188,6 +215,38 @@ and scores each output with an LLM-as-judge prompt. Results are appended to
 - **Accuracy** (0–5): correct issues caught, zero hallucinations
 - **Actionability** (0–5): findings are specific, line-referenced, and directly fixable
 
+### Measured Results
+
+Numbers below come from `eval/regression_log.jsonl` and tool timings measured on this repo —
+not estimates.
+
+**Full golden-dataset run (15 cases, concurrency 5):**
+
+| Metric | Value |
+|--------|-------|
+| Average composite score | 4.93 / 5.0 |
+| Cases above 4.0 threshold | 15 / 15 |
+| Exact verdict match | 12 / 15 |
+| Wall clock | ~7.2 min |
+| Sequential-equivalent (sum of per-case times) | ~30.1 min |
+| Speedup from `asyncio.Semaphore(5)` | ~4.2× |
+
+**Regression detection demo** (same log): injecting a forced-wrong verdict via `AIWT_DEGRADE`
+dropped case GC-009 from 5.0 → 0.0; removing it restored 5.0 — three consecutive logged runs,
+visible as red/green deltas with `eval --compare`.
+
+**Traceability enforcement in practice:** the log contains a real `suppressed_findings` event
+(`suppressed_count: 1`) — a subagent finding without evidence, automatically suppressed by the
+review agent.
+
+**MCP tool timings** (on `api/app.py`, ~500 lines): ruff 0.5 s · bandit 3.2 s · mypy 14.5 s
+warm cache / 61.5 s cold cache. Because tools run via `asyncio.to_thread` + `gather`, the
+phase costs as much as the slowest tool (mypy), not the sum.
+
+> **Known issue:** cold-cache mypy (61.5 s) can exceed the 60 s subprocess timeout in
+> `mcp_server/server.py`, failing the first run after a cache wipe. Fix pending: raise the
+> timeout and degrade gracefully on `TimeoutExpired`.
+
 ### Web UI
 
 FastAPI backend + React (Vite + Tailwind, dark theme) frontend. Thin transport layer over
@@ -213,7 +272,13 @@ AIEngineering workflow toolkit/
 ├── RECORDING_SCRIPT.md          # Screen-share walkthrough script (25 min)
 ├── README.md
 ├── pyproject.toml
-├── main.py                      # CLI: review / eval / serve / ui
+├── main.py                      # CLI: review / eval / serve / queue / ui
+├── Dockerfile                   # Multi-stage build (Node 20 UI → Python 3.11 runtime)
+├── docker-compose.yml           # App + persistent SQLite volume
+├── .env                         # ANTHROPIC_API_KEY etc. (gitignored)
+│
+├── tasks/
+│   └── lessons.md               # Patterns learned from corrections
 │
 ├── .claude/
 │   ├── settings.json
