@@ -208,7 +208,7 @@ Deepgram nova-2
   │  endpointing=150ms, utterance_end_ms=1000, punctuate=true
   │  is_final transcripts → asyncio.Queue
   ▼
-agent_turn()  [35ms]
+agent_turn()
   ▼
 Google Neural2-D TTS
   │  split into sentences → parallel synthesis tasks
