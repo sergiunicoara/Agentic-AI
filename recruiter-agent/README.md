@@ -1,7 +1,7 @@
 # Sergiu – AI Recruiter Tour Agent
 ### Production Voice AI + Multi-Agent System
 
-An interactive AI recruiter agent that helps hiring managers understand Sergiu's strongest qualifications through agentic workflows — with a live voice pipeline, full evaluation stack, and Langfuse observability.
+AI Recruiter is an autonomous voice-first agent that represents a candidate's portfolio to recruiters in real time. Recruiters call in over PSTN or browser voice, where a deterministic multi-agent pipeline extracts the target role, answers CV questions via RAG, ranks relevant projects, and generates ATS-ready summaries — with every reply scored by an LLM-as-a-Judge critic, deployed on Google Cloud Run.
 
 **Live:** https://recruiter-agent-969006882005.europe-west1.run.app
 
