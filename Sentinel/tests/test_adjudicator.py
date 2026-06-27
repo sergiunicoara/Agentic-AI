@@ -3,7 +3,6 @@ Tests for the Adjudicator trust gate.
 This is the most important test file in the project.
 It proves that hallucinated findings are dropped.
 """
-import pytest
 from sentinel.agents.adjudicator import adjudicate
 
 

@@ -1,0 +1,29 @@
+# Secrets — must never enter the image
+.env
+.env*.local
+
+# Version control
+.git
+.gitignore
+
+# Python caches / virtual envs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# ADK local session state
+**/.adk/
+*.db
+
+# Tests and docs (not needed at runtime)
+tests/
+README.md
+
+# Local scratch
+*.sarif.json
+*.log

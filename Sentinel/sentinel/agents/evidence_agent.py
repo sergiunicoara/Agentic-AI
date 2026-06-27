@@ -7,32 +7,69 @@ raw output into structured Evidence objects with unique IDs.
 No LLM judgment here. This agent produces only facts.
 Every evidence item gets a unique ID that findings must reference.
 """
+import asyncio
+import concurrent.futures
 import uuid
-from pathlib import Path
+from fastmcp import Client
 from sentinel.models.schemas import Evidence
-from sentinel.mcp.evidence_server import security_scan, lint_scan, dependency_scan
+from sentinel.mcp.evidence_server import mcp
+
+
+def _run_async(coro):
+    """
+    Run a coroutine to completion regardless of whether we're already
+    inside a running event loop (e.g. called from an async FastAPI
+    background task) or a plain sync context (CLI, pytest, eval runner).
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(coro)).result()
+
+
+async def _call_evidence_tools(target_path: str) -> dict:
+    """
+    Call the MCP evidence server's tools over a real (in-memory) MCP
+    transport, rather than invoking the decorated functions directly.
+    This exercises the actual MCP protocol path.
+    """
+    async with Client(mcp) as client:
+        sec, lint, dep = await asyncio.gather(
+            client.call_tool("security_scan", {"target_path": target_path}),
+            client.call_tool("lint_scan", {"target_path": target_path}),
+            client.call_tool("dependency_scan", {"target_path": target_path}),
+        )
+    return {
+        "security": sec.data,
+        "lint": lint.data,
+        "dependency": dep.data,
+    }
 
 
 def collect_evidence(target_path: str) -> list[Evidence]:
     """
-    Run all deterministic tools against the target and return
-    a list of Evidence objects with unique IDs.
-    
+    Run all deterministic tools against the target (over the real MCP
+    transport, in a single batched call) and return a list of Evidence
+    objects with unique IDs.
+
     Args:
         target_path: Path to the target agent/repo to scan
-        
+
     Returns:
         List of Evidence objects ready for the adjudicator
     """
     evidence_list = []
-    target = Path(target_path)
 
     print(f"\n[EvidenceAgent] Scanning: {target_path}")
     print("-" * 50)
 
+    tool_results = _run_async(_call_evidence_tools(target_path))
+
     # --- Run bandit security scan ---
     print("[EvidenceAgent] Running bandit security scan...")
-    sec_result = security_scan(target_path)
+    sec_result = tool_results["security"]
     bandit_findings = sec_result.get("findings", [])
     print(f"[EvidenceAgent] bandit: {len(bandit_findings)} issues found")
 
@@ -56,7 +93,7 @@ def collect_evidence(target_path: str) -> list[Evidence]:
 
     # --- Run ruff lint scan ---
     print("[EvidenceAgent] Running ruff lint scan...")
-    lint_result = lint_scan(target_path)
+    lint_result = tool_results["lint"]
     ruff_findings = lint_result.get("findings", [])
     print(f"[EvidenceAgent] ruff: {len(ruff_findings)} issues found")
 
@@ -75,7 +112,7 @@ def collect_evidence(target_path: str) -> list[Evidence]:
 
     # --- Run pip-audit dependency scan ---
     print("[EvidenceAgent] Running pip-audit dependency scan...")
-    dep_result = dependency_scan(target_path)
+    dep_result = tool_results["dependency"]
     vulns = dep_result.get("vulnerabilities", [])
     
     # pip-audit returns a list of package dicts

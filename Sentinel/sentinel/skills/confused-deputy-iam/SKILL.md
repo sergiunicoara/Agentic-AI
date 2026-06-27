@@ -1,25 +1,28 @@
 ---
 name: confused-deputy-iam
-description: Evaluates whether tools and agents run with excessive privileges or are susceptible to unauthorized privilege escalation.
-triggers:
-  - iam
-  - credentials
-  - confused deputy
-  - privilege
+description: Detect confused deputy vulnerabilities where an agent forwards credentials or acts on behalf of a caller without verifying intent.
+triggers: [credential_forwarding, token_passthrough, api_key_in_tool, iam_role]
+pillar: 5
 ---
 
-# Confused Deputy IAM
-
 ## What to look for
-- Agents calling tools with the user's authority without explicit authorization check.
-- Over-privileged credentials or IAM service account configurations shared globally.
-- Inability to restrict tool parameter parameters based on the current context.
+- Agent forwards caller's auth token to downstream services without validation
+- API keys or secrets passed as tool arguments rather than injected at runtime
+- Agent has write/delete permissions but the task only requires read
+- No scope check before high-privilege actions (delete, write, deploy)
+- Credentials stored in session state accessible to all agents in pipeline
 
 ## Evidence required
-- Configuration or code templates revealing overly broad IAM scopes.
-- Lack of resource-level isolation checks when calling file system or network APIs.
+A finding is ONLY valid if backed by one of:
+- A `bandit` hit (B106 hardcoded password, B107 hardcoded password funcarg)
+- A `semgrep` match on credential patterns
+- Static analysis showing credentials in function arguments or string literals
+
+No evidence → finding must be dropped by the Adjudicator.
 
 ## Remediation patterns
-- Principle of Least Privilege: bind agent tool permissions to specific roles.
-- Implement explicit user-in-the-loop validation for dangerous actions.
-- Use sandboxing/namespaces for execution environments.
+- Inject credentials at the infrastructure level, not through agent arguments
+- Apply principle of least privilege — scope each agent's IAM role to minimum needed
+- Add explicit scope validation before any destructive action
+- Never store credentials in LLM-visible session state
+- Use short-lived tokens with automatic expiry

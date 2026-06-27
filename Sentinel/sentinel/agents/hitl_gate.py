@@ -77,7 +77,7 @@ class HITLGate:
 
         # High/critical always require explicit approval
         for f in high_severity:
-            print(f"\n  ⚠️  HIGH/CRITICAL FINDING:")
+            print("\n  ⚠️  HIGH/CRITICAL FINDING:")
             print(f"     Title:    {f.title}")
             print(f"     Severity: {f.severity.upper()}")
             print(f"     Pillar:   {f.pillar}")

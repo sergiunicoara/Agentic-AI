@@ -65,5 +65,5 @@ def test_hitl_mixed_severity():
     result = gate.request_approval(findings, "targets/t1", interactive=False)
     assert len(result["approved"]) == 1
     assert result["approved"][0].severity == "low"
-    pending = [l for l in result["approval_log"] if l["decision"] == "pending"]
+    pending = [e for e in result["approval_log"] if e["decision"] == "pending"]
     assert len(pending) == 1

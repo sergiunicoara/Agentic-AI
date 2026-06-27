@@ -8,6 +8,11 @@ __pycache__/
 .venv/
 venv/
 
+# ADK session state (local run artifacts, not source)
+.adk/
+*.pytest_cache/
+.ruff_cache/
+
 # IDE and Editor settings
 .vscode/
 .idea/

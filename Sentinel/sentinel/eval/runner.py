@@ -5,17 +5,16 @@ Runs the full eval corpus and produces the results table.
 This is the quantified proof that Sentinel works.
 
 Metrics:
-- Detection recall: seeded vulns found / total seeded vulns
-- Detection precision: valid findings / total findings emitted
-- Hallucinated-finding rate: findings on clean controls / total
-- Adjudicator gate: findings emitted vs surviving
+- Target detection rate: vulnerable targets caught (verdict != pass) /
+  total vulnerable targets. This is target-level, not per-seeded-vuln:
+  a target counts as detected if ANY of its seeded vulns is caught.
+- Hallucinated-finding rate: findings on clean controls / clean controls
 """
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from sentinel.pipeline import run_sentinel
-from sentinel.redteam.runner import run_red_team
 
 
 # Ground truth: which targets have seeded vulnerabilities
@@ -25,6 +24,13 @@ EVAL_CORPUS = [
         "label": "T1 — Injection",
         "expected_verdict": "fail",
         "seeded_vulns": ["eval() injection", "subprocess shell=True"],
+        "is_clean": False,
+    },
+    {
+        "target": "targets/t2_privilege",
+        "label": "T2 — Privilege Leak",
+        "expected_verdict": "fail",
+        "seeded_vulns": ["hardcoded API key", "hardcoded password"],
         "is_clean": False,
     },
     {
@@ -74,11 +80,9 @@ def run_eval() -> dict:
     print("="*70)
 
     results = []
-    total_seeded = 0
-    detected = 0
+    total_vulnerable_targets = 0
+    detected_targets = 0
     false_positives_on_clean = 0
-    total_candidates_emitted = 0
-    total_surviving = 0
 
     for item in EVAL_CORPUS:
         target = item["target"]
@@ -98,9 +102,9 @@ def run_eval() -> dict:
             )
 
             if not is_clean:
-                total_seeded += 1
+                total_vulnerable_targets += 1
                 if actual_verdict != "pass":
-                    detected += 1
+                    detected_targets += 1
 
             if is_clean and findings_count > 0:
                 false_positives_on_clean += findings_count
@@ -133,8 +137,15 @@ def run_eval() -> dict:
             })
 
     # Calculate metrics
-    detection_recall = detected / total_seeded if total_seeded > 0 else 0
-    hallucination_rate = false_positives_on_clean / 2  # 2 clean controls
+    clean_control_count = sum(1 for item in EVAL_CORPUS if item["is_clean"])
+    target_detection_rate = (
+        detected_targets / total_vulnerable_targets
+        if total_vulnerable_targets > 0 else 0
+    )
+    hallucination_rate = (
+        false_positives_on_clean / clean_control_count
+        if clean_control_count > 0 else 0
+    )
 
     print("\n" + "="*70)
     print("SENTINEL EVAL RESULTS")
@@ -148,8 +159,8 @@ def run_eval() -> dict:
 
     print("\n" + "-"*70)
     print("METRICS:")
-    print(f"  Detection recall:          {detection_recall:.0%} "
-          f"({detected}/{total_seeded} vulnerable targets detected)")
+    print(f"  Target detection rate:     {target_detection_rate:.0%} "
+          f"({detected_targets}/{total_vulnerable_targets} vulnerable targets detected)")
     print(f"  False positives on clean:  {false_positives_on_clean} findings "
           f"({hallucination_rate:.1f} avg per clean target)")
     print(f"  Hallucinated-finding rate: "
@@ -159,9 +170,9 @@ def run_eval() -> dict:
     return {
         "results": results,
         "metrics": {
-            "detection_recall": detection_recall,
-            "detected": detected,
-            "total_seeded": total_seeded,
+            "target_detection_rate": target_detection_rate,
+            "detected_targets": detected_targets,
+            "total_vulnerable_targets": total_vulnerable_targets,
             "false_positives_on_clean": false_positives_on_clean,
             "hallucination_rate": hallucination_rate,
         },

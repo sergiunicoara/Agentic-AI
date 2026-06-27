@@ -1,6 +1,19 @@
 from pydantic import BaseModel, field_validator
 from typing import Literal
 
+# Pillar taxonomy (Finding.pillar). Maps each of the 7 OWASP-Agentic-style
+# risk pillars Sentinel is designed to cover to the auditor that owns it.
+# Pillars without an auditor yet are reserved for future specialists.
+PILLARS: dict[int, str] = {
+    1: "Identity & Access Boundaries",       # reserved — no auditor yet
+    2: "Tool & Capability Misuse",           # reserved — no auditor yet
+    3: "Prompt & Code Injection",            # InjectionAuditor, RedTeamAuditor
+    4: "Supply Chain & Data Integrity",      # SupplyChainAuditor
+    5: "Privilege & Confused Deputy",        # PrivilegeAuditor
+    6: "Observability & Audit Trail",        # reserved — no auditor yet
+    7: "Human Oversight & Containment",      # reserved — HITLGate is process, not a finding source
+}
+
 class Evidence(BaseModel):
     evidence_id: str
     source: Literal["ruff", "mypy", "bandit", "semgrep", "pip_audit", "redteam_trajectory"]

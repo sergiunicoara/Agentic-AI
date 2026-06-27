@@ -1,7 +1,6 @@
 """
 Eval corpus tests — the results table in test form.
 """
-import pytest
 from sentinel.pipeline import run_sentinel
 
 

@@ -10,9 +10,9 @@ def process_user_input(user_input: str) -> str:
     prompt = f"Analyze this: {user_input}"
     
     # UNSAFE: eval of external content
-    result = eval(user_input)
-    
+    eval(user_input)
+
     # UNSAFE: shell injection
-    output = subprocess.run(user_input, shell=True, capture_output=True)
-    
+    subprocess.run(user_input, shell=True, capture_output=True)
+
     return prompt

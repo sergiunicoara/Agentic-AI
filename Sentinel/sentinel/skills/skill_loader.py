@@ -8,6 +8,22 @@ import re
 
 SKILLS_DIR = Path(__file__).parent
 
+
+def _contains_any_token(code: str, tokens: list[str]) -> bool:
+    """
+    Word-boundary match for trigger tokens, so e.g. "token" doesn't
+    match inside "tokenizer" or "AUTH" inside "AUTHOR".
+    Tokens containing non-word characters (like "shell=True") fall back
+    to a plain substring check since \\b doesn't apply to them.
+    """
+    for t in tokens:
+        if re.search(r"\w", t) and re.fullmatch(r"[\w]+", t):
+            if re.search(rf"\b{re.escape(t)}\b", code, re.IGNORECASE):
+                return True
+        elif t in code:
+            return True
+    return False
+
 AVAILABLE_SKILLS = [
     "prompt-injection-defense",
     "confused-deputy-iam",
@@ -66,15 +82,15 @@ def select_skills_for_target(target_path: str) -> list[str]:
             pass
 
     # Check for injection triggers
-    injection_triggers = ["eval(", "exec(", "subprocess", "shell=True", 
+    injection_triggers = ["eval(", "exec(", "subprocess", "shell=True",
                          "web_fetch", "requests.get", "urllib"]
-    if any(t in code for t in injection_triggers):
+    if _contains_any_token(code, injection_triggers):
         selected.append("prompt-injection-defense")
 
-    # Check for IAM/credential triggers  
-    iam_triggers = ["api_key", "token", "secret", "password", 
+    # Check for IAM/credential triggers
+    iam_triggers = ["api_key", "token", "secret", "password",
                    "credential", "AUTH", "Bearer"]
-    if any(t in code for t in iam_triggers):
+    if _contains_any_token(code, iam_triggers):
         selected.append("confused-deputy-iam")
 
     # Check for supply chain triggers

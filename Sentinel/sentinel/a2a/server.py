@@ -9,25 +9,50 @@ Other agents can:
 
 Run with: python -m sentinel.a2a.server
 """
+import os
 import sys
 import uuid
-import asyncio
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sentinel.a2a.agent_card import AGENT_CARD
 from sentinel.pipeline import run_sentinel
-from sentinel.redteam.runner import run_red_team
 
 app = FastAPI(title="Sentinel A2A Server")
 
-# In-memory task store (sufficient for demo)
+# In-memory task store (sufficient for demo). Entries older than
+# SENTINEL_TASK_TTL_SECONDS are purged lazily on each submission so the
+# store doesn't grow unbounded under a long-running server.
 tasks: dict = {}
+TASK_TTL_SECONDS = int(os.environ.get("SENTINEL_TASK_TTL_SECONDS", 3600))
+
+# Bearer-token auth is opt-in: set SENTINEL_A2A_TOKEN to require it.
+# Unset (the demo default) means the endpoints are open, matching prior
+# behavior — set the token for any deployment beyond local demo use.
+A2A_TOKEN = os.environ.get("SENTINEL_A2A_TOKEN")
+
+
+def _require_token(authorization: str | None = Header(default=None)):
+    if A2A_TOKEN is None:
+        return
+    expected = f"Bearer {A2A_TOKEN}"
+    if authorization != expected:
+        raise HTTPException(status_code=401, detail="Missing or invalid bearer token")
+
+
+def _evict_stale_tasks():
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=TASK_TTL_SECONDS)
+    stale = [
+        tid for tid, t in tasks.items()
+        if datetime.fromisoformat(t["created_at"]) < cutoff
+    ]
+    for tid in stale:
+        del tasks[tid]
 
 
 class ReviewRequest(BaseModel):
@@ -51,12 +76,13 @@ async def get_agent_card():
     return JSONResponse(AGENT_CARD)
 
 
-@app.post("/a2a/review")
+@app.post("/a2a/review", dependencies=[Depends(_require_token)])
 async def submit_review(request: ReviewRequest, background_tasks: BackgroundTasks):
     """
     Submit a security review task.
     Returns immediately with a task_id for polling.
     """
+    _evict_stale_tasks()
     task_id = request.task_id or f"task_{uuid.uuid4().hex[:8]}"
 
     task = {
@@ -77,7 +103,7 @@ async def submit_review(request: ReviewRequest, background_tasks: BackgroundTask
     return {"task_id": task_id, "status": "pending", "message": "Review started"}
 
 
-@app.get("/a2a/review/{task_id}")
+@app.get("/a2a/review/{task_id}", dependencies=[Depends(_require_token)])
 async def get_review_result(task_id: str):
     """Poll for review task results."""
     if task_id not in tasks:
@@ -90,17 +116,25 @@ async def health():
     return {"status": "ok", "agent": "sentinel", "version": "1.0.0"}
 
 
-async def _run_review_task(task_id: str, target_path: str, include_red_team: bool):
-    """Background task: run the full Sentinel pipeline."""
+def _run_review_task(task_id: str, target_path: str, include_red_team: bool):
+    """
+    Background task: run the full Sentinel pipeline.
+
+    Deliberately a *sync* function. run_sentinel drives blocking subprocesses
+    (bandit, ruff, pip-audit); FastAPI runs sync BackgroundTasks in a worker
+    thread, so the scan no longer blocks the server's asyncio event loop.
+    """
     tasks[task_id]["status"] = "running"
 
     try:
-        attestation = run_sentinel(target_path, verbose=False,
-                                   include_red_team=include_red_team)
-
-        red_team_result = None
         if include_red_team:
-            red_team_result = run_red_team(target_path)
+            attestation, red_team_result = run_sentinel(
+                target_path, verbose=False,
+                include_red_team=True, return_red_team=True,
+            )
+        else:
+            attestation = run_sentinel(target_path, verbose=False)
+            red_team_result = None
 
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["completed_at"] = datetime.now(timezone.utc).isoformat()

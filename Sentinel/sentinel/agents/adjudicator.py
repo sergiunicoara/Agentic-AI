@@ -9,7 +9,6 @@ Findings without evidence are DROPPED — not flagged, not warned about, DELETED
 This eliminates hallucinated security findings at the architecture level,
 not the prompt level.
 """
-import json
 import uuid
 from datetime import datetime, timezone
 from sentinel.models.schemas import Finding, Evidence, Attestation
@@ -43,7 +42,7 @@ def adjudicate(
             ev = Evidence(**e)
             valid_evidence_ids.add(ev.evidence_id)
             validated_evidence.append(ev)
-        except (ValidationError, Exception):
+        except ValidationError:
             continue  # Malformed evidence is silently dropped
 
     # Adjudicate each candidate finding

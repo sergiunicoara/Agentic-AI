@@ -4,8 +4,6 @@ pickle.loads on untrusted data allows arbitrary code execution.
 """
 import pickle
 import subprocess
-import tempfile
-import os
 
 
 def load_agent_state(serialized_data: bytes) -> dict:

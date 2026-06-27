@@ -1,7 +1,10 @@
 google-adk
 google-cloud-aiplatform
+google-genai
 pydantic>=2.0
 fastmcp
+fastapi
+uvicorn
 bandit
 ruff
 pip-audit
