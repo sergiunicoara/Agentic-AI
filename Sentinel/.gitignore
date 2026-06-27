@@ -1,0 +1,33 @@
+# Local environment variables
+.env
+.env*.local
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE and Editor settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Node dependencies (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs and debug info
+*.log
+logs/
+
+# Build and distribution files
+dist/
+build/
+out/
