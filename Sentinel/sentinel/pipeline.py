@@ -1,14 +1,24 @@
 """
 Sentinel Pipeline — Full end-to-end security review.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from sentinel.agents.evidence_agent import collect_evidence
 from sentinel.agents.injection_auditor import audit_for_injection
+from sentinel.agents.privilege_auditor import audit_for_privilege
+from sentinel.agents.supply_chain_auditor import audit_for_supply_chain
 from sentinel.agents.adjudicator import adjudicate
 from sentinel.skills.skill_loader import select_skills_for_target, load_skill_frontmatter
 from sentinel.models.schemas import Attestation
 
 
-def run_sentinel(target_path: str, verbose: bool = True) -> Attestation:
+def run_sentinel(
+    target_path: str,
+    verbose: bool = True,
+    include_red_team: bool = False,
+) -> Attestation:
     """
     Run a complete Sentinel security review on a target.
     """
@@ -32,15 +42,41 @@ def run_sentinel(target_path: str, verbose: bool = True) -> Attestation:
         print("\n[Stage 2] Collecting deterministic evidence...")
     evidence_list = collect_evidence(target_path)
 
+    # Stage 2b: Red team (optional)
+    red_team_summary = None
+    if include_red_team:
+        if verbose:
+            print("\n[Stage 2b] Running red team assessment...")
+        from sentinel.redteam.runner import run_red_team
+        red_team_summary = run_red_team(target_path)
+
+        # Add trajectory evidence to evidence list
+        from sentinel.models.schemas import Evidence
+        for ev_dict in red_team_summary.get("trajectory_evidence", []):
+            evidence_list.append(Evidence(**ev_dict))
+
     # Stage 3: Run specialist auditors
     if verbose:
         print("\n[Stage 3] Running specialist auditors...")
     all_candidates = []
+
     if "prompt-injection-defense" in selected_skills:
-        injection_candidates = audit_for_injection(evidence_list)
+        candidates = audit_for_injection(evidence_list)
         if verbose:
-            print(f"  → InjectionAuditor: {len(injection_candidates)} candidates")
-        all_candidates.extend(injection_candidates)
+            print(f"  → InjectionAuditor: {len(candidates)} candidates")
+        all_candidates.extend(candidates)
+
+    if "confused-deputy-iam" in selected_skills:
+        candidates = audit_for_privilege(evidence_list)
+        if verbose:
+            print(f"  → PrivilegeAuditor: {len(candidates)} candidates")
+        all_candidates.extend(candidates)
+
+    if "supply-chain-integrity" in selected_skills:
+        candidates = audit_for_supply_chain(evidence_list)
+        if verbose:
+            print(f"  → SupplyChainAuditor: {len(candidates)} candidates")
+        all_candidates.extend(candidates)
 
     # Stage 4: Adjudicate
     if verbose:
@@ -54,6 +90,9 @@ def run_sentinel(target_path: str, verbose: bool = True) -> Attestation:
         print(f"  Verdict:  {attestation.verdict.upper()}")
         print(f"  Findings: {len(attestation.findings)}")
         print(f"  Ref:      {attestation.audit_ref}")
+        if red_team_summary:
+            rate = red_team_summary["injection_success_rate"]
+            print(f"  Red Team: {rate:.0%} injection success rate")
         print("="*60 + "\n")
 
     return attestation
