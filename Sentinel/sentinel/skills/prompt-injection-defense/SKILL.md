@@ -1,24 +1,28 @@
 ---
 name: prompt-injection-defense
-description: Detects vulnerability to prompt injection attacks and evaluates system prompt isolation controls.
-triggers:
-  - prompt injection
-  - jailbreak
-  - system instruction
+description: Detect direct and indirect prompt-injection surfaces in agent tools.
+triggers: [web_fetch, file_read, user_content, rag_retrieval, eval, exec]
+pillar: 3
 ---
 
-# Prompt Injection Defense
-
 ## What to look for
-- System prompts that concatenate untrusted user input directly without sanitization or boundaries.
-- Absence of system prompt protection/instructions.
-- Over-reliance on LLM compliance without output parser checks.
+- Tool output concatenated directly into a system or user prompt without delimiting
+- `eval()` or `exec()` called on external/user-supplied content
+- `subprocess` calls with `shell=True` and user-controlled input
+- F-strings or `.format()` used to build prompts from untrusted sources
+- No input sanitization before tool results enter the LLM context
 
 ## Evidence required
-- Textual patterns matching string formatting or template interpolation in prompt generation.
-- Dynamic red-team trajectory results showing prompt escape.
+A finding is ONLY valid if backed by one of:
+- A `bandit` hit (B307 eval, B602 subprocess shell=True, B603 subprocess without shell)
+- A `semgrep` match on injection patterns
+- A successful red-team trajectory where injected content changed agent behavior
+
+No evidence → finding must be dropped by the Adjudicator.
 
 ## Remediation patterns
-- Use structured formats (e.g. chat messages API structure) rather than raw string interpolation.
-- Enforce strict input delimiters (e.g. triple backticks, custom XML tags) and instruct the model to ignore formatting within those.
-- Add downstream output sanitization and validation.
+- Use structured tool I/O — never concatenate raw tool output into prompts
+- Quarantine untrusted spans with XML delimiters: `<tool_result>...</tool_result>`
+- Replace `eval()` with `ast.literal_eval()` for data, or remove entirely
+- Set `shell=False` on all subprocess calls; pass args as a list
+- Add input validation layer before any user content reaches tool calls
