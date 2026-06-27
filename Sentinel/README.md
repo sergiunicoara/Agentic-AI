@@ -216,10 +216,10 @@ chmod +x deploy.sh
 Or manually:
 
 ```bash
-docker build -t gcr.io/YOUR_PROJECT/sentinel:latest .
-docker push gcr.io/YOUR_PROJECT/sentinel:latest
+docker build -t gcr.io/recruiter-sergiu-260213/sentinel:latest .
+docker push gcr.io/recruiter-sergiu-260213/sentinel:latest
 gcloud run deploy sentinel \
-  --image gcr.io/YOUR_PROJECT/sentinel:latest \
+  --image gcr.io/recruiter-sergiu-260213/sentinel:latest \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated
@@ -233,11 +233,15 @@ Sentinel can review its own code:
 
 ```
 adk run sentinel/orchestrator
-> Review the target at sentinel/agents
+> Review the target at sentinel/mcp
 ```
 
 This is the defining moment: the harness reviewing itself, finding real issues in its own code, with every finding backed by deterministic evidence.
-
+Sentinel flagged a real issue in its own MCP evidence server — subprocess 
+usage without input validation (bandit B603, evidence ev_bandit_9dc5388a) — 
+and returned PASS_WITH_FINDINGS. The finding is backed by deterministic 
+evidence. No hallucination. The harness reviewing itself and finding a 
+genuine issue is the system working exactly as designed.
 ---
 
 ## Security Note
