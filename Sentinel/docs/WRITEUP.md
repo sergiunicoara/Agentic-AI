@@ -67,7 +67,7 @@ Between Scope and Attestation, the pipeline is plain functions: an **Evidence Ag
 | LLM-auditor evidence survival rate (measured live) | 89% (16/18 candidates; the 2 drops were schema violations, not hallucinated evidence) |
 | Hallucinated-finding rate on clean controls | 0% |
 | False positives on clean controls | 0 |
-| Tests passing | 73 |
+| Tests passing | 74 |
 
 The numbers that matter most aren't the 100% — a small bundled corpus making that easy is expected — but the 0% false-positive rate on clean controls and the *measured* (not assumed) 89% survival rate on the one auditor that can fail. Those are the numbers a security team adopting this tool would actually care about: does it cry wolf, and when it's wrong, does something catch it.
 

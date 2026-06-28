@@ -63,7 +63,16 @@ def _sandbox_env() -> dict:
 
 
 def _discover_callable_targets(py_file: Path) -> list[tuple[str, str]]:
-    """Ask the (sandboxed) worker which functions in py_file are safe to call."""
+    """Ask the (sandboxed) worker which functions in py_file are safe to call.
+
+    Fails safe to [] on anything that isn't a well-formed discovery list —
+    including the worker's own error path, which prints a JSON *object*
+    (e.g. {"status": "worker_error", ...}) on failure. Blindly iterating
+    that as if it were the expected list would iterate its dict keys
+    (strings) instead, and `tuple("status")` explodes into a 6-character
+    tuple — surfacing as a confusing "too many values to unpack" in the
+    caller rather than the real failure. Surface the real reason instead.
+    """
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "sentinel.redteam._live_worker", "--discover", str(py_file)],
@@ -72,8 +81,17 @@ def _discover_callable_targets(py_file: Path) -> list[tuple[str, str]]:
         )
         lines = proc.stdout.strip().splitlines()
         if not lines:
+            if proc.stderr:
+                print(f"[LiveRedTeam] discover produced no output for {py_file}: {proc.stderr[:300]}")
             return []
-        return [tuple(x) for x in json.loads(lines[-1])]
+        parsed = json.loads(lines[-1])
+        if not isinstance(parsed, list):
+            print(f"[LiveRedTeam] discover failed for {py_file}: {parsed}")
+            return []
+        return [
+            tuple(x) for x in parsed
+            if isinstance(x, list) and len(x) == 2
+        ]
     except (subprocess.TimeoutExpired, json.JSONDecodeError, IndexError):
         return []
 

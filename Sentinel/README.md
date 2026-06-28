@@ -57,7 +57,7 @@ The 2 drops weren't fabricated evidence — Gemini cited real evidence both time
 | LLM-auditor evidence survival rate (live, measured) | **89%** (16/18 candidates; the 2 dropped were schema violations, not hallucinated evidence) |
 | Hallucinated-finding rate on clean controls | **0%** |
 | False positives on clean controls | **0** (C1 and C2 both pass with zero findings) |
-| Tests passing | **73** |
+| Tests passing | **74** |
 | Course concepts demonstrated | **5** (3 required minimum) |
 
 ---
@@ -276,7 +276,7 @@ Sentinel/
 │   ├── a2a/                # Agent card, A2A server (optional auth + TTL eviction), A2A client
 │   └── eval/               # Eval runner + metrics + SARIF export + LLM gate report
 ├── targets/                # Planted-bug corpus (T1–T6, C1, C2 — T6 is bandit's blind spot)
-├── tests/                  # 73 tests across all components
+├── tests/                  # 74 tests across all components
 ├── deploy/                 # Dockerfile + Cloud Run deploy script
 ├── hello_agent/            # ADK hello-world (setup verification)
 ├── requirements.txt

@@ -7,6 +7,7 @@ rest of the suite — but they're the proof that the sandbox model
 allow-list) actually holds, not just that it's documented.
 """
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from sentinel.redteam.live_runner import run_live_red_team, _discover_callable_targets
 
@@ -50,6 +51,28 @@ def test_live_red_team_blocks_path_traversal():
     summary = run_live_red_team("../../../../Windows/System32")
     assert summary["total_invocations"] == 0
     assert "blocked_reason" in summary
+
+
+def test_discover_fails_safe_on_worker_error_dict():
+    """
+    Regression test. The worker prints a JSON OBJECT on its error path
+    (e.g. {"status": "worker_error", ...}) rather than the expected JSON
+    array of [name, kind] pairs — this happens for real whenever the
+    target module fails to import in a clean environment (e.g. a stray
+    `import eval as evil` that only "worked" by accident via unrelated
+    path pollution on one machine, and raised ModuleNotFoundError on
+    another). Blindly doing `tuple(x) for x in parsed` against a dict
+    iterates its string keys instead, and `tuple("status")` explodes
+    into a 6-character tuple — surfacing as a confusing "too many values
+    to unpack" deep in the caller instead of the real import failure.
+    _discover_callable_targets must fail safe to [] instead.
+    """
+    fake_proc = MagicMock()
+    fake_proc.stdout = '{"status": "worker_error", "error": "No module named \'eval\'"}\n'
+    fake_proc.stderr = ""
+    with patch("subprocess.run", return_value=fake_proc):
+        result = _discover_callable_targets(Path(T1_PATH) / "agent.py")
+    assert result == []
 
 
 def test_live_invocation_does_not_leave_files_in_repo():
