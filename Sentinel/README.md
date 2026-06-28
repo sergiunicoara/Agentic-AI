@@ -66,7 +66,7 @@ The 2 drops weren't fabricated evidence — Gemini cited real evidence both time
 
 ![Sentinel architecture: an ADK orchestrator agent routes user intent into a deterministic seven-stage pipeline, with the Adjudicator trust gate emphasized](docs/architecture.svg)
 
-**A multi-agent ADK system where the LLM agents sit at the boundaries and every load-bearing step is deterministic.** This split is the design, not an accident: LLM agents handle the parts where reasoning and explanation help — the orchestrator the user talks to, the Scope agent that profiles a target, the Attestation agent that interprets and signs the verdict, and the opt-in LLM auditor — while the parts that must be *trusted* (evidence collection, the auditors' evidence→finding mapping, the adjudication gate itself) are plain deterministic Python. *Why Sentinel puts the LLM on a leash:* in a security tool, trust comes from determinism, not from a model promising it didn't hallucinate. The agents reason about and around the evidence; they never get to invent it.
+**A multi-agent ADK system where the model-backed pieces sit at the boundaries and every load-bearing step is deterministic.** This split is the design, not an accident: the model-backed pieces handle parts where reasoning and explanation help — the orchestrator agent the user talks to, the Scope agent that profiles a target, the Attestation agent that interprets and signs the verdict (all three real ADK agents), plus the opt-in LLM auditor (Gemini-backed but a direct API call, not an ADK agent) — while the parts that must be *trusted* (evidence collection, the auditors' evidence→finding mapping, the adjudication gate itself) are plain deterministic Python. *Why Sentinel puts the LLM on a leash:* in a security tool, trust comes from determinism, not from a model promising it didn't hallucinate. The agents reason about and around the evidence; they never get to invent it.
 
 ```
 SentinelOrchestrator (ADK Agent, Gemini 2.5 Flash) ── routes user intent to the right tool
@@ -94,7 +94,9 @@ SentinelOrchestrator (ADK Agent, Gemini 2.5 Flash) ── routes user intent to 
 └─ AttestationAgent  (ADK Agent) ──tool──► produce_attestation()   → runs adjudicate(), signs verdict
 ```
 
-**ADK agents:** `SentinelOrchestrator` (`sentinel/orchestrator/agent.py`), `ScopeAgent` (`sentinel/agents/scope_agent.py`), `AttestationAgent` (`sentinel/agents/attestation_agent.py`), and the opt-in `LLMAuditor` (`sentinel/agents/llm_auditor.py`). The Scope and Attestation agents wrap deterministic tools (`profile_target` → skill selection; `produce_attestation` → the adjudicator gate), so they can *explain* a stage without being able to alter its deterministic result — and they're exposed as orchestrator tools so the full pipeline and each stage are independently drivable. The auditors and evidence collection (stages 2–4) stay pure functions on purpose.
+**ADK agents (3):** `SentinelOrchestrator` (`sentinel/orchestrator/agent.py`), `ScopeAgent` (`sentinel/agents/scope_agent.py`), `AttestationAgent` (`sentinel/agents/attestation_agent.py`) — each a real `google.adk.agents.Agent`. The Scope and Attestation agents wrap deterministic tools (`profile_target` → skill selection; `produce_attestation` → the adjudicator gate), so they can *explain* a stage without being able to alter its deterministic result — and they're exposed as orchestrator tools so the full pipeline and each stage are independently drivable. The auditors and evidence collection (stages 2–4) stay pure functions on purpose.
+
+**The opt-in LLM Auditor (`sentinel/agents/llm_auditor.py`) is Gemini-backed but deliberately *not* an ADK agent** — it's a direct `google.genai.Client` call, used as a one-shot batch classifier rather than a conversational agent. It's still the auditor the whole evidence-gate story is about (the one specialist that can hallucinate), it's just not part of the ADK agent count.
 
 **Live red team** (`--live-red-team`, opt-in, off by default) actually executes the corpus payloads against the target's real functions instead of only checking for static surfaces — e.g. it really calls `eval()` on an adversarial string and really fires a `subprocess` gadget, then reports what happened. Containment, not honor system:
 - Every (function, payload) pair runs in its **own subprocess**, spawned by `sentinel/redteam/_live_worker.py` — target code is never imported in the main Sentinel process.
@@ -133,7 +135,7 @@ The rubric requires demonstrating **at least 3** of these. Sentinel demonstrates
 
 | Concept | Status | Where |
 |---|---|---|
-| Agent / multi-agent system (ADK) | ✅ Code | Four ADK agents: orchestrator (`orchestrator/agent.py`), Scope (`agents/scope_agent.py`), Attestation (`agents/attestation_agent.py`), opt-in LLM auditor (`agents/llm_auditor.py`) — Scope/Attestation are wired as orchestrator tools |
+| Agent / multi-agent system (ADK) | ✅ Code | Three ADK agents: orchestrator (`orchestrator/agent.py`), Scope (`agents/scope_agent.py`), Attestation (`agents/attestation_agent.py`) — Scope/Attestation wired as orchestrator tools, tested to confirm they're actually invoked. (The opt-in LLM auditor in `agents/llm_auditor.py` is Gemini-backed but is a direct API call, not an ADK agent.) |
 | MCP Server | ✅ Code | `sentinel/mcp/evidence_server.py` (4 tools, called over real MCP transport) |
 | Agent Skills | ✅ Code | `sentinel/skills/` (3 composable `SKILL.md` modules + loader) |
 | Security features | ✅ Code | The whole project — `adjudicator.py` evidence gate, `redteam/` sandboxed live execution |

@@ -39,12 +39,12 @@ This isn't a guideline a model can drift away from. It's a Pydantic schema valid
 
 ## Architecture
 
-A multi-agent ADK system where four LLM agents sit at the boundaries and every load-bearing step in between is deterministic Python:
+A multi-agent ADK system: three real ADK agents sit at the boundaries, plus one opt-in Gemini-backed auditor that is deliberately *not* an ADK agent, and every load-bearing step in between is deterministic Python:
 
 - **SentinelOrchestrator** (ADK Agent, Gemini 2.5 Flash) — the agent the user or an A2A peer talks to. Routes intent across 8 tools: five end-to-end review modes (standard, +red-team, +live red-team, +LLM auditor, +HITL remediation) plus per-stage tools and capability discovery.
 - **ScopeAgent** (ADK Agent) — wraps `profile_target()`, profiling a target's code and selecting which security Skills apply, and explaining why.
 - **AttestationAgent** (ADK Agent) — wraps `produce_attestation()`, which runs the Adjudicator and returns the signed, risk-stratified verdict. It can *explain* the gate's decision; it cannot override it.
-- **LLM Auditor** (ADK-backed, opt-in) — the one auditor that reasons freely about source code, discussed above.
+- **LLM Auditor** (Gemini-backed, opt-in, *not* an ADK agent — a direct `google.genai` API call used as a one-shot batch classifier) — the one auditor that reasons freely about source code, discussed above.
 
 Between Scope and Attestation, the pipeline is plain functions: an **Evidence Agent** calls four tools through a real in-process MCP server (`security_scan`/bandit, `lint_scan`/ruff, `dependency_scan`/pip-audit, `semgrep_scan`); four deterministic **Auditors** map evidence to candidate findings; a **Red Team** stage fires 8 adversarial payloads, either as a static textual-surface check or — opt-in — by *actually executing* them against the target's real functions inside a sandboxed subprocess (disposable temp directory, scrubbed environment, network sockets patched to fail closed, hard timeout, POSIX resource limits, and a hard rule that adversarial strings are never passed into a parameter that looks like a filesystem path); and the **Adjudicator** is the gate described above. A **HITL Gate** pauses before any high-severity auto-remediation for human approval. Output is a signed `Attestation` — exportable as a SARIF 2.1.0 report so a CI pipeline can gate a merge on it.
 
@@ -52,7 +52,7 @@ Between Scope and Attestation, the pipeline is plain functions: an **Evidence Ag
 
 ## Course Concepts Demonstrated (4 of the required 3)
 
-- **Multi-agent system (ADK):** four real ADK agents — Orchestrator, Scope, Attestation, LLM Auditor — with Scope and Attestation wired as orchestrator tools and covered by tests that assert they're actually invoked, not just defined.
+- **Multi-agent system (ADK):** three real ADK agents — Orchestrator, Scope, Attestation — with Scope and Attestation wired as orchestrator tools and covered by tests that assert they're actually invoked, not just defined. (The LLM Auditor is a fourth model-backed specialist but a direct Gemini API call, not an ADK agent — kept distinct deliberately, see above.)
 - **MCP Server:** `sentinel/mcp/evidence_server.py`, four tools, called over FastMCP's real in-process transport (not bypassed via direct function calls).
 - **Agent Skills:** three composable `SKILL.md` modules (prompt-injection-defense, confused-deputy-iam, supply-chain-integrity) loaded progressively — front-matter first to decide relevance, full content only when a skill activates for a given scan.
 - **Security features:** the project's entire premise — the evidence gate, plus a genuinely sandboxed live red-team execution mode, are themselves the security feature, not an add-on.

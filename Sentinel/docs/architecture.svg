@@ -1,6 +1,6 @@
 <svg viewBox="0 0 1160 800" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',Helvetica,Arial,sans-serif" role="img" aria-labelledby="title desc">
   <title id="title">Sentinel architecture</title>
-  <desc id="desc">An ADK orchestrator agent routes user intent into a deterministic seven-stage security-review pipeline. LLM agents sit at the boundaries (orchestrator, scope, attestation, optional LLM auditor); evidence collection, the auditors, and the adjudicator trust gate are deterministic. Every finding must cite evidence from bandit, ruff, pip-audit, or semgrep, or the adjudicator drops it.</desc>
+  <desc id="desc">An ADK orchestrator agent routes user intent into a deterministic seven-stage security-review pipeline. Three real ADK agents sit at the boundaries (orchestrator, scope, attestation), plus an optional Gemini-backed LLM auditor that is a direct API call, not an ADK agent; evidence collection, the auditors, and the adjudicator trust gate are deterministic. Every finding must cite evidence from bandit, ruff, pip-audit, or semgrep, or the adjudicator drops it.</desc>
 
   <rect x="0" y="0" width="1160" height="800" fill="#0a1628"/>
 
@@ -8,14 +8,14 @@
   <text x="48" y="56" fill="#e2e8f0" font-size="30" font-weight="700">🛡 Sentinel</text>
   <text x="48" y="82" fill="#7dd3fc" font-size="16" font-weight="500">Hallucination-free security review — every finding traces to deterministic tool evidence</text>
 
-  <!-- ===== legend ===== -->
-  <g font-size="13">
-    <rect x="760" y="36" width="16" height="16" rx="3" fill="#0e7490" stroke="#22d3ee" stroke-width="1.5"/>
-    <text x="784" y="49" fill="#cbd5e1">LLM agent (ADK · Gemini)</text>
-    <rect x="760" y="62" width="16" height="16" rx="3" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
-    <text x="784" y="75" fill="#cbd5e1">Deterministic (no LLM)</text>
-    <rect x="980" y="36" width="16" height="16" rx="3" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
-    <text x="1004" y="49" fill="#cbd5e1">The trust gate</text>
+  <!-- ===== legend (single column, stacked — avoids any width-collision risk) ===== -->
+  <g font-size="12.5">
+    <rect x="700" y="30" width="15" height="15" rx="3" fill="#0e7490" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="723" y="42" fill="#cbd5e1">Gemini-backed (ADK agent or direct API)</text>
+    <rect x="700" y="54" width="15" height="15" rx="3" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="723" y="66" fill="#cbd5e1">Deterministic (no LLM)</text>
+    <rect x="700" y="78" width="15" height="15" rx="3" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="723" y="90" fill="#cbd5e1">The trust gate</text>
   </g>
 
   <!-- ===== user + orchestrator ===== -->
