@@ -58,7 +58,7 @@ The 2 drops weren't fabricated evidence — Gemini cited real evidence both time
 | Hallucinated-finding rate on clean controls | **0%** |
 | False positives on clean controls | **0** (C1 and C2 both pass with zero findings) |
 | Tests passing | **73** |
-| Course concepts demonstrated | **6 / 6** |
+| Course concepts demonstrated | **5** (3 required minimum) |
 
 ---
 

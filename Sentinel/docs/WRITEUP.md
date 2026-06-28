@@ -21,7 +21,7 @@ The obvious fix is to point an LLM at the code and ask "is this secure?" That fa
 
 Sentinel's bet is that this is a business problem with cost on both sides: the cost of shipping a real vulnerability, and the cost of alert fatigue from a scanner nobody trusts. Both sides are why a security team would actually adopt one tool over another — not raw detection count, but whether they can act on every single thing it tells them.
 
-## The Solution: Make Hallucination Structurally Impossible
+## The Solution: Make Unsupported Findings Structurally Impossible to Keep
 
 Sentinel solves this at the architecture level, not the prompt level. Every finding a specialist auditor proposes must cite at least one `evidence_id` from a deterministic evidence store — built by running real static-analysis tools (bandit, ruff, pip-audit, semgrep) against the target's code, never by asking an LLM "did you find anything." An **Adjudicator** then checks every proposed finding against that store:
 
@@ -50,13 +50,14 @@ Between Scope and Attestation, the pipeline is plain functions: an **Evidence Ag
 
 (Architecture diagram: `docs/architecture.svg` in the repo, embedded in the README.)
 
-## Course Concepts Demonstrated (4 of the required 3)
+## Course Concepts Demonstrated — 5 (3 required minimum)
 
 - **Multi-agent system (ADK):** three real ADK agents — Orchestrator, Scope, Attestation — with Scope and Attestation wired as orchestrator tools and covered by tests that assert they're actually invoked, not just defined. (The LLM Auditor is a fourth model-backed specialist but a direct Gemini API call, not an ADK agent — kept distinct deliberately, see above.)
 - **MCP Server:** `sentinel/mcp/evidence_server.py`, four tools, called over FastMCP's real in-process transport (not bypassed via direct function calls).
 - **Agent Skills:** three composable `SKILL.md` modules (prompt-injection-defense, confused-deputy-iam, supply-chain-integrity) loaded progressively — front-matter first to decide relevance, full content only when a skill activates for a given scan.
 - **Security features:** the project's entire premise — the evidence gate, plus a genuinely sandboxed live red-team execution mode, are themselves the security feature, not an add-on.
-- *(Bonus, beyond the required three:* A2A agent-card + HTTP API with optional bearer auth and task-TTL eviction, SARIF/CI-gate export, deployability via Docker/Cloud Run.)*
+- **Deployability:** `deploy/Dockerfile` + `deploy/deploy.sh` → Cloud Run, shown in the demo video.
+- *(Bonus, beyond the five above:* A2A agent-card + HTTP API with optional bearer auth and task-TTL eviction, SARIF/CI-gate export.)*
 
 ## Results
 
