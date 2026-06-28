@@ -57,35 +57,44 @@ The 2 drops weren't fabricated evidence — Gemini cited real evidence both time
 | LLM-auditor evidence survival rate (live, measured) | **89%** (16/18 candidates; the 2 dropped were schema violations, not hallucinated evidence) |
 | Hallucinated-finding rate on clean controls | **0%** |
 | False positives on clean controls | **0** (C1 and C2 both pass with zero findings) |
-| Tests passing | **67** |
+| Tests passing | **73** |
 | Course concepts demonstrated | **6 / 6** |
 
 ---
 
 ## Architecture
 
-Seven-stage ADK pipeline:
+![Sentinel architecture: an ADK orchestrator agent routes user intent into a deterministic seven-stage pipeline, with the Adjudicator trust gate emphasized](docs/architecture.svg)
+
+**A multi-agent ADK system where the LLM agents sit at the boundaries and every load-bearing step is deterministic.** This split is the design, not an accident: LLM agents handle the parts where reasoning and explanation help — the orchestrator the user talks to, the Scope agent that profiles a target, the Attestation agent that interprets and signs the verdict, and the opt-in LLM auditor — while the parts that must be *trusted* (evidence collection, the auditors' evidence→finding mapping, the adjudication gate itself) are plain deterministic Python. *Why Sentinel puts the LLM on a leash:* in a security tool, trust comes from determinism, not from a model promising it didn't hallucinate. The agents reason about and around the evidence; they never get to invent it.
 
 ```
-SentinelOrchestrator (Gemini 2.5 Flash)
+SentinelOrchestrator (ADK Agent, Gemini 2.5 Flash) ── routes user intent to the right tool
+│   8 tools: 5 end-to-end reviews · profile_target · produce_attestation · get_agent_capabilities
 │
-└─► Sequential Pipeline
+├─ ScopeAgent        (ADK Agent) ──tool──► profile_target()        → select Skills
+│
+└─► run_sentinel() — deterministic pipeline:
     │
-    ├─ 1. ScopeAgent          Profile target → select Skills
-    ├─ 2. EvidenceAgent       Call MCP tools over real MCP transport (NO LLM)
-    ├─ 3. Specialist Auditors
-    │     ├─ InjectionAuditor   (loads prompt-injection-defense SKILL) — deterministic
-    │     ├─ PrivilegeAuditor   (loads confused-deputy-iam SKILL) — deterministic
-    │     ├─ SupplyChainAuditor (loads supply-chain-integrity SKILL) — deterministic
-    │     ├─ RedTeamAuditor     (consumes trajectory evidence) — deterministic
-    │     └─ LLMAuditor         (opt-in, Gemini) — the only auditor that CAN hallucinate
-    ├─ 4. RedTeamRunner       Fire 8 adversarial payloads → trajectory evidence
+    ├─ 1. Scope          Profile target → select Skills            (skill_loader, pure fn)
+    ├─ 2. Evidence       Call MCP tools over real MCP transport    (evidence_agent, NO LLM)
+    ├─ 3. Auditors       Map evidence → candidate findings:
+    │     ├─ InjectionAuditor    (prompt-injection-defense SKILL)  — deterministic
+    │     ├─ PrivilegeAuditor    (confused-deputy-iam SKILL)       — deterministic
+    │     ├─ SupplyChainAuditor  (supply-chain-integrity SKILL)    — deterministic
+    │     ├─ RedTeamAuditor      (consumes trajectory evidence)    — deterministic
+    │     └─ LLMAuditor          (opt-in, Gemini)  — the ONLY auditor that CAN hallucinate
+    ├─ 4. Red Team       Fire 8 adversarial payloads → trajectory evidence
     │     ├─ static  (sentinel/redteam/runner.py)       — textual surface match
     │     └─ live    (sentinel/redteam/live_runner.py)  — sandboxed real execution, opt-in
-    ├─ 5. AdjudicatorAgent    ← THE TRUST GATE: drop findings without evidence
-    ├─ 6. HITLGate            Pause before high-severity auto-remediation
-    └─ 7. AttestationAgent    Risk-stratified verdict + immutable audit trail
+    ├─ 5. Adjudicator    ← THE TRUST GATE: drop findings without evidence  (adjudicate, pure fn)
+    ├─ 6. HITL Gate      Pause before high-severity auto-remediation       (HITLGate)
+    └─ 7. Attestation    Risk-stratified verdict + signed audit trail      (Attestation model)
+│
+└─ AttestationAgent  (ADK Agent) ──tool──► produce_attestation()   → runs adjudicate(), signs verdict
 ```
+
+**ADK agents:** `SentinelOrchestrator` (`sentinel/orchestrator/agent.py`), `ScopeAgent` (`sentinel/agents/scope_agent.py`), `AttestationAgent` (`sentinel/agents/attestation_agent.py`), and the opt-in `LLMAuditor` (`sentinel/agents/llm_auditor.py`). The Scope and Attestation agents wrap deterministic tools (`profile_target` → skill selection; `produce_attestation` → the adjudicator gate), so they can *explain* a stage without being able to alter its deterministic result — and they're exposed as orchestrator tools so the full pipeline and each stage are independently drivable. The auditors and evidence collection (stages 2–4) stay pure functions on purpose.
 
 **Live red team** (`--live-red-team`, opt-in, off by default) actually executes the corpus payloads against the target's real functions instead of only checking for static surfaces — e.g. it really calls `eval()` on an adversarial string and really fires a `subprocess` gadget, then reports what happened. Containment, not honor system:
 - Every (function, payload) pair runs in its **own subprocess**, spawned by `sentinel/redteam/_live_worker.py` — target code is never imported in the main Sentinel process.
@@ -120,16 +129,19 @@ SentinelOrchestrator (Gemini 2.5 Flash)
 
 ## Course Concepts Demonstrated
 
+The rubric requires demonstrating **at least 3** of these. Sentinel demonstrates 4 in code alone (the first four below), independent of the video:
+
 | Concept | Status | Where |
 |---|---|---|
-| Multi-agent system (ADK) | ✅ | `sentinel/agents/`, `sentinel/orchestrator/` |
-| MCP Server | ✅ | `sentinel/mcp/evidence_server.py` |
-| Agent Skills | ✅ | `sentinel/skills/` |
-| Security features | ✅ | `sentinel/agents/adjudicator.py`, `sentinel/redteam/` |
-| Deployability | ✅ | `deploy/Dockerfile`, Cloud Run |
-| Antigravity | ✅ | Built spec-driven in Antigravity |
+| Agent / multi-agent system (ADK) | ✅ Code | Four ADK agents: orchestrator (`orchestrator/agent.py`), Scope (`agents/scope_agent.py`), Attestation (`agents/attestation_agent.py`), opt-in LLM auditor (`agents/llm_auditor.py`) — Scope/Attestation are wired as orchestrator tools |
+| MCP Server | ✅ Code | `sentinel/mcp/evidence_server.py` (4 tools, called over real MCP transport) |
+| Agent Skills | ✅ Code | `sentinel/skills/` (3 composable `SKILL.md` modules + loader) |
+| Security features | ✅ Code | The whole project — `adjudicator.py` evidence gate, `redteam/` sandboxed live execution |
+| Deployability | ✅ Video | `deploy/Dockerfile` + `deploy/deploy.sh` → Cloud Run (shown in demo video) |
 
-**Bonus (last cohort only roadmapped these):** A2A agent card + HTTP endpoint, HITL gate, trajectory evaluation, spec-driven development.
+> **Antigravity:** demonstrated in the video if used to build the project — *not claimed here unless it's genuinely part of the build story.* Sentinel already meets the 3-concept bar with the four code concepts above, so this is optional, not load-bearing.
+
+**Bonus beyond the required concepts:** A2A agent card + HTTP endpoint (optional bearer auth), HITL gate, static **and** sandboxed-live trajectory evaluation, SARIF/CI-gate integration.
 
 ---
 
@@ -252,7 +264,7 @@ Set `SENTINEL_A2A_TOKEN` to require `Authorization: Bearer <token>` on review en
 ```
 Sentinel/
 ├── sentinel/
-│   ├── orchestrator/       # ADK root agent + 6 tools
+│   ├── orchestrator/       # ADK root agent + 8 tools (incl. scope & attestation agents' tools)
 │   ├── agents/             # EvidenceAgent, 5 auditors, Adjudicator, HITL gate
 │   ├── mcp/                # FastMCP evidence server (bandit, ruff, pip-audit, semgrep) + path/size guard
 │   │   └── semgrep_rules/  # Project-authored rules: SSRF, LLM-key-by-value-format
@@ -262,7 +274,7 @@ Sentinel/
 │   ├── a2a/                # Agent card, A2A server (optional auth + TTL eviction), A2A client
 │   └── eval/               # Eval runner + metrics + SARIF export + LLM gate report
 ├── targets/                # Planted-bug corpus (T1–T6, C1, C2 — T6 is bandit's blind spot)
-├── tests/                  # 67 tests across all components
+├── tests/                  # 73 tests across all components
 ├── deploy/                 # Dockerfile + Cloud Run deploy script
 ├── hello_agent/            # ADK hello-world (setup verification)
 ├── requirements.txt

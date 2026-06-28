@@ -9,6 +9,8 @@ from google.adk.agents import Agent
 from sentinel.pipeline import run_sentinel
 from sentinel.a2a.agent_card import AGENT_CARD
 from sentinel.agents.hitl_gate import HITLGate
+from sentinel.agents.scope_agent import profile_target
+from sentinel.agents.attestation_agent import produce_attestation
 
 
 def review_target(target_path: str) -> dict:
@@ -207,7 +209,7 @@ root_agent = Agent(
     model="gemini-2.5-flash",
     instruction="""You are Sentinel, an agent security review system.
 
-You have six tools:
+End-to-end review tools (each runs the full deterministic pipeline):
 
 1. review_target — standard security review (deterministic auditors only)
 2. review_with_red_team — review + adversarial injection testing
@@ -219,7 +221,17 @@ You have six tools:
    whose findings can be hallucinated; use this to demonstrate the
    Adjudicator gate dropping unsupported findings)
 5. request_remediation_approval — review + HITL gate for fixes
-6. get_agent_capabilities — return your A2A agent card
+
+Per-stage tools (for inspecting or driving individual pipeline stages):
+
+6. profile_target — the Scope stage: profile a target and report which
+   security Skills apply and why (run this first to explain what a review
+   will focus on before running it)
+7. produce_attestation — the Attestation stage: run the Adjudicator trust
+   gate over candidate findings + evidence and return the signed verdict,
+   showing exactly which findings were dropped for lack of evidence
+
+8. get_agent_capabilities — return your A2A agent card
 
 When reviewing targets:
 - Always explain the verdict clearly
@@ -237,6 +249,8 @@ use get_agent_capabilities to return your agent card.""",
         review_with_live_red_team,
         review_with_llm_auditor,
         request_remediation_approval,
+        profile_target,
+        produce_attestation,
         get_agent_capabilities,
     ],
 )

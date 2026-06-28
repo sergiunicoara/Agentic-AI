@@ -34,7 +34,7 @@ AVAILABLE_SKILLS = [
 def load_skill_frontmatter(skill_name: str) -> dict:
     """
     Load only the front-matter (name, description, triggers, pillar).
-    Used by ScopeAgent to decide which skills to activate.
+    Used during the scope/profiling stage to decide which skills to activate.
     """
     skill_path = SKILLS_DIR / skill_name / "SKILL.md"
     if not skill_path.exists():

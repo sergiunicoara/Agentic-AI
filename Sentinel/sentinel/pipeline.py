@@ -14,15 +14,8 @@ from sentinel.agents.llm_auditor import audit_with_llm
 from sentinel.agents.adjudicator import adjudicate
 from sentinel.skills.skill_loader import select_skills_for_target, load_skill_frontmatter
 from sentinel.models.schemas import Attestation
-
-# Console report prints use unicode glyphs (checkmarks etc). On Windows the
-# default console encoding is cp1252, which crashes on them — force utf-8.
-# Done after imports (nothing prints at import time) to keep imports at top.
-for _stream in (sys.stdout, sys.stderr):
-    try:
-        _stream.reconfigure(encoding="utf-8", errors="replace")
-    except (AttributeError, ValueError):
-        pass
+# Note: utf-8 stdout/stderr reconfiguration for console report glyphs is
+# done centrally in sentinel/__init__.py so it applies to every entry point.
 
 
 def run_sentinel(
