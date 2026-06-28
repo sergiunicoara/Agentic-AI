@@ -36,15 +36,17 @@ async def _call_evidence_tools(target_path: str) -> dict:
     This exercises the actual MCP protocol path.
     """
     async with Client(mcp) as client:
-        sec, lint, dep = await asyncio.gather(
+        sec, lint, dep, semgrep = await asyncio.gather(
             client.call_tool("security_scan", {"target_path": target_path}),
             client.call_tool("lint_scan", {"target_path": target_path}),
             client.call_tool("dependency_scan", {"target_path": target_path}),
+            client.call_tool("semgrep_scan", {"target_path": target_path}),
         )
     return {
         "security": sec.data,
         "lint": lint.data,
         "dependency": dep.data,
+        "semgrep": semgrep.data,
     }
 
 
@@ -137,6 +139,29 @@ def collect_evidence(target_path: str) -> list[Evidence]:
                 vuln_count += 1
 
     print(f"[EvidenceAgent] pip-audit: {vuln_count} vulnerabilities found")
+
+    # --- Run semgrep scan (project rules + p/python + p/gitleaks) ---
+    print("[EvidenceAgent] Running semgrep scan...")
+    semgrep_result = tool_results["semgrep"]
+    semgrep_findings = semgrep_result.get("findings", [])
+    print(f"[EvidenceAgent] semgrep: {len(semgrep_findings)} issues found")
+
+    for issue in semgrep_findings:
+        extra = issue.get("extra", {})
+        ev = Evidence(
+            evidence_id=f"ev_semgrep_{uuid.uuid4().hex[:8]}",
+            source="semgrep",
+            locator=f"{issue.get('path', target_path)}:{issue.get('start', {}).get('line', 0)}",
+            raw={
+                "check_id": issue.get("check_id"),
+                "message": extra.get("message", "")[:300],
+                "severity": extra.get("severity"),
+                "metadata": extra.get("metadata", {}),
+            },
+        )
+        evidence_list.append(ev)
+        print(f"  + {ev.evidence_id}: {ev.raw['check_id']} @ {ev.locator}")
+
     print(f"[EvidenceAgent] Total evidence collected: {len(evidence_list)}")
     print("-" * 50)
 

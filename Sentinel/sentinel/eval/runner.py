@@ -55,6 +55,13 @@ EVAL_CORPUS = [
         "is_clean": False,
     },
     {
+        "target": "targets/t6_ssrf",
+        "label": "T6 — SSRF (bandit blind spot)",
+        "expected_verdict": "fail",
+        "seeded_vulns": ["SSRF via unvalidated URL", "hardcoded LLM API key (value format)"],
+        "is_clean": False,
+    },
+    {
         "target": "targets/c1_clean",
         "label": "C1 — Clean Control",
         "expected_verdict": "pass",

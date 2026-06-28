@@ -4,6 +4,13 @@ Injection Auditor — Specialist for prompt injection and code injection vulnera
 Takes evidence from the EvidenceAgent and proposes findings.
 Each proposed finding MUST reference evidence_ids.
 The Adjudicator will drop any finding without valid evidence.
+
+Two evidence sources feed this auditor:
+- bandit: known-dangerous call patterns (eval, subprocess shell=True, ...)
+- semgrep: includes sentinel-ssrf-unvalidated-url, a project-authored rule
+  for a data-flow pattern bandit has no rule for at all (SSRF via a URL
+  that isn't a string literal) — this is the auditor's actual ceiling
+  raise beyond bandit, not just a second detector for the same patterns.
 """
 from sentinel.models.schemas import Evidence
 
@@ -24,46 +31,79 @@ INJECTION_TEST_IDS = {
     "B701": ("jinja2 autoescape false", "high", 3),
 }
 
+# Semgrep check_id substrings that indicate injection-class vulnerabilities.
+# "ssrf" is the project's own rule (sentinel-ssrf-unvalidated-url) — a true
+# detection-ceiling raise, since bandit has no equivalent. The others
+# overlap with bandit's coverage on the same code but via an independent
+# detection method (pattern-based, not call-blacklist-based).
+SEMGREP_INJECTION_PATTERNS = {
+    "ssrf": ("Server-Side Request Forgery (SSRF)", "high", 3),
+    "eval-detected": ("eval() usage", "high", 3),
+    "subprocess-shell-true": ("subprocess shell=True", "high", 3),
+    "sql-injection": ("SQL injection", "high", 4),
+}
+
 
 def audit_for_injection(evidence_list: list[Evidence]) -> list[dict]:
     """
     Review evidence for injection vulnerabilities.
     Returns candidate findings — each MUST have evidence_ids.
-    
+
     Args:
         evidence_list: Evidence objects from EvidenceAgent
-        
+
     Returns:
         List of candidate finding dicts (will be adjudicated)
     """
     candidates = []
 
     for ev in evidence_list:
-        if ev.source != "bandit":
-            continue
+        if ev.source == "bandit":
+            test_id = ev.raw.get("test_id")
+            if test_id not in INJECTION_TEST_IDS:
+                continue
+            title, severity, pillar = INJECTION_TEST_IDS[test_id]
+            candidates.append({
+                "finding_id": f"inj_{ev.evidence_id}",
+                "pillar": pillar,
+                "severity": severity,
+                "confidence": 0.95,
+                "title": f"Code Injection Risk: {title}",
+                "rationale": (
+                    f"Bandit detected {test_id} ({ev.raw.get('issue_text', '')}) "
+                    f"at {ev.locator}. This creates a code injection surface "
+                    f"that attackers could exploit via prompt injection to execute "
+                    f"arbitrary code."
+                ),
+                "evidence_ids": [ev.evidence_id],
+                "remediation": _get_remediation(test_id),
+            })
 
-        test_id = ev.raw.get("test_id")
-        if test_id not in INJECTION_TEST_IDS:
-            continue
-
-        title, severity, pillar = INJECTION_TEST_IDS[test_id]
-
-        candidate = {
-            "finding_id": f"inj_{ev.evidence_id}",
-            "pillar": pillar,
-            "severity": severity,
-            "confidence": 0.95,
-            "title": f"Code Injection Risk: {title}",
-            "rationale": (
-                f"Bandit detected {test_id} ({ev.raw.get('issue_text', '')}) "
-                f"at {ev.locator}. This creates a code injection surface "
-                f"that attackers could exploit via prompt injection to execute "
-                f"arbitrary code."
-            ),
-            "evidence_ids": [ev.evidence_id],  # MUST reference real evidence
-            "remediation": _get_remediation(test_id),
-        }
-        candidates.append(candidate)
+        elif ev.source == "semgrep":
+            check_id = ev.raw.get("check_id", "")
+            match = next(
+                (v for k, v in SEMGREP_INJECTION_PATTERNS.items() if k in check_id),
+                None,
+            )
+            if match is None:
+                continue
+            title, severity, pillar = match
+            candidates.append({
+                "finding_id": f"inj_{ev.evidence_id}",
+                "pillar": pillar,
+                "severity": severity,
+                "confidence": 0.9,
+                "title": f"Code Injection Risk: {title}",
+                "rationale": (
+                    f"Semgrep detected {check_id} at {ev.locator}: "
+                    f"{ev.raw.get('message', '')[:200]}"
+                ),
+                "evidence_ids": [ev.evidence_id],
+                "remediation": (
+                    "Validate and allowlist any URL/command derived from "
+                    "untrusted input before use, or remove the unsafe call."
+                ),
+            })
 
     return candidates
 

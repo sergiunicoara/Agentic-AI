@@ -5,15 +5,16 @@ Publishes Sentinel's capabilities in the A2A protocol format.
 Any A2A-compatible agent can discover and call Sentinel
 by fetching this card from /.well-known/agent-card.json
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 AGENT_CARD = {
     "name": "Sentinel",
     "version": "1.0.0",
     "description": (
         "Hallucination-free security review for vibe-coded agents. "
-        "Every finding traces to deterministic tool evidence. "
-        "Hallucinated findings are automatically dropped."
+        "Every finding traces to deterministic tool evidence (bandit, "
+        "ruff, pip-audit, semgrep). Hallucinated findings are "
+        "automatically dropped by the Adjudicator gate."
     ),
     "url": "http://localhost:8080",
     "capabilities": {
@@ -40,8 +41,10 @@ AGENT_CARD = {
             "id": "red-team",
             "name": "Red Team Assessment",
             "description": (
-                "Fire adversarial injection payloads at a target agent "
-                "and report the injection success rate."
+                "Fire adversarial injection payloads at a target agent and "
+                "report the injection success rate. Static (surface match) "
+                "by default; live mode actually executes payloads against "
+                "the target's real functions in a sandboxed subprocess."
             ),
             "inputModes": ["text"],
             "outputModes": ["text"],
@@ -51,5 +54,5 @@ AGENT_CARD = {
         "name": "Sergiu Nicoara",
         "url": "https://github.com/sergiunicoara/sentinel",
     },
-    "published": datetime.utcnow().isoformat() + "Z",
+    "published": datetime.now(timezone.utc).isoformat(),
 }

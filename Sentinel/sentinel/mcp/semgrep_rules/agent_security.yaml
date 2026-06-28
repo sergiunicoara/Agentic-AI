@@ -1,0 +1,43 @@
+rules:
+  - id: sentinel-ssrf-unvalidated-url
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Possible SSRF: a URL that is not a string literal (i.e. derived from
+      a function argument, tool output, or other untrusted input) is passed
+      directly to requests.get/post/put with no allowlist or scheme check.
+      In an agentic system this is commonly an indirect-injection vector:
+      attacker-controlled tool output can redirect outbound requests to
+      internal services (cloud metadata endpoints, internal admin panels).
+      Bandit has no rule for this pattern — it is purely a semgrep/LLM-
+      auditor finding.
+    metadata:
+      cwe: ["CWE-918: Server-Side Request Forgery (SSRF)"]
+      owasp: ["A10:2021 - Server-Side Request Forgery (SSRF)"]
+      pillar: 3
+      source: sentinel-custom
+    patterns:
+      - pattern-either:
+          - pattern: requests.get($URL, ...)
+          - pattern: requests.post($URL, ...)
+          - pattern: requests.put($URL, ...)
+      - pattern-not: requests.get("...", ...)
+      - pattern-not: requests.post("...", ...)
+      - pattern-not: requests.put("...", ...)
+
+  - id: sentinel-llm-api-key-hardcoded
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      A string literal matches a known LLM/cloud provider API key format
+      (OpenAI sk-..., Anthropic sk-ant-..., Google AIza..., Google OAuth
+      ya29...). Bandit's hardcoded-password heuristic matches on variable
+      *names* (password/secret/token) and misses keys assigned to
+      differently-named constants, or stored in URLs/headers inline. This
+      rule matches on the *value* format instead, independent of naming.
+    metadata:
+      cwe: ["CWE-798: Use of Hard-coded Credentials"]
+      pillar: 5
+      source: sentinel-custom
+    patterns:
+      - pattern-regex: '(sk-ant-[A-Za-z0-9_\-]{20,}|sk-proj-[A-Za-z0-9_\-]{10,}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_\-]{20,}|ya29\.[0-9A-Za-z_\-]{20,})'
