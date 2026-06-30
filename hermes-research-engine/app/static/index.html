@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Research Engine</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #1a1d27;
+    border-bottom: 1px solid #2d3748;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  header span { font-size: 13px; color: #718096; }
+
+  .badge {
+    background: #1a3a2a;
+    color: #48bb78;
+    border: 1px solid #276749;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: auto;
+  }
+
+  main { max-width: 860px; margin: 40px auto; padding: 0 24px; }
+
+  .search-box {
+    background: #1a1d27;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .search-box label {
+    display: block;
+    font-size: 13px;
+    color: #718096;
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  .input-row { display: flex; gap: 10px; }
+
+  textarea {
+    flex: 1;
+    background: #0f1117;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 15px;
+    padding: 12px 14px;
+    resize: none;
+    height: 52px;
+    line-height: 1.5;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+
+  textarea:focus { border-color: #4a5568; }
+
+  button#submit {
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  button#submit:hover { background: #4f46e5; }
+  button#submit:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+
+  .examples {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .example-chip {
+    background: #1e2433;
+    border: 1px solid #2d3748;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #a0aec0;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .example-chip:hover { border-color: #6366f1; color: #e2e8f0; }
+
+  #activity {
+    background: #1a1d27;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  #activity h3 { font-size: 12px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+
+  .event-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 5px 0;
+    font-size: 13px;
+    color: #a0aec0;
+    border-bottom: 1px solid #1e2433;
+    animation: fadein 0.2s ease;
+  }
+
+  .event-line:last-child { border-bottom: none; }
+
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .event-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+  .event-text { flex: 1; line-height: 1.5; }
+  .event-text strong { color: #e2e8f0; }
+
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid #4a5568;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #result-box {
+    background: #1a1d27;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    padding: 28px 32px;
+    display: none;
+  }
+
+  #result-box h2 { font-size: 14px; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 20px; }
+
+  .report h2 { font-size: 18px; color: #fff; margin: 20px 0 10px; border-bottom: 1px solid #2d3748; padding-bottom: 6px; }
+  .report h3 { font-size: 15px; color: #e2e8f0; margin: 16px 0 8px; }
+  .report p { color: #cbd5e0; line-height: 1.7; margin-bottom: 10px; font-size: 14px; }
+  .report ul { padding-left: 20px; margin-bottom: 12px; }
+  .report li { color: #cbd5e0; line-height: 1.7; font-size: 14px; margin-bottom: 4px; }
+  .report strong { color: #e2e8f0; }
+  .report a { color: #6366f1; }
+  .report ol { padding-left: 20px; margin-bottom: 12px; }
+
+  .metrics-bar {
+    display: flex;
+    gap: 24px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #2d3748;
+    flex-wrap: wrap;
+  }
+
+  .metric { text-align: center; }
+  .metric-val { font-size: 20px; font-weight: 700; color: #6366f1; }
+  .metric-lbl { font-size: 11px; color: #718096; margin-top: 2px; }
+
+  #error-box {
+    background: #2d1515;
+    border: 1px solid #7b2d2d;
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: #fc8181;
+    font-size: 13px;
+    display: none;
+    margin-bottom: 24px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" stroke="#6366f1" stroke-width="1.5"/>
+    <path d="M8 12h8M12 8v8" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+  <h1>Hermes Research Engine</h1>
+  <span>Multi-agent deep research</span>
+  <span class="badge" id="status-badge">● Online</span>
+</header>
+
+<main>
+  <div class="search-box">
+    <label>Ask a research question</label>
+    <div class="input-row">
+      <textarea id="question" placeholder="e.g. How does prompt caching reduce LLM inference costs?"></textarea>
+      <button id="submit" onclick="startResearch()">Research →</button>
+    </div>
+    <div class="examples">
+      <span class="example-chip" onclick="setQ('How do mixture-of-experts models reduce inference cost without sacrificing quality?')">MoE efficiency</span>
+      <span class="example-chip" onclick="setQ('What are the architectural differences between Mamba and Transformer attention?')">Mamba vs Transformers</span>
+      <span class="example-chip" onclick="setQ('How does speculative decoding achieve lower latency in LLM serving?')">Speculative decoding</span>
+      <span class="example-chip" onclick="setQ('What tradeoffs exist between RLHF, DPO, and RLAIF for LLM alignment?')">Alignment tradeoffs</span>
+      <span class="example-chip" onclick="setQ('How does the KV cache work and what are its memory scaling limitations?')">KV cache scaling</span>
+    </div>
+  </div>
+
+  <div id="error-box"></div>
+
+  <div id="activity">
+    <h3>Agent Activity</h3>
+    <div id="events"></div>
+  </div>
+
+  <div id="result-box">
+    <h2>Research Report</h2>
+    <div class="report" id="report"></div>
+    <div class="metrics-bar" id="metrics"></div>
+  </div>
+</main>
+
+<script>
+function setQ(q) {
+  document.getElementById('question').value = q;
+}
+
+function addEvent(icon, html) {
+  const div = document.createElement('div');
+  div.className = 'event-line';
+  div.innerHTML = `<span class="event-icon">${icon}</span><span class="event-text">${html}</span>`;
+  document.getElementById('events').appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth' });
+}
+
+function markdownToHtml(md) {
+  return md
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\* (.+)$/gm, '<li>$1</li>')
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/\[Source: (.+?)\]/g, '<span style="color:#6366f1;font-size:12px">[Source: $1]</span>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hul])(.+)$/gm, (m) => m.trim() ? m : '')
+    .replace(/<p><\/p>/g, '');
+}
+
+async function startResearch() {
+  const q = document.getElementById('question').value.trim();
+  if (!q) return;
+
+  // Reset UI
+  document.getElementById('submit').disabled = true;
+  document.getElementById('submit').textContent = 'Researching...';
+  document.getElementById('events').innerHTML = '';
+  document.getElementById('activity').style.display = 'block';
+  document.getElementById('result-box').style.display = 'none';
+  document.getElementById('error-box').style.display = 'none';
+
+  addEvent('<div class="spinner"></div>', `<strong>Starting research:</strong> ${q}`);
+
+  try {
+    const url = `/research/stream?question=${encodeURIComponent(q)}`;
+    const evtSource = new EventSource(url);
+
+    evtSource.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+
+      if (data.type === 'status') {
+        addEvent('⚡', data.msg);
+      } else if (data.type === 'decomposed') {
+        addEvent('🔀', `<strong>Decomposed into ${data.sub_questions.length} sub-questions:</strong><br>` +
+          data.sub_questions.map((sq, i) => `${i+1}. ${sq}`).join('<br>'));
+      } else if (data.type === 'worker_done') {
+        addEvent('✅', `Worker ${data.worker_idx + 1} completed: <em>${data.sub_q}</em>`);
+      } else if (data.type === 'thought') {
+        // skip verbose thoughts
+      } else if (data.type === 'tool_call') {
+        addEvent('🔧', `Tool call: <strong>${data.tool}</strong>`);
+      } else if (data.type === 'final_report') {
+        addEvent('📄', '<strong>Report generated</strong>');
+        document.getElementById('result-box').style.display = 'block';
+        document.getElementById('report').innerHTML = `<p>${markdownToHtml(data.content)}</p>`;
+        evtSource.close();
+        document.getElementById('submit').disabled = false;
+        document.getElementById('submit').textContent = 'Research →';
+      } else if (data.type === 'metrics') {
+        const m = data.data;
+        document.getElementById('metrics').innerHTML = `
+          <div class="metric"><div class="metric-val">${Math.round(m.wall_ms/1000)}s</div><div class="metric-lbl">Total time</div></div>
+          <div class="metric"><div class="metric-val">${m.llm_calls}</div><div class="metric-lbl">LLM calls</div></div>
+          <div class="metric"><div class="metric-val">${m.tool_calls}</div><div class="metric-lbl">Tool calls</div></div>
+          <div class="metric"><div class="metric-val">${(m.tokens_in/1000).toFixed(1)}k</div><div class="metric-lbl">Tokens in</div></div>
+          <div class="metric"><div class="metric-val">${(m.tokens_out/1000).toFixed(1)}k</div><div class="metric-lbl">Tokens out</div></div>
+        `;
+      } else if (data.type === 'error') {
+        showError(data.content);
+        evtSource.close();
+        document.getElementById('submit').disabled = false;
+        document.getElementById('submit').textContent = 'Research →';
+      }
+    };
+
+    evtSource.onerror = () => {
+      evtSource.close();
+      document.getElementById('submit').disabled = false;
+      document.getElementById('submit').textContent = 'Research →';
+    };
+
+  } catch (err) {
+    showError(err.message);
+    document.getElementById('submit').disabled = false;
+    document.getElementById('submit').textContent = 'Research →';
+  }
+}
+
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = '⚠ ' + msg;
+  box.style.display = 'block';
+}
+
+document.getElementById('question').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); startResearch(); }
+});
+
+// Check health
+fetch('/health').then(r => r.json()).then(d => {
+  document.getElementById('status-badge').textContent = `● ${d.model}`;
+}).catch(() => {
+  document.getElementById('status-badge').textContent = '● Offline';
+  document.getElementById('status-badge').style.color = '#fc8181';
+});
+</script>
+</body>
+</html>
