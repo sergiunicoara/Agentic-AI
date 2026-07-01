@@ -26,6 +26,7 @@ def run_sentinel(
     include_llm_auditor: bool = False,
     return_red_team: bool = False,
     sarif_output: str | None = None,
+    on_progress=None,
 ) -> Attestation:
     """
     Run a complete Sentinel security review on a target.
@@ -58,16 +59,32 @@ def run_sentinel(
     # Stage 1: Profile target and select skills
     if verbose:
         print("\n[Stage 1] Profiling target and selecting skills...")
+    if on_progress:
+        on_progress({
+            "type": "stage",
+            "stage": "profiling",
+            "message": "Profiling the target, selecting which security skills apply.",
+        })
     selected_skills = select_skills_for_target(target_path)
     if verbose:
         for skill_name in selected_skills:
             fm = load_skill_frontmatter(skill_name)
             print(f"  → Loaded skill: {fm.get('name', skill_name)}")
+    if on_progress:
+        on_progress({"type": "skills", "skills": list(selected_skills)})
 
     # Stage 2: Collect deterministic evidence
     if verbose:
         print("\n[Stage 2] Collecting deterministic evidence...")
+    if on_progress:
+        on_progress({
+            "type": "stage",
+            "stage": "evidence",
+            "message": "Four real tools running - bandit, ruff, pip-audit, semgrep. No LLM in this path.",
+        })
     evidence_list = collect_evidence(target_path)
+    if on_progress:
+        on_progress({"type": "evidence_done", "count": len(evidence_list)})
 
     # Stage 2b: Red team (optional — static surface match, and/or live execution)
     red_team_summary = None
@@ -93,43 +110,61 @@ def run_sentinel(
     # Stage 3: Run specialist auditors
     if verbose:
         print("\n[Stage 3] Running specialist auditors...")
+    if on_progress:
+        on_progress({"type": "stage", "stage": "auditors", "message": "Running specialist auditors..."})
     all_candidates = []
 
     if "prompt-injection-defense" in selected_skills:
         candidates = audit_for_injection(evidence_list)
         if verbose:
             print(f"  → InjectionAuditor: {len(candidates)} candidates")
+        if on_progress:
+            on_progress({"type": "auditor", "name": "InjectionAuditor", "candidates": len(candidates)})
         all_candidates.extend(candidates)
 
     if "confused-deputy-iam" in selected_skills:
         candidates = audit_for_privilege(evidence_list)
         if verbose:
             print(f"  → PrivilegeAuditor: {len(candidates)} candidates")
+        if on_progress:
+            on_progress({"type": "auditor", "name": "PrivilegeAuditor", "candidates": len(candidates)})
         all_candidates.extend(candidates)
 
     if "supply-chain-integrity" in selected_skills:
         candidates = audit_for_supply_chain(evidence_list)
         if verbose:
             print(f"  → SupplyChainAuditor: {len(candidates)} candidates")
+        if on_progress:
+            on_progress({"type": "auditor", "name": "SupplyChainAuditor", "candidates": len(candidates)})
         all_candidates.extend(candidates)
 
     if include_red_team or include_live_red_team:
         candidates = audit_for_redteam(evidence_list)
         if verbose:
             print(f"  → RedTeamAuditor: {len(candidates)} candidates")
+        if on_progress:
+            on_progress({"type": "auditor", "name": "RedTeamAuditor", "candidates": len(candidates)})
         all_candidates.extend(candidates)
 
     if include_llm_auditor:
         candidates = audit_with_llm(evidence_list, target_path)
         if verbose:
             print(f"  → LLMAuditor: {len(candidates)} candidates")
+        if on_progress:
+            on_progress({"type": "auditor", "name": "LLMAuditor", "candidates": len(candidates)})
         all_candidates.extend(candidates)
 
     # Stage 4: Adjudicate
     if verbose:
         print(f"\n[Stage 4] Adjudicating {len(all_candidates)} candidates...")
+    if on_progress:
+        on_progress({
+            "type": "stage",
+            "stage": "adjudicating",
+            "message": "Now the trust gate.",
+        })
     evidence_dicts = [ev.model_dump() for ev in evidence_list]
-    attestation = adjudicate(all_candidates, evidence_dicts, target_path)
+    attestation = adjudicate(all_candidates, evidence_dicts, target_path, on_progress=on_progress)
 
     if sarif_output:
         from sentinel.eval.sarif import write_sarif

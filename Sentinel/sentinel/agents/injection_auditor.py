@@ -12,17 +12,21 @@ Two evidence sources feed this auditor:
   that isn't a string literal) — this is the auditor's actual ceiling
   raise beyond bandit, not just a second detector for the same patterns.
 """
+import re
+
 from sentinel.models.schemas import Evidence
 
 
-# Bandit test IDs that indicate injection vulnerabilities
+# Bandit test IDs that indicate injection vulnerabilities.
+# The titles are intentionally short and demo-friendly because the live
+# dashboard shows them directly.
 INJECTION_TEST_IDS = {
-    "B307": ("eval() usage", "high", 3),
+    "B307": ("Unsafe eval() of user input", "high", 3),
     "B301": ("pickle usage", "high", 3),  # ADD THIS
     "B302": ("marshal usage", "high", 3),  # ADD THIS
     "B303": ("md5 usage", "med", 3),       # ADD THIS
     "B506": ("yaml load", "high", 3),      # ADD THIS
-    "B602": ("subprocess shell=True", "high", 3),
+    "B602": ("Shell injection via subprocess", "high", 3),
     "B603": ("subprocess without shell", "med", 3),
     "B604": ("function call with shell=True", "high", 3),
     "B605": ("os.system call", "high", 3),
@@ -38,8 +42,8 @@ INJECTION_TEST_IDS = {
 # detection method (pattern-based, not call-blacklist-based).
 SEMGREP_INJECTION_PATTERNS = {
     "ssrf": ("Server-Side Request Forgery (SSRF)", "high", 3),
-    "eval-detected": ("eval() usage", "high", 3),
-    "subprocess-shell-true": ("subprocess shell=True", "high", 3),
+    "eval-detected": ("Unsafe eval() of user input", "high", 3),
+    "subprocess-shell-true": ("Shell injection via subprocess", "high", 3),
     "sql-injection": ("SQL injection", "high", 4),
 }
 
@@ -57,18 +61,34 @@ def audit_for_injection(evidence_list: list[Evidence]) -> list[dict]:
     """
     candidates = []
 
+    def _merge_or_add(candidate: dict) -> None:
+        """Merge duplicate findings reported for the same issue site."""
+        for existing in candidates:
+            if existing["finding_id"] != candidate["finding_id"]:
+                continue
+            merged_ids = list(dict.fromkeys(existing["evidence_ids"] + candidate["evidence_ids"]))
+            existing["evidence_ids"] = merged_ids
+            # Keep the first rationale/remediation so the display remains stable.
+            return
+        candidates.append(candidate)
+
+    def _finding_id(ev: Evidence, title: str) -> str:
+        """Build a stable ID from the issue site and title."""
+        slug = re.sub(r"[^a-z0-9]+", "_", f"{ev.locator}_{title}".lower()).strip("_")
+        return f"inj_{slug}"
+
     for ev in evidence_list:
         if ev.source == "bandit":
             test_id = ev.raw.get("test_id")
             if test_id not in INJECTION_TEST_IDS:
                 continue
             title, severity, pillar = INJECTION_TEST_IDS[test_id]
-            candidates.append({
-                "finding_id": f"inj_{ev.evidence_id}",
+            _merge_or_add({
+                "finding_id": _finding_id(ev, title),
                 "pillar": pillar,
                 "severity": severity,
                 "confidence": 0.95,
-                "title": f"Code Injection Risk: {title}",
+                "title": title,
                 "rationale": (
                     f"Bandit detected {test_id} ({ev.raw.get('issue_text', '')}) "
                     f"at {ev.locator}. This creates a code injection surface "
@@ -88,12 +108,12 @@ def audit_for_injection(evidence_list: list[Evidence]) -> list[dict]:
             if match is None:
                 continue
             title, severity, pillar = match
-            candidates.append({
-                "finding_id": f"inj_{ev.evidence_id}",
+            _merge_or_add({
+                "finding_id": _finding_id(ev, title),
                 "pillar": pillar,
                 "severity": severity,
                 "confidence": 0.9,
-                "title": f"Code Injection Risk: {title}",
+                "title": title,
                 "rationale": (
                     f"Semgrep detected {check_id} at {ev.locator}: "
                     f"{ev.raw.get('message', '')[:200]}"

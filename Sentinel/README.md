@@ -38,14 +38,14 @@ This eliminates hallucinated security findings structurally — not by asking th
 |---|---|---|---|
 | T1 — Injection | 2 | 2 | 0 |
 | T2 — Privilege Leak | 3 | 2 | **1** |
-| T3 — Secret Leak | 4 | 4 | 0 |
+| T3 — Secret Leak | 4 | 3 | **1** |
 | T4 — SQL Injection | 2 | 2 | 0 |
 | T5 — Unsafe Deserial | 3 | 3 | 0 |
 | T6 — SSRF | 4 | 3 | **1** |
 | C1 / C2 — Clean | 0 | 0 | 0 |
-| **Total** | **18** | **16** | **2** |
+| **Total** | **18** | **15** | **3** |
 
-The 2 drops weren't fabricated evidence — Gemini cited real evidence both times. It wrote `severity: "medium"` instead of the schema's required literal `"med"`, and the Adjudicator rejected the candidate outright (Pydantic schema validation, not just the evidence check). That's arguably a *better* demonstration than a clean hallucination: it shows the gate enforces the **entire** Finding contract, not just the evidence_id field, and that even a well-instructed model drifts on exact-string requirements often enough that structural validation — not prompting — is what should be trusted. For the harder, deliberately-adversarial case (a candidate that cites a *fabricated* `evidence_id`), see the mocked, offline-reproducible proof in `tests/test_llm_auditor.py::test_llm_hallucinated_evidence_id_is_dropped_by_gate` and `tests/test_adjudicator.py::test_finding_with_fake_evidence_id_is_dropped`.
+The 3 drops weren't fabricated evidence — Gemini cited real evidence all three times. Each wrote `severity: "medium"` instead of the schema's required literal `"med"`, and the Adjudicator rejected the candidate outright (Pydantic schema validation, not just the evidence check). That's arguably a *better* demonstration than a clean hallucination: it shows the gate enforces the **entire** Finding contract, not just the evidence_id field, and that even a well-instructed model drifts on exact-string requirements often enough that structural validation — not prompting — is what should be trusted. For the harder, deliberately-adversarial case (a candidate that cites a *fabricated* `evidence_id`), see the mocked, offline-reproducible proof in `tests/test_llm_auditor.py::test_llm_hallucinated_evidence_id_is_dropped_by_gate` and `tests/test_adjudicator.py::test_finding_with_fake_evidence_id_is_dropped`.
 
 ---
 
@@ -54,10 +54,10 @@ The 2 drops weren't fabricated evidence — Gemini cited real evidence both time
 | Metric | Value |
 |---|---|
 | Target detection rate | **100%** (6/6 vulnerable targets detected, including a bandit blind spot) |
-| LLM-auditor evidence survival rate (live, measured) | **89%** (16/18 candidates; the 2 dropped were schema violations, not hallucinated evidence) |
+| LLM-auditor evidence survival rate (live, measured) | **83%** (15/18 candidates; the 3 dropped were schema violations, not hallucinated evidence) |
 | Hallucinated-finding rate on clean controls | **0%** |
 | False positives on clean controls | **0** (C1 and C2 both pass with zero findings) |
-| Tests passing | **74** |
+| Tests passing | **75** |
 | Course concepts demonstrated | **5** (3 required minimum) |
 
 ---
@@ -152,7 +152,7 @@ The rubric requires demonstrating **at least 3** of these. Sentinel demonstrates
 | Target | Seeded Vulnerability | Caught By | Detected | Verdict |
 |---|---|---|---|---|
 | T1 | eval() + subprocess shell=True | bandit + semgrep | ✅ | FAIL |
-| T2 | Hardcoded API key/password | bandit | ✅ | FAIL |
+| T2 | Hardcoded credentials + SSRF (unvalidated URL) | bandit + semgrep | ✅ | FAIL |
 | T3 | Hardcoded secrets/credentials | bandit + semgrep (gitleaks) | ✅ | FAIL |
 | T4 | SQL injection via string concat | bandit | ✅ | FAIL |
 | T5 | pickle deserialization + subprocess | bandit | ✅ | FAIL |
@@ -192,6 +192,10 @@ uv pip install -r requirements.txt
 gcloud auth application-default login
 ```
 
+For Cloud Run deployment, `deploy/deploy.sh` also needs an active gcloud account.
+Use `gcloud auth login` in an interactive shell, or set `GOOGLE_APPLICATION_CREDENTIALS`
+to a service-account key file for headless runs.
+
 ### Environment
 
 Create `.env` in the `Sentinel/` folder:
@@ -227,7 +231,8 @@ python -m sentinel.eval.runner
 ### Run the LLM gate report (the quantified "proposed vs. survived" table above)
 
 ```bash
-python -m sentinel.eval.llm_gate_report   # requires Vertex AI credentials
+python -m sentinel.eval.llm_gate_report   # auto-falls back to the recorded demo table if live LLM access is unavailable
+python -m sentinel.eval.llm_gate_report --mode live   # force live Vertex AI usage
 ```
 
 ### Run tests
@@ -249,13 +254,21 @@ python -m sentinel.pipeline targets/t1_injection --llm-auditor   # requires Vert
 
 Exits non-zero when the verdict meets `--fail-on` (default `fail`) — wire this into a CI security gate.
 
-### Start the A2A server
+### Start the A2A server + live dashboard
 
 ```bash
 python -m sentinel.a2a.server
 ```
 
-Agent card available at: `http://localhost:8080/.well-known/agent-card.json`
+Agent card: `http://localhost:8080/.well-known/agent-card.json`
+
+**Live dashboard (local dev):**
+```bash
+cd sentinel/dashboard && npm install && npm run dev
+# → open http://localhost:5173
+```
+
+The dashboard connects via WebSocket (`/ws/scan`) and streams every pipeline stage in real time — evidence collected, candidates proposed per auditor, and each gate decision (SURVIVED / DROPPED) as it happens. When deployed, the React build is served from the same container at `/ui`.
 
 Set `SENTINEL_A2A_TOKEN` to require `Authorization: Bearer <token>` on review endpoints (unset by default for local demo use).
 
@@ -274,11 +287,11 @@ Sentinel/
 │   ├── skills/             # 3 SKILL.md domain expertise modules
 │   ├── redteam/            # 8-payload corpus + static runner + sandboxed live runner
 │   ├── a2a/                # Agent card, A2A server (optional auth + TTL eviction), A2A client
+│   ├── dashboard/          # React/Vite live dashboard — WebSocket feed of gate decisions
 │   └── eval/               # Eval runner + metrics + SARIF export + LLM gate report
 ├── targets/                # Planted-bug corpus (T1–T6, C1, C2 — T6 is bandit's blind spot)
-├── tests/                  # 74 tests across all components
-├── deploy/                 # Dockerfile + Cloud Run deploy script
-├── hello_agent/            # ADK hello-world (setup verification)
+├── tests/                  # 75 tests across all components
+├── deploy/                 # Multi-stage Dockerfile (Node → Python) + Cloud Run deploy script
 ├── requirements.txt
 ├── pyproject.toml
 └── .env                    # Not committed — see Environment section above
@@ -294,6 +307,9 @@ Run from the `Sentinel/` repo root (the script resolves the build context itself
 chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
+
+If the shell has no active gcloud account, the script will stop with a message
+unless `GOOGLE_APPLICATION_CREDENTIALS` points to a valid service-account key.
 
 Or manually — note `-f deploy/Dockerfile` with the **repo root** as the build context, so `requirements.txt` and the `sentinel/` package are included (and `.dockerignore` keeps `.env` out of the image):
 

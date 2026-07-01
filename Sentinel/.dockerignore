@@ -24,6 +24,10 @@ venv/
 tests/
 README.md
 
+# Dashboard build artifacts (built inside Docker, not from host)
+sentinel/dashboard/node_modules/
+sentinel/dashboard/dist/
+
 # Local scratch
 *.sarif.json
 *.log

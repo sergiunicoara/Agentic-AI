@@ -19,6 +19,7 @@ def adjudicate(
     candidate_findings: list[dict],
     evidence_store: list[dict],
     target_path: str,
+    on_progress=None,
 ) -> Attestation:
     """
     The trust gate. Takes raw candidate findings from LLM auditors
@@ -57,19 +58,24 @@ def adjudicate(
         # Drop if no evidence_ids at all
         if not evidence_ids:
             dropped_count += 1
-            dropped_reasons.append(
-                f"DROPPED: '{candidate.get('title', 'unknown')}' — no evidence_ids"
-            )
+            title = candidate.get("title", "unknown")
+            dropped_reasons.append(f"DROPPED: '{title}' — no evidence_ids")
+            if on_progress:
+                on_progress({"type": "gate_decision", "decision": "DROPPED",
+                             "title": title, "reason": "no evidence_ids"})
             continue
 
         # Drop if evidence_ids don't match any real evidence
         valid_refs = [eid for eid in evidence_ids if eid in valid_evidence_ids]
         if not valid_refs:
             dropped_count += 1
+            title = candidate.get("title", "unknown")
             dropped_reasons.append(
-                f"DROPPED: '{candidate.get('title', 'unknown')}' "
-                f"— evidence_ids {evidence_ids} not in evidence store"
+                f"DROPPED: '{title}' — evidence_ids {evidence_ids} not in evidence store"
             )
+            if on_progress:
+                on_progress({"type": "gate_decision", "decision": "DROPPED",
+                             "title": title, "reason": f"evidence_ids not in store: {evidence_ids}"})
             continue
 
         # Only keep valid evidence references
@@ -79,12 +85,21 @@ def adjudicate(
         try:
             finding = Finding(**candidate)
             surviving_findings.append(finding)
+            if on_progress:
+                on_progress({"type": "gate_decision", "decision": "SURVIVED",
+                             "title": finding.title, "severity": finding.severity,
+                             "evidence_ids": finding.evidence_ids})
         except ValidationError as e:
             dropped_count += 1
+            reason = str(e)
             dropped_reasons.append(
                 f"DROPPED: '{candidate.get('title', 'unknown')}' "
                 f"— schema validation failed: {e}"
             )
+            if on_progress:
+                on_progress({"type": "gate_decision", "decision": "DROPPED",
+                             "title": candidate.get("title", "unknown"),
+                             "reason": f"schema validation failed: {reason[:120]}"})
 
     # Determine verdict
     if not surviving_findings:
@@ -102,6 +117,15 @@ def adjudicate(
         signature=f"sentinel-{uuid.uuid4().hex[:8]}",
         audit_ref=f"audit-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
     )
+
+    if on_progress:
+        on_progress({"type": "complete", "verdict": verdict,
+                     "findings_count": len(surviving_findings),
+                     "dropped_count": dropped_count,
+                     "findings": [{"title": f.title, "severity": f.severity,
+                                   "pillar": f.pillar, "evidence_ids": f.evidence_ids,
+                                   "remediation": f.remediation}
+                                  for f in surviving_findings]})
 
     # Print gate report (this is what you show in the demo)
     print("\n" + "="*60)

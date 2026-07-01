@@ -31,6 +31,7 @@ yarn-error.log*
 # Logs and debug info
 *.log
 logs/
+CUsersSergiuAppDataRoaminggcloud/
 
 # Build and distribution files
 dist/

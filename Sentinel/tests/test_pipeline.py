@@ -8,7 +8,11 @@ def test_pipeline_finds_issues_in_t1():
     """Full pipeline on T1 must return fail verdict with findings."""
     attestation = run_sentinel("targets/t1_injection", verbose=False)
     assert attestation.verdict == "fail"
-    assert len(attestation.findings) > 0
+    assert len(attestation.findings) == 2
+    assert [f.title for f in attestation.findings] == [
+        "Unsafe eval() of user input",
+        "Shell injection via subprocess",
+    ]
     # Every finding must have evidence
     for f in attestation.findings:
         assert len(f.evidence_ids) > 0

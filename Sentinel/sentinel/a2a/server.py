@@ -9,6 +9,7 @@ Other agents can:
 
 Run with: python -m sentinel.a2a.server
 """
+import asyncio
 import os
 import sys
 import uuid
@@ -17,13 +18,27 @@ from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from fastapi import FastAPI, BackgroundTasks, Depends, Header, HTTPException
+from fastapi import FastAPI, BackgroundTasks, Depends, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sentinel.a2a.agent_card import AGENT_CARD
 from sentinel.pipeline import run_sentinel
 
 app = FastAPI(title="Sentinel A2A Server")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve the React dashboard from /ui if the build exists (local dev or container).
+_DASHBOARD_DIST = Path(__file__).parent.parent / "dashboard" / "dist"
+if _DASHBOARD_DIST.exists():
+    app.mount("/ui", StaticFiles(directory=str(_DASHBOARD_DIST), html=True), name="dashboard")
 
 # In-memory task store (sufficient for demo). Entries older than
 # SENTINEL_TASK_TTL_SECONDS are purged lazily on each submission so the
@@ -158,6 +173,52 @@ def _run_review_task(task_id: str, target_path: str, include_red_team: bool):
     except Exception as e:
         tasks[task_id]["status"] = "failed"
         tasks[task_id]["result"] = {"error": str(e)}
+
+
+@app.websocket("/ws/scan")
+async def ws_scan(websocket: WebSocket):
+    """
+    WebSocket endpoint for the live dashboard.
+    Client sends: {"target_path": "...", "include_red_team": bool, "include_llm_auditor": bool}
+    Server streams progress events as JSON until the scan completes.
+    """
+    await websocket.accept()
+    try:
+        data = await websocket.receive_json()
+    except WebSocketDisconnect:
+        return
+
+    loop = asyncio.get_event_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def on_progress(event: dict):
+        loop.call_soon_threadsafe(queue.put_nowait, event)
+
+    async def _run():
+        try:
+            await loop.run_in_executor(None, lambda: run_sentinel(
+                data.get("target_path", ""),
+                verbose=False,
+                include_red_team=data.get("include_red_team", False),
+                include_llm_auditor=data.get("include_llm_auditor", False),
+                on_progress=on_progress,
+            ))
+        except Exception as e:
+            loop.call_soon_threadsafe(queue.put_nowait,
+                                      {"type": "error", "message": str(e)})
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel = done
+
+    asyncio.create_task(_run())
+
+    try:
+        while True:
+            event = await queue.get()
+            if event is None:
+                break
+            await websocket.send_json(event)
+    except WebSocketDisconnect:
+        pass
 
 
 if __name__ == "__main__":

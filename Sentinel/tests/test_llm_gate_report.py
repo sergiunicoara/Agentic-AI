@@ -74,8 +74,19 @@ def test_report_handles_no_credentials_gracefully():
     """If the model call fails everywhere, the report must not crash —
     every row degrades to proposed=0."""
     with patch("google.genai.Client", side_effect=RuntimeError("no credentials")):
-        report = run_llm_gate_report()
+        report = run_llm_gate_report(mode="live")
 
     assert report["total_proposed"] == 0
     assert report["total_survived"] == 0
     assert report["survival_rate"] is None
+
+
+def test_report_auto_falls_back_to_demo_replay_when_live_is_empty():
+    """Auto mode should replay the recorded demo table when live is unavailable."""
+    with patch("google.genai.Client", side_effect=RuntimeError("no credentials")):
+        report = run_llm_gate_report()
+
+    assert report["mode"] == "demo"
+    assert report["total_proposed"] == 18
+    assert report["total_survived"] == 15
+    assert report["total_unsupported"] == 3
