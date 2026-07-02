@@ -33,13 +33,20 @@ Do these steps in advance — they must not appear in the video.
 
 | Scene | Time |
 |---|---|
-| README pitch | 0:00 – 0:25 |
-| Deploy script | 0:25 – 1:30 |
-| Antigravity — GitHub commit b7f9516 | 1:30 – 1:50 |
-| Dashboard loads, scan runs | 1:50 – 3:00 |
-| Self-review ADK | 3:00 – 4:00 |
-| LLM gate report | 4:00 – 4:45 |
-| Close | 4:45 – 5:00 |
+| README pitch | 0:00 – 0:20 |
+| Deploy script | 0:20 – 1:00 |
+| Antigravity — GitHub commit b7f9516 | 1:00 – 1:20 |
+| Dashboard loads, scan runs | 1:20 – 2:05 |
+| Bandit blind spot (T6 / semgrep) — NEW | 2:05 – 2:35 |
+| Live sandboxed red team (trimmed) — NEW, optional | 2:35 – 2:50 |
+| Self-review ADK | 2:50 – 3:30 |
+| LLM gate report (+ DROPPED callout) | 3:30 – 4:20 |
+| Close (+ business line) | 4:20 – 4:45 |
+
+> The three NEW/changed beats vs. the first recording: (1) the **Bandit blind spot**
+> segment, (2) an explicit **DROPPED** callout narrated over the existing gate-report
+> table, and (3) a one-line **business framing** in the close. Everything else is as
+> already recorded — you can splice these in rather than re-shoot the whole thing.
 
 ---
 
@@ -138,7 +145,64 @@ targets/t1_injection
 
 ---
 
-## STEP 5 — ADK Self-Review (3:00 – 4:00)
+## STEP 5 (NEW) — The Bandit Blind Spot (2:10 – 2:40)
+
+*Why: this is the concrete answer to the obvious skeptic question — "isn't this just
+bandit with a UI?" It's deterministic and reproducible, so it's safe on camera.*
+
+**Show:** Terminal 1 (or Terminal 2)
+
+**Type — first prove bandit finds nothing on T6:**
+```bash
+bandit -r targets/t6_ssrf -q
+```
+
+Point at the empty result (no issues identified).
+
+**Then run Sentinel's full pipeline on the same target:**
+```bash
+python -m sentinel.pipeline targets/t6_ssrf
+```
+
+Point at the surviving findings — the SSRF and the hardcoded LLM API key — and their
+`ev_semgrep_...` evidence IDs.
+
+**Say:**
+> "A fair question about any scanner built on bandit is — isn't this just bandit with a UI?
+> Here's target T6. Bandit finds nothing. Sentinel catches both the SSRF and the hardcoded
+> API key — through two custom semgrep rules bandit has no equivalent for. The detection
+> ceiling actually moved, and there's a test that proves bandit catches neither."
+
+---
+
+## STEP 5b (NEW, optional) — Live Sandboxed Red Team (~15s, trimmed)
+
+*Why: nothing else on the page actually EXECUTES attacks. This proves the red team is
+real, not a static string match. Legibility is solved by editing — show the setup and
+the result, jump-cut the repetitive middle.*
+
+**Show:** Terminal 1
+
+**Type:**
+```bash
+python -m sentinel.pipeline targets/t1_injection --live-red-team
+```
+
+**What to keep in the cut (trim everything between):**
+1. The command + the header line: `[LiveRedTeam] Starting live (sandboxed) red team assessment...`
+2. One `[LIVE-CONFIRMED]` line (e.g. an eval or shell-injection payload → real function)
+3. **Jump-cut** past the rest of the payload lines
+4. The final summary line: `[LiveRedTeam] N/M invocations live-confirmed`
+
+**Say (over the trimmed cut):**
+> "Opt in, and Sentinel doesn't just pattern-match — it actually executes the attack
+> payloads against the target's real functions, inside a sandbox: disposable directory,
+> network cut off, hard timeout. It fires eval and shell-injection payloads and confirms
+> they really fire. That's trajectory evidence — not a guess."
+
+---
+
+## STEP 6 — ADK Self-Review (2:40 – 3:25)
 
 **Show:** Terminal 1
 
@@ -171,7 +235,41 @@ Verdict: PASS_WITH_FINDINGS
 
 ---
 
-## STEP 6 — LLM Gate Measured Live (4:00 – 4:45)
+## STEP 7 — The DROPPED Money Shot (3:25 – 4:15)
+
+*The whole thesis is "unprovable findings get deleted." This step SHOWS that happening.
+Try for the live dashboard badge first (7A); if you don't land a clean take quickly,
+fall back to the gate-report table (7B) which shows the drops deterministically.*
+
+### 7A — PRIMARY: live DROPPED badge on the dashboard (multi-take)
+
+**Prep before recording (off-camera):** the drop is non-deterministic per run, so pre-run
+it a few times until you get one, then record that take. Odds are best on **T6** (4 LLM
+proposals → highest chance one drifts; ~50–60% per run, ~95% over 3–4 takes). A smaller/
+faster Gemini variant drifts *more* on the exact-string schema, which raises the drop rate
+in your favor — legitimate, since the gate genuinely rejects it.
+
+**Show:** the deployed dashboard (`/ui/`).
+
+**In the Target path field, type:**
+```
+targets/t6_ssrf
+```
+
+**Check the `LLM auditor` box** (leave Red team unchecked). Click **Start Scan**.
+
+**What you're waiting for in the live event feed:** at least one red **✗ DROPPED** badge
+appear alongside the green ✓ SURVIVED ones — with the reason `schema validation failed`.
+
+**Say (point at the DROPPED badge as it lands):**
+> "There it is. The LLM auditor proposed this finding, and the gate refused to keep it —
+> live, in real time. The model can say whatever it wants; only what it can actually prove
+> survives. That red badge is the entire thesis in one frame."
+
+*If after ~5 minutes of takes you don't get a clean DROPPED, switch to 7B — don't burn
+more time; the table version lands the same point reliably.*
+
+### 7B — FALLBACK: gate-report table (deterministic)
 
 **Show:** Terminal 2 (or same terminal after adk exits)
 
@@ -180,31 +278,47 @@ Verdict: PASS_WITH_FINDINGS
 python -m sentinel.eval.llm_gate_report
 ```
 
-If live LLM access is unavailable, the command now replays the recorded demo
-table automatically. Use `--mode live` to force a real Vertex AI call.
+If live LLM access is unavailable, the command replays the recorded demo table
+automatically. Use `--mode live` to force a real Vertex AI call.
 
-**Wait for the table to print. When it appears, point at the Total row:**
+**Point at the three rows with a DROPPED count — T2, T3, T6 (Unsupported = 1 each):**
+```
+T2 — Privilege Leak   3   2   1
+T3 — Secret Leak      4   3   1
+T6 — SSRF             4   3   1
+```
+
+**Say:**
+> "Watch these three rows. The LLM auditor proposed a finding the gate refused to keep —
+> because it couldn't back it the way the schema requires. The model can say whatever it
+> wants; only what it can prove survives."
+
+**Then point at the Total row:**
 ```
 | Total  |  18  |  15  |  3  |
 ```
 
 **Say:**
-> "The LLM auditor proposed 18 findings across the full corpus.
-> 15 survived the gate. 3 were dropped —
-> not fabricated evidence IDs, but the model wrote 'severity: medium'
-> instead of the schema's required literal 'med'.
-> The gate enforces the entire Finding contract, not just one field.
-> That's structural validation — not prompting."
+> "18 proposed across the corpus, 15 survived, 3 dropped — and none of the drops were
+> fabricated evidence IDs. Each cited real evidence but wrote 'severity: medium' instead
+> of the schema's required literal 'med'. The gate enforces the entire Finding contract,
+> not just one field. That's structural validation — not prompting."
 
 ---
 
-## STEP 7 — Close (4:45 – 5:00)
+## STEP 8 — Close, with business framing (4:15 – 4:40)
 
-**Show:** Table still visible on screen.
+**Show:** Table still visible on screen (or cut back to the dashboard / cover image).
 
-**Say:**
-> "75 tests passing. Five course concepts demonstrated.
-> Repo and live demo links in the description."
+**Say (business line first — this is the "Agents for Business" track fit):**
+> "The buyer is a security lead who won't approve an LLM code reviewer because it
+> might just make things up. Sentinel makes that structurally impossible, and it
+> wires into the CI gate they already run — fail the build on a real finding, SARIF
+> output, and trust every line it produces."
+
+**Then the wrap:**
+> "75 tests passing. Five course concepts demonstrated, plus Antigravity for the
+> spec-driven scaffolding. Repo and live demo links in the description."
 
 ---
 

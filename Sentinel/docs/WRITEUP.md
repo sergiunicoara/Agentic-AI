@@ -13,6 +13,14 @@ A multi-agent system that reviews AI agents for security flaws — where every f
 
 ---
 
+## Links
+
+- **Live dashboard (deployed on Cloud Run):** https://sentinel-969006882005.us-central1.run.app/ui/
+- **GitHub repository:** https://github.com/sergiunicoara/Agentic-AI/tree/main/Sentinel
+- **Demo video:** _(add YouTube link here before submitting)_
+
+---
+
 ## The Problem
 
 Vibe coding lets anyone ship an AI agent in an afternoon. It also lets anyone ship one with `eval()` on user input, a hardcoded API key, or a tool that fetches whatever URL it's handed. These aren't exotic bugs — they're the default outcome of moving fast without a security review step, because nobody pairs "build an agent quickly" with "review the agent's security."
@@ -57,7 +65,7 @@ Between Scope and Attestation, the pipeline is plain functions: an **Evidence Ag
 - **Agent Skills:** three composable `SKILL.md` modules (prompt-injection-defense, confused-deputy-iam, supply-chain-integrity) loaded progressively — front-matter first to decide relevance, full content only when a skill activates for a given scan.
 - **Security features:** the project's entire premise — the evidence gate, plus a genuinely sandboxed live red-team execution mode, are themselves the security feature, not an add-on.
 - **Deployability:** multi-stage `deploy/Dockerfile` (Node builds React dashboard → Python runtime) + `deploy/deploy.sh` → Cloud Run, shown in the demo video. A live WebSocket dashboard (`sentinel/dashboard/`, React/Vite) is served from the same container at `/ui` — streaming every pipeline stage and gate decision (SURVIVED / DROPPED) in real time.
-- *(Bonus, beyond the five above:* A2A agent-card + HTTP API with optional bearer auth and task-TTL eviction, SARIF/CI-gate export.)*
+- *(Bonus, beyond the five above:* A2A agent-card + HTTP API with optional bearer auth and task-TTL eviction, SARIF/CI-gate export, and spec-driven scaffolding in **Antigravity** — one specification generated the initial 27-file skeleton in a single commit, shown in the demo video.)*
 
 ## Results
 
@@ -77,10 +85,10 @@ The buyer is an engineering or security lead who already runs bandit/semgrep in 
 
 ## The Build
 
-Built iteratively over several "days" of work (see commit history: MCP evidence server → Skills + Adjudicator → full pipeline → red team + auditors → A2A + HITL → eval corpus → deployment hardening → live red-team sandboxing + semgrep + live gate measurement). Each stage added a course concept and a test suite; nothing shipped without `pytest` passing. Along the way, real bugs surfaced and got fixed rather than worked around: a genuine PyPI dependency conflict between `semgrep` and `fastmcp` (resolved by pinning the one `fastmcp` version whose `mcp` range still includes semgrep's exact pin); a Docker build-context mismatch that would have broken deployment and, if fixed naively, leaked `.env` into the image (fixed with a `.dockerignore` written *before* the context fix landed); an async FastAPI background task that called blocking scans synchronously, stalling the event loop; and a `semgrep` failure mode where one unreachable registry pack silently zeroed out the project's own offline-capable rules.
+The project started spec-driven in **Antigravity**: a single specification scaffolded the initial 27-file skeleton — schemas, agent stubs, Skills, and the first passing tests — in one commit (`b7f9516`), and the rest was built iteratively from there. Built over several "days" of work (see commit history: MCP evidence server → Skills + Adjudicator → full pipeline → red team + auditors → A2A + HITL → eval corpus → deployment hardening → live red-team sandboxing + semgrep + live gate measurement). Each stage added a course concept and a test suite; nothing shipped without `pytest` passing. Along the way, real bugs surfaced and got fixed rather than worked around: a genuine PyPI dependency conflict between `semgrep` and `fastmcp` (resolved by pinning the one `fastmcp` version whose `mcp` range still includes semgrep's exact pin); a Docker build-context mismatch that would have broken deployment and, if fixed naively, leaked `.env` into the image (fixed with a `.dockerignore` written *before* the context fix landed); an async FastAPI background task that called blocking scans synchronously, stalling the event loop; and a `semgrep` failure mode where one unreachable registry pack silently zeroed out the project's own offline-capable rules.
 
 No API keys or secrets are in this repository. Authentication uses Google Cloud Application Default Credentials; `.env` is gitignored and the Docker build explicitly excludes it.
 
 ---
 
-*(Word count of body above: ~1,530 — under the 2,500 limit, leaving room for screenshots/output excerpts inline if the Kaggle editor format benefits from them.)*
+*(Word count of body above: ~1,600 — under the 2,500 limit, leaving room for screenshots/output excerpts inline if the Kaggle editor format benefits from them.)*
