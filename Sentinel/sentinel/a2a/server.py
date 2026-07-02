@@ -211,9 +211,21 @@ async def ws_scan(websocket: WebSocket):
 
     asyncio.create_task(_run())
 
+    # Cloud Run's front end (and some dev proxies) silently close a
+    # WebSocket that carries no bytes for ~30s, regardless of the app's
+    # own request timeout. Long-running stages (pip-audit querying an
+    # advisory DB per dependency, semgrep on a cold cache) can go quiet
+    # for well over that — so send a heartbeat on any gap longer than
+    # HEARTBEAT_INTERVAL to keep the connection demonstrably alive
+    # without changing the actual event stream the dashboard renders.
+    HEARTBEAT_INTERVAL = 10  # seconds
     try:
         while True:
-            event = await queue.get()
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_INTERVAL)
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "heartbeat"})
+                continue
             if event is None:
                 break
             await websocket.send_json(event)

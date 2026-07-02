@@ -131,6 +131,7 @@ export default function App() {
 
     ws.onmessage = ({ data }) => {
       const ev = JSON.parse(data)
+      if (ev.type === 'heartbeat') return  // keep-alive only, not shown in the feed
       if (ev.type === 'complete') {
         setVerdict(ev)
         setScanning(false)
