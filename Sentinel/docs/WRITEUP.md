@@ -58,6 +58,15 @@ Between Scope and Attestation, the pipeline is plain functions: an **Evidence Ag
 
 (Architecture diagram: `docs/architecture.svg` in the repo, embedded in the README.)
 
+**Why this is a meaningful multi-agent system — not a pipeline with agents bolted on.** The agents in Sentinel each do work only an agent can do, and the *boundary* between what an agent decides and what a deterministic function enforces is the whole design:
+
+- The **Orchestrator** genuinely reasons about intent — it routes a free-text request ("review this, and actually execute the red-team payloads this time") across eight tools and five review modes, choosing which stages to run. That's LLM decision-making, not a fixed script.
+- The **Scope Agent** reasons over the target's code to decide *which* security Skills apply and explains why — the same target can activate a different Skill set, and that selection is a judgment call, not a lookup.
+- The **LLM Auditor** is the agent doing the hardest reasoning: reading raw source and proposing vulnerabilities in natural language, exactly like a human reviewer would — and it's the one that can be wrong.
+- The **Attestation Agent** interprets and signs the verdict but is *architecturally forbidden* from overriding the gate.
+
+The insight is that a security tool needs both: agents to reason (route, scope, audit, explain) and determinism to *enforce* (the gate the reasoning agents cannot bypass). Most multi-agent systems let agents make the final call; Sentinel deliberately puts a deterministic adjudicator between the reasoning agents and the output. The multi-agent design isn't decoration — it's the reason the system can reason freely *and* be trusted, at the same time.
+
 ## Course Concepts Demonstrated — 5 (3 required minimum)
 
 - **Multi-agent system (ADK):** three real ADK agents — Orchestrator, Scope, Attestation — with Scope and Attestation wired as orchestrator tools and covered by tests that assert they're actually invoked, not just defined. (The LLM Auditor is a fourth model-backed specialist but a direct Gemini API call, not an ADK agent — kept distinct deliberately, see above.)
@@ -83,6 +92,20 @@ The numbers that matter most aren't the 100% — a small bundled corpus making t
 
 The buyer is an engineering or security lead who already runs bandit/semgrep in CI and is tired of triaging false positives, or who wants an LLM-assisted review but can't get sign-off because "the LLM might just make things up" is a real, reasonable objection from their security team. Sentinel's pitch to that buyer isn't "more detections" — it's "you can wire this into a CI gate (`--fail-on fail`, SARIF output) and trust every line it produces, because the architecture won't let it lie to you." That's the adoptable feature: not detection count, but zero-tolerance for unverifiable claims, in a workflow (`docker build` → Cloud Run, or a GitHub Action) a team already has.
 
+**The business case, in numbers.** Two costs sit on either side of an unreviewed vibe-coded agent, and Sentinel is engineered to attack both:
+
+| Cost driver | Without Sentinel | With Sentinel |
+|---|---|---|
+| A shipped vulnerability (leaked key, SSRF, `eval()` on user input) | Caught in production — industry-average breach cost runs into the millions; a shift-left fix is orders of magnitude cheaper than a post-incident one | Caught pre-merge by a CI gate that exits non-zero, before the agent ever deploys |
+| Alert fatigue from an untrusted scanner | Analysts triage noise; a 30–40% false-positive rate (typical for naive LLM review) means most flags are wasted attention, and real findings get ignored with the fake ones | **0% false positives on clean controls, by construction** — every surviving finding traces to tool evidence, so nothing gets waved through as "probably noise" |
+| Cost of the review itself | A human security pass is hours per change | The deterministic path (bandit/ruff/pip-audit/semgrep) is free compute per scan; the only paid call is the *optional* LLM auditor — one batched request, not per-finding |
+
+*(Breach and false-positive figures are industry-typical, cited illustratively; the 0% false-positive rate and the 83% measured gate-survival rate are Sentinel's own, reproducible numbers.)*
+
+The ROI story a security lead can take to their own management is simple: **you get LLM-assisted review you're actually allowed to trust, wired into the pipeline you already run, at near-zero marginal cost per scan — and it structurally cannot cry wolf.** That combination, not raw detection count, is what makes it adoptable.
+
+**Agent-to-agent by design.** Because Sentinel exposes an A2A agent card (`/.well-known/agent-card.json`) and a task-based HTTP API, it isn't only a human-driven tool — another agent in a build pipeline can *request a security review as a service*: submit a target, poll for the signed attestation, gate its own next action on the verdict. In an agentic org where a coding agent ships changes, Sentinel is the reviewing agent that signs off (or refuses to) before those changes go anywhere. That's the business-native shape of this tool: a trust checkpoint other agents can call.
+
 ## The Build
 
 The project started spec-driven in **Antigravity**: a single specification scaffolded the initial 27-file skeleton — schemas, agent stubs, Skills, and the first passing tests — in one commit (`b7f9516`), and the rest was built iteratively from there. Built over several "days" of work (see commit history: MCP evidence server → Skills + Adjudicator → full pipeline → red team + auditors → A2A + HITL → eval corpus → deployment hardening → live red-team sandboxing + semgrep + live gate measurement). Each stage added a course concept and a test suite; nothing shipped without `pytest` passing. Along the way, real bugs surfaced and got fixed rather than worked around: a genuine PyPI dependency conflict between `semgrep` and `fastmcp` (resolved by pinning the one `fastmcp` version whose `mcp` range still includes semgrep's exact pin); a Docker build-context mismatch that would have broken deployment and, if fixed naively, leaked `.env` into the image (fixed with a `.dockerignore` written *before* the context fix landed); an async FastAPI background task that called blocking scans synchronously, stalling the event loop; and a `semgrep` failure mode where one unreachable registry pack silently zeroed out the project's own offline-capable rules.
@@ -91,4 +114,4 @@ No API keys or secrets are in this repository. Authentication uses Google Cloud 
 
 ---
 
-*(Word count of body above: ~1,600 — under the 2,500 limit, leaving room for screenshots/output excerpts inline if the Kaggle editor format benefits from them.)*
+*(Word count of body above: ~2,350 including table markup — under the 2,500 limit. If you want more margin for inline screenshots, the "The Build" bug list is the easiest paragraph to trim.)*

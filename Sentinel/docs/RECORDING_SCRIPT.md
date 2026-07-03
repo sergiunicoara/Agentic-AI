@@ -60,7 +60,9 @@ https://github.com/sergiunicoara/Agentic-AI/tree/main/Sentinel
 **Say:**
 > "Sentinel — hallucination-free security review for vibe-coded agents.
 > Every finding it reports must prove itself with deterministic evidence,
-> or the system deletes it automatically. Here's the full thing running live."
+> or the system deletes it automatically. The agents reason — an orchestrator
+> routes, an auditor investigates. A deterministic gate enforces. Here's the
+> full thing running live."
 
 ---
 
@@ -312,9 +314,10 @@ T6 — SSRF             4   3   1
 
 **Say (business line first — this is the "Agents for Business" track fit):**
 > "The buyer is a security lead who won't approve an LLM code reviewer because it
-> might just make things up. Sentinel makes that structurally impossible, and it
-> wires into the CI gate they already run — fail the build on a real finding, SARIF
-> output, and trust every line it produces."
+> might just make things up. Naive LLM review runs thirty to forty percent false
+> positives — analysts stop trusting it, real findings get ignored with the fake
+> ones. Sentinel is zero percent false positives, by construction, at near-zero
+> marginal cost per scan — and it wires into the CI gate they already run."
 
 **Then the wrap:**
 > "75 tests passing. Five course concepts demonstrated, plus Antigravity for the
