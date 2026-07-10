@@ -29,7 +29,7 @@ Alertmanager routes fire to your configured receiver (email/PagerDuty/Slack — 
 1. Open SmartOps at `http://localhost:3001` (or production URL).
 2. Navigate to **Dashboard** — the affected region will show a red pulse dot on its tab.
 3. Click the region tab → verify metric cards for CPU / Memory / P99 / RPS.
-4. Cross-reference with Grafana Golden Signals dashboard at `:3001` (port mapped from container).
+4. Cross-reference with Grafana Golden Signals dashboard at `:3002` (port mapped from container).
 
 ---
 

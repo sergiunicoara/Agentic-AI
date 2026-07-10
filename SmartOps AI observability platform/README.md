@@ -106,9 +106,9 @@ Generates synthetic metrics, logs, and traces against the local stack.
 | Service | URL |
 |---|---|
 | API | http://localhost:3000 |
-| API Swagger docs | http://localhost:3000/documentation |
+| API Swagger docs | http://localhost:3000/api/docs |
 | Web dashboard | http://localhost:3001 |
-| Grafana | http://localhost:3001 (admin / `smartops_dev`) |
+| Grafana | http://localhost:3002 (admin / `smartops_dev`) |
 | VictoriaMetrics | http://localhost:8428 |
 | Elasticsearch | http://localhost:9200 |
 | Alertmanager | http://localhost:9093 |

@@ -111,7 +111,7 @@ services:
     image: grafana/grafana:10.4.0
     container_name: smartops-grafana
     ports:
-      - "3001:3000"
+      - "3002:3000"   # 3001 is taken by the web dashboard
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-smartops_dev}
       GF_SECURITY_ADMIN_USER: admin
