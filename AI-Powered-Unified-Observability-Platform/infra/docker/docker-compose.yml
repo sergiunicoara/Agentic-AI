@@ -1,0 +1,173 @@
+name: smartops
+
+networks:
+  smartops:
+    driver: bridge
+
+volumes:
+  vm_data:
+  es_data:
+  pg_data:
+  grafana_data:
+  alertmanager_data:
+
+services:
+  # ── Metrics store ────────────────────────────────────────────
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.99.0
+    container_name: smartops-vm
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm_data:/victoria-metrics-data
+      - ../victoria/prometheus.yml:/etc/victoria/prometheus.yml:ro
+    command:
+      - "--promscrape.config=/etc/victoria/prometheus.yml"
+      - "--retentionPeriod=90d"
+      - "--downsampling.period=30d:5m,60d:1h"
+    networks: [smartops]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8428/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Metric alerting ─────────────────────────────────────────
+  vmalert:
+    image: victoriametrics/vmalert:v1.99.0
+    container_name: smartops-vmalert
+    ports:
+      - "8880:8880"
+    volumes:
+      - ../victoria/vmalert-rules.yml:/etc/vmalert/rules.yml:ro
+    command:
+      - "--datasource.url=http://victoriametrics:8428"
+      - "--remoteWrite.url=http://victoriametrics:8428"
+      - "--remoteRead.url=http://victoriametrics:8428"
+      - "--notifier.url=http://alertmanager:9093"
+      - "--rule=/etc/vmalert/rules.yml"
+      - "--httpListenAddr=:8880"
+    networks: [smartops]
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Alertmanager ─────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: smartops-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - alertmanager_data:/alertmanager
+    networks: [smartops]
+    restart: unless-stopped
+
+  # ── Log & trace store ─────────────────────────────────────────
+  elasticsearch:
+    image: elasticsearch:8.13.0
+    container_name: smartops-es
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks: [smartops]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v '\"status\":\"red\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ── Relational store ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartops-pg
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smartops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartops_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-smartops}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks: [smartops]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartops"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Visualization ─────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: smartops-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-smartops_dev}
+      GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks: [smartops]
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── OTel Collector ────────────────────────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.98.0
+    container_name: smartops-otel
+    ports:
+      - "4317:4317"   # gRPC OTLP
+      - "4318:4318"   # HTTP OTLP
+      - "8889:8889"   # Prometheus metrics (self)
+    volumes:
+      - ../otel/collector-config.yaml:/etc/otel/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["--config=/etc/otel/config.yaml"]
+    networks: [smartops]
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Log pipeline ──────────────────────────────────────────────
+  vector:
+    image: timberio/vector:0.38.0-alpine
+    container_name: smartops-vector
+    ports:
+      - "8686:8686"   # Vector API
+    volumes:
+      - ../vector/vector.toml:/etc/vector/vector.toml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["--config=/etc/vector/vector.toml"]
+    networks: [smartops]
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped

@@ -21,7 +21,7 @@ fi
 export DOCKER_CONFIG="$(mktemp -d)"
 trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 
-gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
+gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io > /dev/null 2>&1
 docker build -f "$ROOT_DIR/deploy/Dockerfile" -t "$IMAGE" "$ROOT_DIR"
 docker push "$IMAGE"
 

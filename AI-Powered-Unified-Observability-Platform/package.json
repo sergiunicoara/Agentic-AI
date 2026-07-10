@@ -1,0 +1,29 @@
+{
+  "name": "smartops",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "dev:api": "turbo run dev --filter=@smartops/api",
+    "dev:web": "turbo run dev --filter=@smartops/web",
+    "simulate": "tsx scripts/simulate-infra.ts",
+    "db:generate": "turbo run db:generate --filter=@smartops/api",
+    "db:migrate": "turbo run db:migrate --filter=@smartops/api",
+    "stack:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+    "stack:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "stack:logs": "docker compose -f infra/docker/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0"
+}

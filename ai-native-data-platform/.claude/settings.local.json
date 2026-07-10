@@ -55,7 +55,18 @@
       "Bash(curl -s \"http://localhost:3000/api/datasources/proxy/uid/prometheus/api/v1/query?query=http_requests_total\" -u admin:admin)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('status:', d.get\\('status'\\)\\); print\\('results:', len\\(d.get\\('data',{}\\).get\\('result',[]\\)\\)\\)\")",
       "Bash(curl -s \"http://localhost:3000/api/dashboards/uid/ai-platform-overview\" -u admin:admin)",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('found:', 'dashboard' in d\\); print\\('title:', d.get\\('dashboard',{}\\).get\\('title','NOT FOUND'\\)\\)\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('found:', 'dashboard' in d\\); print\\('title:', d.get\\('dashboard',{}\\).get\\('title','NOT FOUND'\\)\\)\")",
+      "Bash(python -m pytest tests/test_opensearch.py -v)",
+      "Bash(C:\\\\Users\\\\Sergiu\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python311\\\\python.exe -m pytest tests/test_opensearch.py -v)",
+      "Bash(py -3.11 -m pytest tests/test_opensearch.py -v)",
+      "Bash(pytest tests/test_opensearch.py -v)",
+      "Bash(pytest tests/test_opensearch.py tests/test_reliability.py tests/test_sql_builder.py -v --tb=no -q)",
+      "Bash(pytest tests/ -q --tb=no)",
+      "Bash(git commit -m ' *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git commit -m 'Update README with OpenSearch backend, retrieval mode table, and 184 tests *)",
+      "Bash(pytest tests/test_opensearch.py -q --tb=short)"
     ]
   }
 }

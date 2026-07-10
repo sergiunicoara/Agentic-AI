@@ -1,0 +1,72 @@
+{{- if .Values.victoriametrics.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "smartops.fullname" . }}-victoriametrics
+  labels:
+    {{- include "smartops.labels" . | nindent 4 }}
+    app.kubernetes.io/component: victoriametrics
+spec:
+  serviceName: {{ include "smartops.fullname" . }}-victoriametrics
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "smartops.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: victoriametrics
+  template:
+    metadata:
+      labels:
+        {{- include "smartops.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: victoriametrics
+    spec:
+      containers:
+        - name: victoriametrics
+          image: "{{ .Values.victoriametrics.image.repository }}:{{ .Values.victoriametrics.image.tag }}"
+          imagePullPolicy: {{ .Values.victoriametrics.image.pullPolicy }}
+          args:
+            - --storageDataPath=/storage
+            - --retentionPeriod={{ .Values.victoriametrics.retentionPeriod }}
+            - --httpListenAddr=:8428
+          ports:
+            - name: http
+              containerPort: 8428
+          volumeMounts:
+            - name: storage
+              mountPath: /storage
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.victoriametrics.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.victoriametrics.storage.storageClass }}
+        storageClassName: {{ .Values.victoriametrics.storage.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.victoriametrics.storage.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "smartops.fullname" . }}-victoriametrics
+  labels:
+    {{- include "smartops.labels" . | nindent 4 }}
+    app.kubernetes.io/component: victoriametrics
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.victoriametrics.service.port }}
+      targetPort: http
+      name: http
+  selector:
+    {{- include "smartops.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: victoriametrics
+{{- end }}

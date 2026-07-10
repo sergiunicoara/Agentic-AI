@@ -1,0 +1,706 @@
+{
+  "nodes": [
+    {
+      "id": "k8s_api_service_ai_platform_api",
+      "label": "AI Platform API Service (k8s)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\api-service.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_cronjob_drift_drift_monitor",
+      "label": "Drift Monitor CronJob (every 30m)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\cronjob-drift.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_eval_job_ai_platform_eval",
+      "label": "AI Platform Eval Job (k8s batch)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\eval-job.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_istio_destinationrule_ai_platform_dr",
+      "label": "Istio DestinationRule (ai-platform)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\destinationrule.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_istio_destinationrule_outlier_detection",
+      "label": "Outlier Detection Policy (circuit breaker)",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\destinationrule.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_istio_peer_authentication_ai_platform_mtls",
+      "label": "Istio mTLS PeerAuthentication (STRICT)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\peer-authentication.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_istio_virtualservice_ai_platform_vs",
+      "label": "Istio VirtualService (ai-platform, 3s timeout, 2 retries)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\virtualservice.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_networkpolicy_ai_platform_default_deny",
+      "label": "NetworkPolicy Default Deny (all ingress+egress)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\networkpolicy.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_networkpolicy_ai_platform_allow_internal",
+      "label": "NetworkPolicy Allow Internal (ai-platform label)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\networkpolicy.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "k8s_worker_deployment_ai_platform_worker",
+      "label": "AI Platform Worker Deployment (app.worker_main)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\worker-deployment.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "loadtest_readme_k6_load_testing",
+      "label": "k6 Load Testing (retrieval + ingestion scenarios)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\loadtest\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "loadtest_readme_soak_testing",
+      "label": "Soak Testing (benchmarks/soak/soak.py, p50/p95/p99)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\loadtest\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_alertmanager_alertmanager_config",
+      "label": "Alertmanager Configuration (webhook receiver)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\alertmanager\\alertmanager.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_grafana_provisioning_dashboards_dashboards_grafana_dashboard_provisioner",
+      "label": "Grafana Dashboard Provisioner (file-based)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\grafana\\provisioning\\dashboards\\dashboards.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_grafana_provisioning_datasources_prometheus_grafana_prometheus_datasource",
+      "label": "Grafana Prometheus Datasource (prometheus:9090)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\grafana\\provisioning\\datasources\\prometheus.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_prometheus_alerts_high_rolling_latency",
+      "label": "HighRollingLatency Alert (p95 > 900ms for 5m)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\alerts.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_prometheus_alerts_high_error_rate",
+      "label": "HighErrorRate Alert (error_rate > 2% for 5m)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\alerts.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_prometheus_alerts_high_unknown_rate",
+      "label": "HighUnknownRate Alert (unknown_rate > 35% for 10m)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\alerts.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_prometheus_alerts_platform_anomaly_detected",
+      "label": "PlatformAnomalyDetected Alert (EWMA anomaly_score > 8 for 2m)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\alerts.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ops_prometheus_prometheus_prometheus_config",
+      "label": "Prometheus Configuration (scrapes api:8000, 15s interval)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\prometheus.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "perf_readme_k6_baseline_regression_gate",
+      "label": "k6 Baseline Regression Gate (CI, p95/p99 +10% threshold)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\perf\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "perf_readme_compare_k6_baseline",
+      "label": "compare_k6_baseline.py (CI regression checker)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\perf\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_fastapi",
+      "label": "FastAPI",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_pydantic_ai",
+      "label": "pydantic-ai[openai]",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_ragas",
+      "label": "RAGAS Evaluation Framework (faithfulness, answer_relevancy, etc.)",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_dspy_ai",
+      "label": "DSPy-AI (BootstrapFewShot NL→SQL optimizer)",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_opensearch_py",
+      "label": "opensearch-py 2.6.0 (kNN + BM25 + bulk indexing)",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_prometheus_client",
+      "label": "prometheus-client (metrics exposition)",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_openai",
+      "label": "OpenAI (GPT-4o Vision captioning)",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_google_generativeai",
+      "label": "google-generativeai (Gemini Vision captioning)",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tasks_lessons_dual_store_consistency",
+      "label": "Dual-Store Consistency Lesson (OpenSearch audit 2026-04)",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tasks_lessons_reliability_slo",
+      "label": "Reliability SLO Lesson (silent dead code in remediation gate)",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tasks_lessons_testing_lessons",
+      "label": "Testing Lessons (patch usage site, never neuter tests)",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tasks_lessons_sqlalchemy_psycopg2",
+      "label": "SQLAlchemy + psycopg2 Lessons (vector cast, uuid/text cast)",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tasks_lessons_opensearch_lessons",
+      "label": "OpenSearch Configuration Lessons (engine settings, RRF fusion)",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tasks_lessons_dspy_lessons",
+      "label": "DSPy NL→SQL Optimization Lessons (cache=False, normalize output)",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tasks_lessons_environment_lessons",
+      "label": "Environment / Shell Lessons (PowerShell vs bash)",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "ops_prometheus_prometheus_prometheus_config",
+      "target": "ops_alertmanager_alertmanager_config",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\prometheus.yml",
+      "source_location": "line 7-9",
+      "weight": 1.0
+    },
+    {
+      "source": "ops_prometheus_prometheus_prometheus_config",
+      "target": "ops_prometheus_alerts_high_rolling_latency",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\prometheus.yml",
+      "source_location": "line 11-12",
+      "weight": 1.0
+    },
+    {
+      "source": "ops_prometheus_prometheus_prometheus_config",
+      "target": "ops_prometheus_alerts_high_error_rate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\prometheus.yml",
+      "source_location": "line 11-12",
+      "weight": 1.0
+    },
+    {
+      "source": "ops_prometheus_prometheus_prometheus_config",
+      "target": "ops_prometheus_alerts_high_unknown_rate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\prometheus.yml",
+      "source_location": "line 11-12",
+      "weight": 1.0
+    },
+    {
+      "source": "ops_prometheus_prometheus_prometheus_config",
+      "target": "ops_prometheus_alerts_platform_anomaly_detected",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\prometheus.yml",
+      "source_location": "line 11-12",
+      "weight": 1.0
+    },
+    {
+      "source": "ops_grafana_provisioning_datasources_prometheus_grafana_prometheus_datasource",
+      "target": "ops_prometheus_prometheus_prometheus_config",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\grafana\\provisioning\\datasources\\prometheus.yml",
+      "source_location": "line 7",
+      "weight": 1.0
+    },
+    {
+      "source": "k8s_istio_destinationrule_ai_platform_dr",
+      "target": "k8s_istio_destinationrule_outlier_detection",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\destinationrule.yaml",
+      "source_location": "line 14-18",
+      "weight": 1.0
+    },
+    {
+      "source": "perf_readme_k6_baseline_regression_gate",
+      "target": "loadtest_readme_k6_load_testing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\perf\\README.md",
+      "source_location": "line 16-24",
+      "weight": 1.0
+    },
+    {
+      "source": "perf_readme_k6_baseline_regression_gate",
+      "target": "perf_readme_compare_k6_baseline",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\perf\\README.md",
+      "source_location": "line 8",
+      "weight": 1.0
+    },
+    {
+      "source": "k8s_networkpolicy_ai_platform_default_deny",
+      "target": "k8s_networkpolicy_ai_platform_allow_internal",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\networkpolicy.yaml",
+      "source_location": "line 1-29",
+      "weight": 1.0
+    },
+    {
+      "source": "k8s_istio_virtualservice_ai_platform_vs",
+      "target": "k8s_istio_destinationrule_ai_platform_dr",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\virtualservice.yaml",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "k8s_istio_peer_authentication_ai_platform_mtls",
+      "target": "k8s_istio_destinationrule_ai_platform_dr",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\peer-authentication.yaml",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "k8s_worker_deployment_ai_platform_worker",
+      "target": "k8s_api_service_ai_platform_api",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\worker-deployment.yaml",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "requirements_prometheus_client",
+      "target": "ops_prometheus_prometheus_prometheus_config",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "requirements_ragas",
+      "target": "k8s_eval_job_ai_platform_eval",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "requirements_dspy_ai",
+      "target": "tasks_lessons_dspy_lessons",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "requirements_opensearch_py",
+      "target": "tasks_lessons_opensearch_lessons",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "requirements_opensearch_py",
+      "target": "tasks_lessons_dual_store_consistency",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "k8s_cronjob_drift_drift_monitor",
+      "target": "tasks_lessons_reliability_slo",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\cronjob-drift.yaml",
+      "source_location": null,
+      "weight": 0.65
+    },
+    {
+      "source": "ops_prometheus_alerts_high_rolling_latency",
+      "target": "tasks_lessons_reliability_slo",
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\alerts.yml",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "ops_prometheus_alerts_high_error_rate",
+      "target": "tasks_lessons_reliability_slo",
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\alerts.yml",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "requirements_openai",
+      "target": "requirements_google_generativeai",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\requirements.txt",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "k8s_istio_peer_authentication_ai_platform_mtls",
+      "target": "k8s_networkpolicy_ai_platform_default_deny",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\peer-authentication.yaml",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "tasks_lessons_dual_store_consistency",
+      "target": "tasks_lessons_opensearch_lessons",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\tasks\\lessons.md",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "loadtest_readme_soak_testing",
+      "target": "loadtest_readme_k6_load_testing",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\loadtest\\README.md",
+      "source_location": null,
+      "weight": 0.85
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "istio_service_mesh_controls",
+      "label": "Istio Service Mesh Controls (mTLS + traffic policy + retries)",
+      "nodes": [
+        "k8s_istio_peer_authentication_ai_platform_mtls",
+        "k8s_istio_destinationrule_ai_platform_dr",
+        "k8s_istio_virtualservice_ai_platform_vs"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\k8s\\istio\\destinationrule.yaml"
+    },
+    {
+      "id": "prometheus_observability_stack",
+      "label": "Prometheus Observability Stack (scrape → alert → visualize)",
+      "nodes": [
+        "ops_prometheus_prometheus_prometheus_config",
+        "ops_alertmanager_alertmanager_config",
+        "ops_grafana_provisioning_datasources_prometheus_grafana_prometheus_datasource"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\ops\\prometheus\\prometheus.yml"
+    },
+    {
+      "id": "k6_performance_testing_pipeline",
+      "label": "k6 Performance Testing Pipeline (load → baseline → CI gate)",
+      "nodes": [
+        "loadtest_readme_k6_load_testing",
+        "perf_readme_k6_baseline_regression_gate",
+        "perf_readme_compare_k6_baseline"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\perf\\README.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

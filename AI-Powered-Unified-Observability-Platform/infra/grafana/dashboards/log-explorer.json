@@ -1,0 +1,86 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "Log explorer backed by Elasticsearch — search, filter, and visualize log volume",
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "panels": [
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "title": "Log Volume by Level",
+      "type": "timeseries",
+      "targets": [
+        {
+          "bucketAggs": [
+            { "id": "2", "settings": { "interval": "auto", "min_doc_count": 0, "trimEdges": 0 }, "type": "date_histogram", "field": "@timestamp" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "log_level:error OR log_level:warn OR log_level:info",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 8 },
+      "id": 2,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "title": "Log Stream",
+      "type": "logs",
+      "targets": [
+        {
+          "bucketAggs": [],
+          "metrics": [{ "id": "1", "type": "logs" }],
+          "query": "",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["smartops", "logs", "elasticsearch"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "hide": 0,
+        "includeAll": true,
+        "multi": false,
+        "name": "log_level",
+        "options": [
+          { "selected": true, "text": "All", "value": "$__all" },
+          { "selected": false, "text": "error", "value": "error" },
+          { "selected": false, "text": "warn", "value": "warn" },
+          { "selected": false, "text": "info", "value": "info" }
+        ],
+        "query": "error,warn,info",
+        "type": "custom",
+        "label": "Log Level"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Log Explorer",
+  "uid": "smartops-log-explorer",
+  "version": 1
+}

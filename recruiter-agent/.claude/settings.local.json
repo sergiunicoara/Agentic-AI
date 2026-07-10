@@ -72,7 +72,14 @@
       "Bash(pip show *)",
       "Bash(python -c \"from langfuse.decorators import observe, langfuse_context; print\\('v2/v3 imports OK'\\)\")",
       "Bash(python -c \"from langfuse import observe, get_client; print\\('v4 imports OK'\\); help\\(observe\\)\")",
-      "Bash(\"C:/Users/Sergiu/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud\" run deploy recruiter-agent --source . --region europe-west1)"
+      "Bash(\"C:/Users/Sergiu/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud\" run deploy recruiter-agent --source . --region europe-west1)",
+      "Bash(git rm *)",
+      "Bash(python -c \"from langfuse import get_client; lf = get_client\\(\\); print\\([m for m in dir\\(lf\\) if 'score' in m.lower\\(\\)]\\)\")",
+      "Bash(python -c \"from app.server import app; print\\('OK'\\)\")",
+      "Bash(ls *.sh *.yaml)",
+      "Bash(cat cloudbuild.yaml)",
+      "Bash(cat deploy.sh)",
+      "PowerShell(& \"C:\\\\Users\\\\Sergiu\\\\AppData\\\\Local\\\\Google\\\\Cloud SDK\\\\google-cloud-sdk\\\\bin\\\\gcloud.cmd\" run services describe recruiter-agent --region=europe-west1 --format=\"value\\(status.url,status.latestReadyRevisionName\\)\" 2>&1)"
     ]
   }
 }

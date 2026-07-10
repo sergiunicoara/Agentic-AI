@@ -1,0 +1,60 @@
+groups:
+  - name: infrastructure
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: smartops_cpu_usage_percent > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.host }} ({{ $labels.region }})"
+          description: "CPU at {{ $value | humanize }}% for 2+ minutes."
+
+      - alert: CriticalCPUUsage
+        expr: smartops_cpu_usage_percent > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU on {{ $labels.host }} ({{ $labels.region }})"
+          description: "CPU at {{ $value | humanize }}% — immediate action required."
+
+      - alert: HighMemoryUsage
+        expr: smartops_memory_usage_percent > 90
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory on {{ $labels.host }} ({{ $labels.region }})"
+          description: "Memory at {{ $value | humanize }}%."
+
+      - alert: LowDiskSpace
+        expr: smartops_disk_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk on {{ $labels.host }} ({{ $labels.region }})"
+          description: "Disk at {{ $value | humanize }}%."
+
+  - name: service-health
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: rate(smartops_http_errors_total[5m]) / rate(smartops_http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate in {{ $labels.service }} ({{ $labels.region }})"
+          description: "Error rate {{ $value | humanizePercentage }} over last 5m."
+
+      - alert: HighP99Latency
+        expr: smartops_http_latency_p99_ms > 2000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 latency degraded in {{ $labels.service }} ({{ $labels.region }})"
+          description: "P99 latency at {{ $value | humanize }}ms."

@@ -1,0 +1,97 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "Asset inventory and audit log backed by PostgreSQL",
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "postgresql" },
+      "fieldConfig": { "defaults": {} },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "colorMode": "background", "graphMode": "none" },
+      "title": "Total Assets",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgresql" },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) as count FROM assets WHERE status = 'active'",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgresql" },
+      "fieldConfig": { "defaults": {} },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "id": 2,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "colorMode": "background", "graphMode": "none" },
+      "title": "Active Alert Rules",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgresql" },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) as count FROM alert_rules WHERE enabled = true",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgresql" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "created_at" }, "properties": [{ "id": "unit", "value": "dateTimeAsIso" }] }
+        ]
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 6 },
+      "id": 3,
+      "options": { "sortBy": [{ "displayName": "created_at", "desc": true }] },
+      "title": "Asset Inventory",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgresql" },
+          "format": "table",
+          "rawSql": "SELECT name, asset_type, region, environment, status, ip_address, created_at FROM assets ORDER BY created_at DESC LIMIT 100",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgresql" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "created_at" }, "properties": [{ "id": "unit", "value": "dateTimeAsIso" }] }
+        ]
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 18 },
+      "id": 4,
+      "title": "Recent Audit Log",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgresql" },
+          "format": "table",
+          "rawSql": "SELECT created_at, user_email, action, resource_type, resource_id, ip_address FROM audit_log ORDER BY created_at DESC LIMIT 200",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["smartops", "assets", "postgresql", "audit"],
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Asset Inventory & Audit",
+  "uid": "smartops-asset-audit",
+  "version": 1
+}

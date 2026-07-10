@@ -1,0 +1,156 @@
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# ── API (Fastify) ─────────────────────────────────────────────
+api:
+  replicaCount: 2
+  image:
+    repository: smartops/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  env:
+    NODE_ENV: production
+    PORT: "3000"
+    VICTORIAMETRICS_URL: http://smartops-victoriametrics:8428
+    ELASTICSEARCH_URL: http://smartops-elasticsearch:9200
+  envSecrets:
+    DATABASE_URL: smartops-secrets
+    JWT_SECRET: smartops-secrets
+    ANTHROPIC_API_KEY: smartops-secrets
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# ── Web (Next.js) ─────────────────────────────────────────────
+web:
+  replicaCount: 2
+  image:
+    repository: smartops/web
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    NEXT_PUBLIC_API_URL: ""  # set to ingress API URL in production
+
+# ── VictoriaMetrics ───────────────────────────────────────────
+victoriametrics:
+  enabled: true
+  image:
+    repository: victoriametrics/victoria-metrics
+    tag: v1.99.0
+    pullPolicy: IfNotPresent
+  service:
+    port: 8428
+  storage:
+    size: 50Gi
+    storageClass: ""
+  retentionPeriod: "3"  # months
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+# ── Grafana ───────────────────────────────────────────────────
+grafana:
+  enabled: true
+  image:
+    repository: grafana/grafana
+    tag: "10.4.0"
+    pullPolicy: IfNotPresent
+  service:
+    port: 3000
+  adminPassword: ""  # set via secret
+  storage:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Ingress ───────────────────────────────────────────────────
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: smartops.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: api
+        - path: /
+          pathType: Prefix
+          service: web
+  tls:
+    - secretName: smartops-tls
+      hosts:
+        - smartops.example.com
+
+# ── Bitnami PostgreSQL sub-chart ──────────────────────────────
+postgresql:
+  enabled: true
+  auth:
+    database: smartops
+    username: smartops
+    existingSecret: smartops-secrets
+    secretKeys:
+      adminPasswordKey: POSTGRES_PASSWORD
+      userPasswordKey: POSTGRES_PASSWORD
+  primary:
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# ── Bitnami Elasticsearch sub-chart ──────────────────────────
+elasticsearch:
+  enabled: true
+  security:
+    enabled: false
+  master:
+    replicaCount: 1
+    persistence:
+      size: 30Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi

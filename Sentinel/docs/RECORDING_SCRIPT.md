@@ -154,26 +154,37 @@ bandit with a UI?" It's deterministic and reproducible, so it's safe on camera.*
 
 **Show:** Terminal 1 (or Terminal 2)
 
-**Type — first prove bandit finds nothing on T6:**
+**Type — first show what bandit actually finds on T6:**
 ```bash
 bandit -r targets/t6_ssrf -q
 ```
 
-Point at the empty result (no issues identified).
+Bandit prints **one** finding: `B113 request_without_timeout` on line 39 — a generic
+style nit (missing timeout kwarg), nothing to do with the two vulnerabilities actually
+seeded in this file. Point at it and say what it is *not*: not the SSRF, not the
+hardcoded key. Bandit has zero rule coverage for either of those two.
 
 **Then run Sentinel's full pipeline on the same target:**
 ```bash
 python -m sentinel.pipeline targets/t6_ssrf
 ```
 
-Point at the surviving findings — the SSRF and the hardcoded LLM API key — and their
-`ev_semgrep_...` evidence IDs.
+**Point at the 3 surviving findings (this target has two separate unvalidated
+`requests.get()` call sites, so the SSRF rule fires once per call site, plus one
+hit for the hardcoded key):**
+```
+✓ [HIGH] Server-Side Request Forgery (SSRF) (evidence: ['ev_semgrep_...'])
+✓ [HIGH] Server-Side Request Forgery (SSRF) (evidence: ['ev_semgrep_...'])
+✓ [HIGH] Credential Risk: Hardcoded API Key (value-format match) (evidence: ['ev_semgrep_...'])
+```
 
 **Say:**
 > "A fair question about any scanner built on bandit is — isn't this just bandit with a UI?
-> Here's target T6. Bandit finds nothing. Sentinel catches both the SSRF and the hardcoded
-> API key — through two custom semgrep rules bandit has no equivalent for. The detection
-> ceiling actually moved, and there's a test that proves bandit catches neither."
+> Here's target T6. Bandit's only finding is a generic missing-timeout nit — it has no rule
+> at all for the vulnerabilities seeded here: an SSRF, present at two separate call sites,
+> and a hardcoded API key. Sentinel catches all three, through two custom semgrep rules
+> bandit has no equivalent for. The detection ceiling actually moved, and there's a test
+> that proves it."
 
 ---
 
@@ -218,9 +229,11 @@ adk run sentinel/orchestrator
 Review the target at sentinel/mcp
 ```
 
-**Wait for the output. When the adjudicator report prints, point at the B603 finding line, e.g.:**
+**Wait for the output. When the adjudicator report prints, point at the surviving finding
+line (this is bandit's B603 test, "subprocess call without shell equals True" — the
+Adjudicator's title is the short human-readable form, not the raw bandit test ID):**
 ```
-✓ [MED] Subprocess call without shell — evaluating a value from elsewhere
+✓ [MED] subprocess without shell (evidence: ['ev_bandit_...'])
 ```
 
 **And the verdict line:**
@@ -230,8 +243,8 @@ Verdict: PASS_WITH_FINDINGS
 
 **Say:**
 > "Sentinel reviewing its own code.
-> It finds a real bandit B603 in its own MCP evidence server —
-> subprocess call evaluating an external value.
+> It finds a real bandit finding in its own MCP evidence server —
+> a subprocess call without shell.
 > Verdict: pass with findings.
 > The finding is backed by real evidence. No hallucination."
 
@@ -245,11 +258,16 @@ fall back to the gate-report table (7B) which shows the drops deterministically.
 
 ### 7A — PRIMARY: live DROPPED badge on the dashboard (multi-take)
 
-**Prep before recording (off-camera):** the drop is non-deterministic per run, so pre-run
-it a few times until you get one, then record that take. Odds are best on **T6** (4 LLM
-proposals → highest chance one drifts; ~50–60% per run, ~95% over 3–4 takes). A smaller/
-faster Gemini variant drifts *more* on the exact-string schema, which raises the drop rate
-in your favor — legitimate, since the gate genuinely rejects it.
+**CONFIRMED — this take has already been captured successfully.** Running this exact
+setup produced a real, live DROPPED badge on the first take (no forcing needed). Total
+candidates = 7 (`InjectionAuditor: 2` + `PrivilegeAuditor: 1` + `LLMAuditor: 4`) → 6
+SURVIVED, 1 **DROPPED**: `HTTP Request Missing Timeout Parameter — schema validation
+failed: ... severity ... Input should be 'low', 'med', 'high' or 'critical'`. The two
+deterministic auditors and the LLM auditor independently examine the *same* semgrep
+evidence and each propose their own finding — that's why SSRF shows up more than once,
+worded differently each time. If you already have this clip, use it — skip straight to
+the narration below. If re-recording, odds are still good (a drop landed on the very
+first attempt here) but budget a few takes in case this run doesn't repeat it exactly.
 
 **Show:** the deployed dashboard (`/ui/`).
 
@@ -260,16 +278,52 @@ targets/t6_ssrf
 
 **Check the `LLM auditor` box** (leave Red team unchecked). Click **Start Scan**.
 
-**What you're waiting for in the live event feed:** at least one red **✗ DROPPED** badge
-appear alongside the green ✓ SURVIVED ones — with the reason `schema validation failed`.
+**What appears in the live event feed, in order:**
+```
+🔍 Profiling the target, selecting which security skills apply.
+Skills activated: prompt-injection-defense · confused-deputy-iam
+🛠 Four real tools running — bandit, ruff, pip-audit, semgrep. No LLM in this path.
+Evidence collected: 4 items
+🤖 Running specialist auditors…
+InjectionAuditor: 2 candidates
+PrivilegeAuditor: 1 candidate
+LLMAuditor: 4 candidates
+⚖️ Now the trust gate.
+✓ SURVIVED  Server-Side Request Forgery (SSRF)                          [high]      (InjectionAuditor)
+✓ SURVIVED  Server-Side Request Forgery (SSRF)                          [high]      (InjectionAuditor)
+✓ SURVIVED  Credential Risk: Hardcoded API Key (value-format match)     [high]      (PrivilegeAuditor)
+✓ SURVIVED  Hardcoded LLM API Key                                       [high]      (LLMAuditor)
+✓ SURVIVED  Server-Side Request Forgery (SSRF) in `fetch_referenced_url` [critical]  (LLMAuditor)
+✓ SURVIVED  Server-Side Request Forgery (SSRF) in `summarize_page`      [critical]  (LLMAuditor)
+✗ DROPPED   HTTP Request Missing Timeout Parameter                                  (LLMAuditor)
+            schema validation failed: severity must be 'low'/'med'/'high'/'critical'
+```
+
+*(The "(Auditor)" labels above are for your own reference while narrating — they don't
+appear on screen. Three auditors independently examine the same evidence; the two
+deterministic ones use fixed templates, the LLM auditor writes its own wording — which
+is exactly why the same underlying issue appears multiple times with different phrasing,
+and why only the LLM's version is at risk of a schema-format drop.)*
+
+**Note on "No LLM in this path":** that line describes only the evidence-collection
+stage (bandit/ruff/pip-audit/semgrep — all deterministic tools). It's not claiming the
+whole scan is LLM-free; the LLM Auditor runs afterward, in the clearly separate
+"Running specialist auditors" stage. If you want to preempt any confusion on camera,
+say so explicitly (see narration below).
 
 **Say (point at the DROPPED badge as it lands):**
-> "There it is. The LLM auditor proposed this finding, and the gate refused to keep it —
-> live, in real time. The model can say whatever it wants; only what it can actually prove
-> survives. That red badge is the entire thesis in one frame."
+> "Notice the evidence stage says 'no LLM in this path' — that's the four deterministic
+> tools. The LLM enters afterward, in the auditor stage: three auditors independently
+> look at the same evidence — two deterministic ones, and the LLM auditor, which reasons
+> freely and writes its own findings. Seven candidates total. Six survive — every one
+> traces to real semgrep evidence, even the LLM's own wording of it. But this one — a
+> missing-timeout finding — got dropped. The model wrote an invalid severity value, and
+> the schema rejected it outright. The model can say whatever it wants; only what it can
+> actually prove, in the exact shape required, survives. That red badge is the entire
+> thesis in one frame."
 
-*If after ~5 minutes of takes you don't get a clean DROPPED, switch to 7B — don't burn
-more time; the table version lands the same point reliably.*
+*If re-recording and you don't land a clean DROPPED within ~5 minutes of takes, switch
+to 7B — don't burn more time; the table version lands the same point reliably.*
 
 ### 7B — FALLBACK: gate-report table (deterministic)
 
@@ -277,17 +331,24 @@ more time; the table version lands the same point reliably.*
 
 **Type:**
 ```bash
-python -m sentinel.eval.llm_gate_report
+python -m sentinel.eval.llm_gate_report --mode demo
 ```
 
-If live LLM access is unavailable, the command replays the recorded demo table
-automatically. Use `--mode live` to force a real Vertex AI call.
+**Use `--mode demo` explicitly — do not use the default `--mode auto` for this recording.**
+The LLM auditor is genuinely non-deterministic between runs: a live re-run measured while
+writing this script returned 16/14/2 (88%), not the 18/15/3 (83%) documented in the
+README/WRITEUP and narrated below. `--mode demo` replays that specific, already-measured
+snapshot exactly — which is the correct thing to show on camera, since it's what the
+written numbers refer to. (`--mode live` exists if you want to force a fresh real call and
+narrate whatever comes back instead — just make sure your spoken numbers match what
+actually prints.)
 
-**Point at the three rows with a DROPPED count — T2, T3, T6 (Unsupported = 1 each):**
+**Point at the three rows with a nonzero Unsupported column (plain-text aligned
+columns, not a markdown table — this is what actually prints):**
 ```
-T2 — Privilege Leak   3   2   1
-T3 — Secret Leak      4   3   1
-T6 — SSRF             4   3   1
+T2 — Privilege Leak                    3          2            1
+T3 — Secret Leak                       4          3            1
+T6 — SSRF (bandit blind spot)          4          3            1
 ```
 
 **Say:**
@@ -295,9 +356,9 @@ T6 — SSRF             4   3   1
 > because it couldn't back it the way the schema requires. The model can say whatever it
 > wants; only what it can prove survives."
 
-**Then point at the Total row:**
+**Then point at the TOTAL row:**
 ```
-| Total  |  18  |  15  |  3  |
+TOTAL                                 18         15            3
 ```
 
 **Say:**

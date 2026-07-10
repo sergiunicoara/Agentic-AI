@@ -1,0 +1,46 @@
+apiVersion: 1
+
+datasources:
+  - name: VictoriaMetrics
+    type: prometheus
+    uid: victoriametrics
+    url: http://victoriametrics:8428
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+
+  - name: Elasticsearch
+    type: elasticsearch
+    uid: elasticsearch
+    url: http://elasticsearch:9200
+    access: proxy
+    editable: false
+    database: "smartops-logs-*"
+    jsonData:
+      esVersion: "8.0.0"
+      timeField: "@timestamp"
+      interval: Daily
+      logMessageField: message
+      logLevelField: log_level
+      maxConcurrentShardRequests: 5
+
+  - name: PostgreSQL
+    type: postgres
+    uid: postgresql
+    url: postgres:5432
+    access: proxy
+    editable: false
+    user: smartops
+    secureJsonData:
+      password: smartops_dev
+    jsonData:
+      database: smartops
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1600
+      timescaledb: false

@@ -1,0 +1,39 @@
+{
+  "index_patterns": ["smartops-traces-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.lifecycle.name": "smartops-traces-policy"
+    },
+    "mappings": {
+      "dynamic": true,
+      "_source": { "enabled": true },
+      "properties": {
+        "@timestamp":           { "type": "date" },
+        "traceId":              { "type": "keyword" },
+        "spanId":               { "type": "keyword" },
+        "parentSpanId":         { "type": "keyword" },
+        "name":                 { "type": "keyword" },
+        "kind":                 { "type": "keyword" },
+        "status":               { "type": "keyword" },
+        "durationNano":         { "type": "long" },
+        "serviceName":          { "type": "keyword" },
+        "region":               { "type": "keyword" },
+        "environment":          { "type": "keyword" },
+        "attributes": {
+          "type": "object",
+          "dynamic": true
+        },
+        "resource": {
+          "type": "object",
+          "dynamic": true
+        }
+      }
+    }
+  },
+  "priority": 100,
+  "_meta": {
+    "description": "SmartOps OTel distributed traces"
+  }
+}

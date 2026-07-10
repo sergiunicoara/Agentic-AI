@@ -43,7 +43,10 @@
       "Bash(.venv/Scripts/python.exe -c \"from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter; print\\('OTLP OK'\\)\")",
       "Bash(.venv/Scripts/python.exe -c ' *)",
       "Bash('..\\\\.venvScriptspython.exe' -c ' *)",
-      "Bash('C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Agentic-AI\\\\.venv\\\\Scripts\\\\python.exe' -c ' *)"
+      "Bash('C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Agentic-AI\\\\.venv\\\\Scripts\\\\python.exe' -c ' *)",
+      "PowerShell($f = \"api/app.py\"; foreach \\($tool in @\\(@\\(\"ruff\",\"check\"\\), @\\(\"mypy\",\"\"\\), @\\(\"bandit\",\"-q\"\\)\\)\\) { $name = $tool[0]; $cmd = if \\($name -eq \"ruff\"\\) { { python -m ruff check api/app.py 2>$null } } elseif \\($name -eq \"mypy\"\\) { { python -m mypy --ignore-missing-imports api/app.py 2>$null } } else { { python -m bandit -q api/app.py 2>$null } }; $t = Measure-Command $cmd; Write-Output \\(\"{0}: {1:N0} ms\" -f $name, $t.TotalMilliseconds\\) })",
+      "PowerShell($py = \"C:\\\\Users\\\\Sergiu\\\\Desktop\\\\Projects\\\\Agentic-AI\\\\.venv\\\\Scripts\\\\python.exe\"; $t1 = Measure-Command { $script:out1 = & $py -m ruff check api/app.py }; $t2 = Measure-Command { $script:out2 = & $py -m mypy --ignore-missing-imports --no-strict-optional api/app.py }; $t3 = Measure-Command { $script:out3 = & $py -m bandit -q api/app.py }; Write-Output \\(\"ruff:   {0:N0} ms \\({1} lines out\\)\" -f $t1.TotalMilliseconds, \\($out1 | Measure-Object\\).Count\\); Write-Output \\(\"mypy:   {0:N0} ms \\({1} lines out\\)\" -f $t2.TotalMilliseconds, \\($out2 | Measure-Object\\).Count\\); Write-Output \\(\"bandit: {0:N0} ms \\({1} lines out\\)\" -f $t3.TotalMilliseconds, \\($out3 | Measure-Object\\).Count\\))",
+      "PowerShell(uv tool list 2>$null)"
     ]
   }
 }

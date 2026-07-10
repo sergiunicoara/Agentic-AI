@@ -9,7 +9,8 @@
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:claudecertifications.com)",
       "WebFetch(domain:www.lowcode.agency)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(git status *)"
     ]
   }
 }

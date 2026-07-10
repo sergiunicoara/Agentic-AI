@@ -1,0 +1,17 @@
+node_modules/
+.turbo/
+dist/
+.next/
+*.local
+.env
+.env.local
+
+# Data volumes (docker bind mounts)
+infra/docker/data/
+
+# Drizzle generated
+apps/api/drizzle/migrations/*.sql
+
+# OS
+.DS_Store
+Thumbs.db

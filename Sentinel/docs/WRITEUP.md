@@ -78,13 +78,11 @@ The insight is that a security tool needs both: agents to reason (route, scope, 
 
 ## Results
 
-| Metric | Value |
-|---|---|
-| Target detection rate | 100% (6/6 vulnerable targets, including one bandit structurally cannot catch) |
-| LLM-auditor evidence survival rate (measured live) | 83% (15/18 candidates; the 3 dropped were schema violations, not hallucinated evidence) |
-| Hallucinated-finding rate on clean controls | 0% |
-| False positives on clean controls | 0 |
-| Tests passing | 75 |
+- **Target detection rate:** 100% (6/6 vulnerable targets, including one bandit structurally cannot catch)
+- **LLM-auditor evidence survival rate (measured live):** 83% (15/18 candidates; the 3 dropped were schema violations, not hallucinated evidence)
+- **Hallucinated-finding rate on clean controls:** 0%
+- **False positives on clean controls:** 0
+- **Tests passing:** 75
 
 The numbers that matter most aren't the 100% — a small bundled corpus making that easy is expected — but the 0% false-positive rate on clean controls and the *measured* (not assumed) 83% survival rate on the one auditor that can fail. Those are the numbers a security team adopting this tool would actually care about: does it cry wolf, and when it's wrong, does something catch it.
 
@@ -94,11 +92,11 @@ The buyer is an engineering or security lead who already runs bandit/semgrep in 
 
 **The business case, in numbers.** Two costs sit on either side of an unreviewed vibe-coded agent, and Sentinel is engineered to attack both:
 
-| Cost driver | Without Sentinel | With Sentinel |
-|---|---|---|
-| A shipped vulnerability (leaked key, SSRF, `eval()` on user input) | Caught in production — industry-average breach cost runs into the millions; a shift-left fix is orders of magnitude cheaper than a post-incident one | Caught pre-merge by a CI gate that exits non-zero, before the agent ever deploys |
-| Alert fatigue from an untrusted scanner | Analysts triage noise; a 30–40% false-positive rate (typical for naive LLM review) means most flags are wasted attention, and real findings get ignored with the fake ones | **0% false positives on clean controls, by construction** — every surviving finding traces to tool evidence, so nothing gets waved through as "probably noise" |
-| Cost of the review itself | A human security pass is hours per change | The deterministic path (bandit/ruff/pip-audit/semgrep) is free compute per scan; the only paid call is the *optional* LLM auditor — one batched request, not per-finding |
+**A shipped vulnerability** (leaked key, SSRF, `eval()` on user input) — *Without Sentinel:* caught in production, where the industry-average breach cost runs into the millions; a shift-left fix is orders of magnitude cheaper than a post-incident one. → *With Sentinel:* caught pre-merge by a CI gate that exits non-zero, before the agent ever deploys.
+
+**Alert fatigue from an untrusted scanner** — *Without Sentinel:* analysts triage noise; a 30–40% false-positive rate (typical for naive LLM review) means most flags are wasted attention, and real findings get ignored along with the fake ones. → *With Sentinel:* **0% false positives on clean controls, by construction** — every surviving finding traces to tool evidence, so nothing gets waved through as "probably noise."
+
+**Cost of the review itself** — *Without Sentinel:* a human security pass is hours per change. → *With Sentinel:* the deterministic path (bandit/ruff/pip-audit/semgrep) is free compute per scan; the only paid call is the *optional* LLM auditor — one batched request, not per-finding.
 
 *(Breach and false-positive figures are industry-typical, cited illustratively; the 0% false-positive rate and the 83% measured gate-survival rate are Sentinel's own, reproducible numbers.)*
 

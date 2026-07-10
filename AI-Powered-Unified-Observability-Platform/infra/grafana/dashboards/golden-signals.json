@@ -1,0 +1,180 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "Golden signals: latency, traffic, errors, saturation across all regions",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Golden Signals",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
+      "title": "Avg CPU %",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "avg(smartops_cpu_usage_percent)",
+          "legendFormat": "CPU"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 75 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": false, "showThresholdMarkers": true },
+      "title": "Avg Memory %",
+      "type": "gauge",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "avg(smartops_memory_usage_percent)",
+          "legendFormat": "Memory"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Request Rate by Region",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "sum by (region) (rate(smartops_http_requests_total[1m]))",
+          "legendFormat": "{{ region }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "percent", "min": 0, "max": 10 }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "id": 4,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Error Rate % by Region",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "100 * sum by (region) (rate(smartops_http_errors_total[1m])) / sum by (region) (rate(smartops_http_requests_total[1m]))",
+          "legendFormat": "{{ region }}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 5,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "P99 Latency by Region (ms)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "smartops_http_latency_p99_ms",
+          "legendFormat": "{{ region }} p99"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "percent", "min": 0, "max": 100 }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "id": 6,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "CPU Usage by Region",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "avg by (region) (smartops_cpu_usage_percent)",
+          "legendFormat": "{{ region }}"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["smartops", "golden-signals", "infrastructure"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "definition": "label_values(smartops_cpu_usage_percent, region)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "region",
+        "query": "label_values(smartops_cpu_usage_percent, region)",
+        "refresh": 2,
+        "type": "query",
+        "label": "Region"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Golden Signals",
+  "uid": "smartops-golden-signals",
+  "version": 1
+}

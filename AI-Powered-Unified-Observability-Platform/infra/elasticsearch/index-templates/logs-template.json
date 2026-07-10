@@ -1,0 +1,36 @@
+{
+  "index_patterns": ["smartops-logs-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.lifecycle.name": "smartops-logs-policy",
+      "index.lifecycle.rollover_alias": "smartops-logs"
+    },
+    "mappings": {
+      "dynamic": true,
+      "_source": { "enabled": true },
+      "properties": {
+        "@timestamp":  { "type": "date" },
+        "message":     { "type": "text", "analyzer": "standard" },
+        "log_level":   { "type": "keyword" },
+        "service":     { "type": "keyword" },
+        "region":      { "type": "keyword" },
+        "environment": { "type": "keyword" },
+        "host":        { "type": "keyword" },
+        "trace_id":    { "type": "keyword" },
+        "span_id":     { "type": "keyword" },
+        "error": {
+          "properties": {
+            "message": { "type": "text" },
+            "stack":   { "type": "text", "index": false }
+          }
+        }
+      }
+    }
+  },
+  "priority": 100,
+  "_meta": {
+    "description": "SmartOps application and infrastructure logs"
+  }
+}

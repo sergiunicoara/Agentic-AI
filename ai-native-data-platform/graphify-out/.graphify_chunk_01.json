@@ -1,0 +1,766 @@
+{
+  "nodes": [
+    {
+      "id": "_github_workflows_eval_gates_evalgates",
+      "label": "eval-gates CI Workflow",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\eval-gates.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "_github_workflows_loadtest_loadtestk6",
+      "label": "loadtest-k6 Workflow",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\loadtest.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "_github_workflows_perf_ci_perfregression",
+      "label": "perf-regression CI Workflow",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\perf-ci.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "claude_workfloworchestration",
+      "label": "Workflow Orchestration Principles",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "readme_ainativedataplatform",
+      "label": "AI-Native Data Platform",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_eval_datasets_nl_query_golden_nlquerygolden",
+      "label": "NL Query Golden Dataset",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\datasets\\nl_query_golden.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_eval_datasets_registry_democases",
+      "label": "Eval Dataset Registry (demo_cases)",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\datasets\\registry.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_eval_experiments_baseline_baseline",
+      "label": "Baseline Experiment Config",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\baseline.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_eval_experiments_hybrid_rrf_hybridrrf",
+      "label": "Hybrid RRF Experiment Config",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\hybrid_rrf.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_eval_experiments_opensearch_bm25_opensearchbm25",
+      "label": "OpenSearch BM25 Experiment Config",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_bm25.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_eval_experiments_opensearch_hybrid_opensearchhybrid",
+      "label": "OpenSearch Hybrid Experiment Config",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_hybrid.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "benchmarks_readme_benchmarkharness",
+      "label": "Benchmark Harness README",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\benchmarks\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docker_compose_dockerstack",
+      "label": "Docker Compose Stack",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docker-compose.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_cost_performance_costperformance",
+      "label": "Cost and Performance Engineering",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\cost_performance.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_data_lifecycle_management_datalifecycle",
+      "label": "Data Lifecycle Management",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\data_lifecycle_management.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_deployment_k8s_k8sdeployment",
+      "label": "Kubernetes Deployment Guide",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\deployment_k8s.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_embedding_lifecycle_ops_embeddinglifecycle",
+      "label": "Embedding Lifecycle Operations",
+      "file_type": "document",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\embedding_lifecycle_ops.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_rag_platform",
+      "label": "RAG Platform",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_rrf_fusion",
+      "label": "RRF Fusion in Python",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "Key design decisions",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_dspy_nl_sql",
+      "label": "DSPy NL to SQL Intent Extraction",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_pgvector_retrieval",
+      "label": "pgvector Retrieval Backend",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_opensearch_retrieval",
+      "label": "OpenSearch Retrieval Backend",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_embedding_versioning",
+      "label": "Embedding Version Tags and Blue-Green Reindex",
+      "file_type": "rationale",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "Key design decisions",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_ci_quality_gates",
+      "label": "CI Quality and Latency Gates",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\eval-gates.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_slo_reliability",
+      "label": "SLO Reliability Contracts",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_observability_stack",
+      "label": "Prometheus and Grafana Observability Stack",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docker-compose.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_k6_load_testing",
+      "label": "k6 Load Testing",
+      "file_type": "concept",
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\loadtest.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "_github_workflows_eval_gates_evalgates",
+      "target": "app_eval_experiments_baseline_baseline",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\eval-gates.yml",
+      "source_location": "line 57-60",
+      "weight": 1.0
+    },
+    {
+      "source": "_github_workflows_eval_gates_evalgates",
+      "target": "app_eval_datasets_registry_democases",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\eval-gates.yml",
+      "source_location": "line 58: --cases app/eval/datasets/cases.jsonl",
+      "weight": 1.0
+    },
+    {
+      "source": "_github_workflows_eval_gates_evalgates",
+      "target": "concept_ci_quality_gates",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\eval-gates.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "_github_workflows_loadtest_loadtestk6",
+      "target": "concept_k6_load_testing",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\loadtest.yml",
+      "source_location": "line 31-41",
+      "weight": 1.0
+    },
+    {
+      "source": "_github_workflows_loadtest_loadtestk6",
+      "target": "benchmarks_readme_benchmarkharness",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\loadtest.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "_github_workflows_perf_ci_perfregression",
+      "target": "concept_k6_load_testing",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\perf-ci.yml",
+      "source_location": "line 44-54",
+      "weight": 1.0
+    },
+    {
+      "source": "_github_workflows_perf_ci_perfregression",
+      "target": "concept_pgvector_retrieval",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\perf-ci.yml",
+      "source_location": "line 27-34: seed_corpus + run_bulk_index",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_rag_platform",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_pgvector_retrieval",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "What's inside table: pgvector retrieval row",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_opensearch_retrieval",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "What's inside table: OpenSearch retrieval row",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_dspy_nl_sql",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "What's inside table: NL->SQL layer",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_rrf_fusion",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "Key design decisions: RRF in Python for OpenSearch hybrid",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_slo_reliability",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "Key design decisions: Reliability over accuracy",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_observability_stack",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "Observability section",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "concept_embedding_versioning",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "Key design decisions: Embedding version tags",
+      "weight": 1.0
+    },
+    {
+      "source": "readme_ainativedataplatform",
+      "target": "_github_workflows_eval_gates_evalgates",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\README.md",
+      "source_location": "Offline evaluation: CI runs eval-gates.yml on every PR",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_datasets_nl_query_golden_nlquerygolden",
+      "target": "concept_dspy_nl_sql",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\datasets\\nl_query_golden.yaml",
+      "source_location": "description: NL->SQL golden dataset for DSPy BootstrapFewShot optimization",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_baseline_baseline",
+      "target": "concept_ci_quality_gates",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\baseline.yaml",
+      "source_location": "gates section",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_baseline_baseline",
+      "target": "concept_pgvector_retrieval",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\baseline.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_hybrid_rrf_hybridrrf",
+      "target": "concept_rrf_fusion",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\hybrid_rrf.yaml",
+      "source_location": "name: hybrid_rrf",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_hybrid_rrf_hybridrrf",
+      "target": "app_eval_experiments_baseline_baseline",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\hybrid_rrf.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_opensearch_bm25_opensearchbm25",
+      "target": "concept_opensearch_retrieval",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_bm25.yaml",
+      "source_location": "retrieval.mode: opensearch_bm25",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_opensearch_bm25_opensearchbm25",
+      "target": "app_eval_experiments_baseline_baseline",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_bm25.yaml",
+      "source_location": "description: Baseline for comparing lexical-only performance against pgvector",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_opensearch_hybrid_opensearchhybrid",
+      "target": "concept_opensearch_retrieval",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_hybrid.yaml",
+      "source_location": "retrieval.mode: opensearch_hybrid",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_opensearch_hybrid_opensearchhybrid",
+      "target": "concept_rrf_fusion",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_hybrid.yaml",
+      "source_location": "retrieval.fusion: rrf, rrf_k: 60",
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_opensearch_hybrid_opensearchhybrid",
+      "target": "app_eval_experiments_baseline_baseline",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_hybrid.yaml",
+      "source_location": "description: Primary challenger against the pgvector baseline",
+      "weight": 1.0
+    },
+    {
+      "source": "docker_compose_dockerstack",
+      "target": "concept_pgvector_retrieval",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docker-compose.yml",
+      "source_location": "db service: pgvector/pgvector:pg16",
+      "weight": 1.0
+    },
+    {
+      "source": "docker_compose_dockerstack",
+      "target": "concept_opensearch_retrieval",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docker-compose.yml",
+      "source_location": "opensearch service: opensearchproject/opensearch:2.12.0",
+      "weight": 1.0
+    },
+    {
+      "source": "docker_compose_dockerstack",
+      "target": "concept_observability_stack",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docker-compose.yml",
+      "source_location": "prometheus, alertmanager, grafana services",
+      "weight": 1.0
+    },
+    {
+      "source": "docker_compose_dockerstack",
+      "target": "concept_rag_platform",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docker-compose.yml",
+      "source_location": "api and worker services",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_cost_performance_costperformance",
+      "target": "concept_k6_load_testing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\cost_performance.md",
+      "source_location": "Load testing section",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_cost_performance_costperformance",
+      "target": "concept_slo_reliability",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\cost_performance.md",
+      "source_location": "What to measure: SLO violation rate",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_cost_performance_costperformance",
+      "target": "concept_rag_platform",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\cost_performance.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_data_lifecycle_management_datalifecycle",
+      "target": "concept_embedding_versioning",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\data_lifecycle_management.md",
+      "source_location": "Embedding reindexing (zero downtime) section",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_deployment_k8s_k8sdeployment",
+      "target": "concept_pgvector_retrieval",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\deployment_k8s.md",
+      "source_location": "Components: Postgres + pgvector (external or managed) as primary vector store",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_deployment_k8s_k8sdeployment",
+      "target": "concept_rag_platform",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\deployment_k8s.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_embedding_lifecycle_ops_embeddinglifecycle",
+      "target": "concept_embedding_versioning",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\embedding_lifecycle_ops.md",
+      "source_location": "blue/green embedding versions via document_chunk.embedding_version",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_embedding_lifecycle_ops_embeddinglifecycle",
+      "target": "concept_k6_load_testing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\embedding_lifecycle_ops.md",
+      "source_location": "End-to-end reindex: Runs a k6 canary",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_embedding_lifecycle_ops_embeddinglifecycle",
+      "target": "concept_slo_reliability",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\embedding_lifecycle_ops.md",
+      "source_location": "If SLOs pass, promotes target -> active atomically",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_embedding_lifecycle_ops_embeddinglifecycle",
+      "target": "docs_data_lifecycle_management_datalifecycle",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\embedding_lifecycle_ops.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "app_eval_experiments_opensearch_hybrid_opensearchhybrid",
+      "target": "app_eval_experiments_hybrid_rrf_hybridrrf",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_hybrid.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "_github_workflows_loadtest_loadtestk6",
+      "target": "_github_workflows_perf_ci_perfregression",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\loadtest.yml",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "eval_ci_pipeline",
+      "label": "CI Eval Pipeline (eval-gates + baseline experiment + demo cases dataset)",
+      "nodes": [
+        "_github_workflows_eval_gates_evalgates",
+        "app_eval_experiments_baseline_baseline",
+        "app_eval_datasets_registry_democases"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\.github\\workflows\\eval-gates.yml"
+    },
+    {
+      "id": "opensearch_hybrid_retrieval_pattern",
+      "label": "OpenSearch Hybrid Retrieval Pattern (experiment + backend + RRF fusion)",
+      "nodes": [
+        "app_eval_experiments_opensearch_hybrid_opensearchhybrid",
+        "concept_opensearch_retrieval",
+        "concept_rrf_fusion"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\app\\eval\\experiments\\opensearch_hybrid.yaml"
+    },
+    {
+      "id": "embedding_reindex_safety_pattern",
+      "label": "Embedding Reindex Safety Pattern (lifecycle ops + versioning + SLO gate)",
+      "nodes": [
+        "docs_embedding_lifecycle_ops_embeddinglifecycle",
+        "concept_embedding_versioning",
+        "concept_slo_reliability"
+      ],
+      "relation": "implement",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "C:\\Users\\Sergiu\\Desktop\\Projects\\Agentic-AI\\ai-native-data-platform\\docs\\embedding_lifecycle_ops.md"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

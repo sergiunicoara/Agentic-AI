@@ -1,0 +1,94 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: victoriametrics-self
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["victoriametrics:8428"]
+        - job_name: vmalert-self
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["vmalert:8880"]
+        - job_name: otel-collector-self
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["localhost:8889"]
+
+  docker_stats:
+    endpoint: "unix:///var/run/docker.sock"
+    collection_interval: 10s
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "local"
+        action: insert
+      - key: service.namespace
+        value: "smartops"
+        action: insert
+
+  resourcedetection:
+    detectors: [env, system]
+    timeout: 5s
+
+exporters:
+  prometheusremotewrite:
+    endpoint: "http://victoriametrics:8428/api/v1/write"
+    tls:
+      insecure: true
+
+  elasticsearch/logs:
+    endpoint: "http://elasticsearch:9200"
+    logs_index: "smartops-logs"
+    tls:
+      insecure: true
+
+  elasticsearch/traces:
+    endpoint: "http://elasticsearch:9200"
+    traces_index: "smartops-traces"
+    tls:
+      insecure: true
+
+  debug:
+    verbosity: basic
+    sampling_initial: 2
+    sampling_thereafter: 500
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp, prometheus, docker_stats]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheusremotewrite]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, resourcedetection, batch]
+      exporters: [elasticsearch/logs]
+
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [elasticsearch/traces]
+
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8889

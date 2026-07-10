@@ -1,0 +1,8 @@
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\.github\workflows\deploy.yml
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\.github\workflows\eval.yml
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\CLAUDE.md
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\README.md
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\app\cv.txt
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\frontend\index.html
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\requirements.txt
+C:\Users\Sergiu\Desktop\Projects\Agentic-AI\recruiter-agent\tasks\lessons.md
