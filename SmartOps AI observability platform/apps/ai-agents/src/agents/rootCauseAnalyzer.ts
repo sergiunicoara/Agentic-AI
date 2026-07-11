@@ -34,7 +34,7 @@ export async function analyzeRootCause(anomaly: AnomalyEvent): Promise<RCAResult
     ]);
 
   const [logResult, traceSpans] = await Promise.all([
-    withFallback(searchLogs("error", anomaly.region, startTime, endTime, 100), 5000, { total: 0, hits: [] }),
+    withFallback(searchLogs("", anomaly.region, startTime, endTime, 100), 5000, { total: 0, hits: [] }),
     withFallback(fetchTracesByRegion(anomaly.region, startTime, endTime, 20), 5000, []),
   ]);
 

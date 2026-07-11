@@ -54,6 +54,8 @@ exporters:
   elasticsearch/logs:
     endpoints: ["http://elasticsearch:9200"]
     logs_index: "smartops-logs"
+    mapping:
+      mode: ecs
     tls:
       insecure: true
 

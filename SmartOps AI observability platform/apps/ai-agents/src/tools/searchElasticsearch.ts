@@ -23,10 +23,19 @@ export async function searchLogs(
   const must: object[] = [];
 
   if (query.trim()) {
-    must.push({ multi_match: { query, fields: ["message", "service"] } });
+    must.push({ multi_match: { query, fields: ["message", "service.name", "service"] } });
   }
   if (region) {
-    must.push({ term: { region } });
+    // ECS mode (OTel): region lands in labels.region; Vector: flat region field
+    must.push({
+      bool: {
+        should: [
+          { match: { "labels.region": region } },
+          { match: { region } },
+        ],
+        minimum_should_match: 1,
+      },
+    });
   }
   if (startTime || endTime) {
     must.push({
@@ -40,19 +49,27 @@ export async function searchLogs(
   }
 
   const res = await esClient.search({
-    index: "smartops-logs-*",
+    index: "smartops-logs*",
     size,
     sort: [{ "@timestamp": { order: "desc" } }],
     query: must.length > 0 ? { bool: { must } } : { match_all: {} },
   });
 
-  const hits = (res.hits.hits as Array<{ _source: Record<string, unknown> }>).map((h) => ({
-    timestamp: h._source["@timestamp"] as string ?? "",
-    message:   h._source.message   as string ?? "",
-    logLevel:  h._source.log_level as string ?? "info",
-    service:   h._source.service   as string ?? "",
-    region:    h._source.region    as string ?? "",
-  }));
+  const hits = (res.hits.hits as Array<{ _source: Record<string, unknown> }>).map((h) => {
+    const src = h._source;
+    // ECS mode (from OTel exporter): log.level, service.name, labels.region
+    // Flat mode (from Vector pipeline):  log_level, service, region
+    const logObj     = src.log     as Record<string, unknown> | undefined;
+    const svcObj     = src.service as Record<string, unknown> | undefined;
+    const labelsObj  = src.labels  as Record<string, unknown> | undefined;
+    return {
+      timestamp: src["@timestamp"] as string ?? "",
+      message:   src.message as string ?? "",
+      logLevel:  ((logObj?.level ?? src.log_level ?? "info") as string).toLowerCase(),
+      service:   (svcObj?.name ?? src.service ?? "") as string,
+      region:    (labelsObj?.region ?? src.region ?? "") as string,
+    };
+  });
 
   const total = typeof res.hits.total === "number"
     ? res.hits.total
