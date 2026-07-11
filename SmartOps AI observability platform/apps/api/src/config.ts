@@ -12,7 +12,7 @@ export const config = {
   host:     optional("HOST", "0.0.0.0"),
   nodeEnv:  optional("NODE_ENV", "development"),
 
-  databaseUrl:        optional("DATABASE_URL", "postgresql://smartops:smartops_dev@localhost:5432/smartops"),
+  databaseUrl:        optional("DATABASE_URL", "postgresql://smartops:smartops_dev@localhost:5433/smartops"),
   victoriaMetricsUrl: optional("VICTORIAMETRICS_URL", "http://localhost:8428"),
   elasticsearchUrl:   optional("ELASTICSEARCH_URL", "http://localhost:9200"),
 

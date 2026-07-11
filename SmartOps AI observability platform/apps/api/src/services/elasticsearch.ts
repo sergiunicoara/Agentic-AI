@@ -55,10 +55,10 @@ export async function searchLogs(
   }
 
   const res = await esClient.search({
-    index: "smartops-logs-*",
+    index: "smartops-logs*",
     from,
     size,
-    sort: [{ "@timestamp": { order: "desc" } }],
+    sort: [{ "@timestamp": { order: "desc", unmapped_type: "date" } }],
     query: must.length > 0 ? { bool: { must } } : { match_all: {} },
   });
 

@@ -5,7 +5,7 @@ export default defineConfig({
   out: "./drizzle/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5432/smartops",
+    url: process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5433/smartops",
   },
   verbose: true,
   strict: true,

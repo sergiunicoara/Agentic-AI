@@ -91,7 +91,7 @@ services:
     image: postgres:16-alpine
     container_name: smartops-pg
     ports:
-      - "5432:5432"
+      - "5433:5432"   # 5432 occupied by host PostgreSQL
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-smartops}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartops_dev}

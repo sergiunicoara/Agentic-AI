@@ -17,13 +17,16 @@
     "stack:logs": "docker compose -f infra/docker/docker-compose.yml logs -f"
   },
   "devDependencies": {
-    "turbo": "^2.1.0",
     "tsx": "^4.15.0",
+    "turbo": "^2.1.0",
     "typescript": "^5.5.0"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.12.0"
+  "packageManager": "pnpm@9.12.0",
+  "dependencies": {
+    "pino-pretty": "^13.1.3"
+  }
 }

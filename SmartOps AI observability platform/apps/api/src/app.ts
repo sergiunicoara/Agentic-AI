@@ -22,9 +22,6 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
   const app = Fastify({
     logger: {
       level: config.nodeEnv === "development" ? "info" : "warn",
-      transport: config.nodeEnv === "development"
-        ? { target: "pino-pretty", options: { colorize: true } }
-        : undefined,
     },
     ...opts,
   });

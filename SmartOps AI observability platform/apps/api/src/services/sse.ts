@@ -13,6 +13,7 @@ export function subscribe(reply: FastifyReply): () => void {
   reply.raw.setHeader("Cache-Control", "no-cache");
   reply.raw.setHeader("Connection", "keep-alive");
   reply.raw.setHeader("X-Accel-Buffering", "no");
+  reply.raw.setHeader("Access-Control-Allow-Origin", "*");
   reply.raw.flushHeaders();
 
   // Send initial connection event

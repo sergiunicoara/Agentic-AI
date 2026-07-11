@@ -8,7 +8,7 @@ address = "0.0.0.0:8686"
 [sources.docker_logs]
 type = "docker_logs"
 docker_host = "unix:///var/run/docker.sock"
-exclude_containers = ["smartops-vector"]
+exclude_containers = ["smartops-vector", "smartops-es", "smartops-vm", "smartops-grafana", "smartops-otel", "smartops-alertmanager", "smartops-vmalert"]
 
 # ── Transforms ───────────────────────────────────────────────
 [transforms.parse_json]
@@ -17,10 +17,13 @@ inputs = ["docker_logs"]
 source = '''
   parsed = parse_json(.message) ?? {}
   . = merge!(., parsed)
-  .service = to_string(del(.container_name)) ?? "unknown"
-  .service = replace(.service, "/", "")
+  .service = if exists(.container_name) { replace(string!(.container_name), "/", "") } else { "unknown" }
+  del(.container_name)
   .region = "local"
   .environment = "local"
+  del(.label)
+  del(.container_id)
+  del(.image)
 '''
 
 [transforms.add_metadata]
@@ -44,4 +47,4 @@ healthcheck.enabled = true
 index = "smartops-logs-%Y.%m.%d"
 
 [sinks.elasticsearch.encoding]
-except_fields = ["source_type", "stream"]
+except_fields = ["source_type", "stream", "label"]
