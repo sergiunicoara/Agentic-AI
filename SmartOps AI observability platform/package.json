@@ -11,6 +11,7 @@
     "dev:web": "turbo run dev --filter=@smartops/web",
     "simulate": "tsx scripts/simulate-infra.ts",
     "simulate:consumer": "tsx scripts/metrics-consumer.ts",
+    "simulate:es-consumer": "tsx scripts/es-consumer.ts",
     "db:generate": "turbo run db:generate --filter=@smartops/api",
     "db:migrate": "turbo run db:migrate --filter=@smartops/api",
     "stack:up": "docker compose -f infra/docker/docker-compose.yml up -d",
