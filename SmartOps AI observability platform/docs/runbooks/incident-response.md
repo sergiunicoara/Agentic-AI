@@ -8,17 +8,17 @@ This runbook covers how to respond to infrastructure alerts surfaced by SmartOps
 
 ## 1. Alert Fires (vmalert → Alertmanager)
 
-vmalert evaluates rules every 60 seconds against VictoriaMetrics.  
+vmalert evaluates rules every 30 seconds against VictoriaMetrics.  
 Alert rules live in [`infra/victoria/vmalert-rules.yml`](../../infra/victoria/vmalert-rules.yml).
 
 | Alert | Threshold | Severity |
 |---|---|---|
-| HighCPUUsage | CPU > 85% for 5m | warning |
-| CriticalCPUUsage | CPU > 95% for 2m | critical |
-| HighMemoryUsage | memory > 90% for 5m | warning |
-| LowDiskSpace | disk > 80% for 10m | warning |
-| HighErrorRate | HTTP error rate > 5% | critical |
-| HighP99Latency | p99 > 2000ms for 5m | warning |
+| HighCPUUsage | CPU > 85% for 2m | warning |
+| CriticalCPUUsage | CPU > 95% for 1m | critical |
+| HighMemoryUsage | memory > 90% for 3m | warning |
+| LowDiskSpace | disk > 80% for 5m | warning |
+| HighErrorRate | HTTP error rate > 5% for 2m | warning |
+| HighP99Latency | p99 > 2000ms for 2m | warning |
 
 Alertmanager routes fire to your configured receiver (email/PagerDuty/Slack — configure in `infra/docker/alertmanager.yml`).
 
