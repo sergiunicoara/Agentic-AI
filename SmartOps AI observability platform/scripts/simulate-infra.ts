@@ -10,13 +10,23 @@
  */
 
 import { Client } from "pg";
+import { Kafka, Partitioners, type Producer } from "kafkajs";
 
 // ── Config ────────────────────────────────────────────────────
-const VM_URL      = process.env.VICTORIAMETRICS_URL ?? "http://localhost:8428";
-const OTEL_URL    = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318";
-const DB_URL      = process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5433/smartops";
-const INTERVAL_MS = 5_000;
+const KAFKA_BROKERS      = process.env.KAFKA_BROKERS ?? "localhost:9092";
+const METRICS_TOPIC      = "smartops.metrics";
+const OTEL_URL           = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318";
+const DB_URL             = process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5433/smartops";
+const INTERVAL_MS        = 5_000;
 const ANOMALY_INTERVAL_MS = 60_000;
+
+// ── Kafka producer ────────────────────────────────────────────
+const kafka = new Kafka({
+  clientId: "smartops-simulator",
+  brokers: [KAFKA_BROKERS],
+  retry: { retries: 5, initialRetryTime: 1_000 },
+});
+let producer: Producer;
 
 // ── Regions ───────────────────────────────────────────────────
 const REGIONS = [
@@ -60,35 +70,38 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
-// ── Prometheus remote-write ───────────────────────────────────
-// Uses the simplest form: text/plain Prometheus exposition format
-// pushed to /api/v1/import/prometheus on VictoriaMetrics
-async function pushMetrics(metrics: string): Promise<void> {
-  const res = await fetch(`${VM_URL}/api/v1/import/prometheus`, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: metrics,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`[VM] Push failed ${res.status}: ${body.slice(0, 200)}`);
-  }
+// ── Kafka metric publish ──────────────────────────────────────
+// Publishes a structured JSON message to the smartops.metrics topic.
+// A separate consumer (scripts/metrics-consumer.ts) reads from the topic
+// and writes to VictoriaMetrics — decoupling ingestion from storage.
+interface MetricMessage {
+  region: string;
+  host: string;
+  timestamp: number;
+  metrics: {
+    cpu: number; memory: number; disk: number;
+    netIn: number; netOut: number;
+    rps: number; errorRate: number; p99: number;
+  };
+  labels: Record<string, string>;
 }
 
-function buildMetrics(regionName: string, host: string, s: typeof state[string]): string {
-  const ts = Date.now();
-  const labels = `region="${regionName}",host="${host}",environment="local"`;
-  const lines = [
-    `smartops_cpu_usage_percent{${labels}} ${s.cpu.toFixed(2)} ${ts}`,
-    `smartops_memory_usage_percent{${labels}} ${s.mem.toFixed(2)} ${ts}`,
-    `smartops_disk_usage_percent{${labels}} ${s.disk.toFixed(2)} ${ts}`,
-    `smartops_network_in_mbps{${labels}} ${s.netIn.toFixed(2)} ${ts}`,
-    `smartops_network_out_mbps{${labels}} ${s.netOut.toFixed(2)} ${ts}`,
-    `smartops_http_requests_total{${labels},service="api"} ${Math.floor(s.rps)} ${ts}`,
-    `smartops_http_errors_total{${labels},service="api"} ${Math.floor(s.rps * s.errorRate / 100)} ${ts}`,
-    `smartops_http_latency_p99_ms{${labels},service="api"} ${s.p99.toFixed(2)} ${ts}`,
-  ];
-  return lines.join("\n") + "\n";
+async function publishMetrics(regionName: string, host: string, s: typeof state[string]): Promise<void> {
+  const message: MetricMessage = {
+    region: regionName,
+    host,
+    timestamp: Date.now(),
+    metrics: {
+      cpu: s.cpu, memory: s.mem, disk: s.disk,
+      netIn: s.netIn, netOut: s.netOut,
+      rps: s.rps, errorRate: s.errorRate, p99: s.p99,
+    },
+    labels: { environment: "local" },
+  };
+  await producer.send({
+    topic: METRICS_TOPIC,
+    messages: [{ key: regionName, value: JSON.stringify(message) }],
+  });
 }
 
 // ── OTel log push ─────────────────────────────────────────────
@@ -252,9 +265,8 @@ async function loop(): Promise<void> {
     const s = state[region.name];
     const host = `${region.name}-host-01`;
 
-    // Push metrics
-    const metricsText = buildMetrics(region.name, host, s);
-    pushes.push(pushMetrics(metricsText));
+    // Publish metrics to Kafka (consumer forwards to VictoriaMetrics)
+    pushes.push(publishMetrics(region.name, host, s));
 
     // Push log (every other tick to avoid noise)
     if (Math.random() > 0.5) {
@@ -278,13 +290,25 @@ async function loop(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log("SmartOps Infrastructure Simulator");
-  console.log(`  VictoriaMetrics : ${VM_URL}`);
+  console.log(`  Kafka           : ${KAFKA_BROKERS}  topic=${METRICS_TOPIC}`);
   console.log(`  OTel HTTP       : ${OTEL_URL}`);
   console.log(`  PostgreSQL      : ${DB_URL}`);
   console.log(`  Interval        : ${INTERVAL_MS}ms`);
   console.log(`  Anomaly every   : ~${ANOMALY_INTERVAL_MS / 1000}s\n`);
 
+  producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
+  await producer.connect();
+  console.log("[Kafka] Producer connected");
+
   await seedPostgres();
+
+  const shutdown = async () => {
+    console.log("\nShutting down producer...");
+    await producer.disconnect();
+    process.exit(0);
+  };
+  process.on("SIGINT",  shutdown);
+  process.on("SIGTERM", shutdown);
 
   console.log("\nStarting metric loop (Ctrl+C to stop)...\n");
   await loop();
