@@ -24,11 +24,10 @@ services:
     command:
       - "--promscrape.config=/etc/victoria/prometheus.yml"
       - "--retentionPeriod=90d"
-      - "--downsampling.period=30d:5m,60d:1h"
     networks: [smartops]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8428/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8428/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -81,10 +80,11 @@ services:
     networks: [smartops]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -v '\"status\":\"red\"'"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9200/_cluster/health | grep -v '\"status\":\"red\"'"]
       interval: 15s
       timeout: 10s
       retries: 10
+      start_period: 60s
 
   # ── Relational store ──────────────────────────────────────────
   postgres:
@@ -131,10 +131,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   # ── OTel Collector ────────────────────────────────────────────
   otel-collector:
@@ -146,7 +147,6 @@ services:
       - "8889:8889"   # Prometheus metrics (self)
     volumes:
       - ../otel/collector-config.yaml:/etc/otel/config.yaml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: ["--config=/etc/otel/config.yaml"]
     networks: [smartops]
     depends_on:

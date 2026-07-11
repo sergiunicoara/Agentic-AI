@@ -15,26 +15,20 @@ exclude_containers = ["smartops-vector"]
 type = "remap"
 inputs = ["docker_logs"]
 source = '''
-  # Try to parse the message as JSON; fall back to raw string
-  parsed, err = parse_json(.message)
-  if err == null {
-    . = merge(., parsed)
-  }
-
-  # Normalize fields
-  .service = del(.container_name) ?? "unknown"
+  parsed = parse_json(.message) ?? {}
+  . = merge!(., parsed)
+  .service = to_string(del(.container_name)) ?? "unknown"
   .service = replace(.service, "/", "")
-  .region = get_env_var("SMARTOPS_REGION") ?? "local"
+  .region = "local"
   .environment = "local"
-  .@timestamp = to_string(now())
 '''
 
 [transforms.add_metadata]
 type = "remap"
 inputs = ["parse_json"]
 source = '''
-  .log_level = downcase(string(.level ?? .severity ?? "info"))
-  .host = .host ?? "smartops-local"
+  .log_level = downcase(string!(.level || .severity || "info"))
+  .host = string!(.host || "smartops-local")
 '''
 
 # ── Sinks ─────────────────────────────────────────────────────
@@ -43,9 +37,11 @@ type = "elasticsearch"
 inputs = ["add_metadata"]
 endpoints = ["http://elasticsearch:9200"]
 mode = "bulk"
-index = "smartops-logs-%Y.%m.%d"
 compression = "none"
 healthcheck.enabled = true
+
+[sinks.elasticsearch.bulk]
+index = "smartops-logs-%Y.%m.%d"
 
 [sinks.elasticsearch.encoding]
 except_fields = ["source_type", "stream"]

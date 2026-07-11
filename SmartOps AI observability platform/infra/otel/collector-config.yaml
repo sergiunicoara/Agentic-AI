@@ -22,10 +22,6 @@ receivers:
           static_configs:
             - targets: ["localhost:8889"]
 
-  docker_stats:
-    endpoint: "unix:///var/run/docker.sock"
-    collection_interval: 10s
-
 processors:
   batch:
     timeout: 1s
@@ -56,13 +52,13 @@ exporters:
       insecure: true
 
   elasticsearch/logs:
-    endpoint: "http://elasticsearch:9200"
+    endpoints: ["http://elasticsearch:9200"]
     logs_index: "smartops-logs"
     tls:
       insecure: true
 
   elasticsearch/traces:
-    endpoint: "http://elasticsearch:9200"
+    endpoints: ["http://elasticsearch:9200"]
     traces_index: "smartops-traces"
     tls:
       insecure: true
@@ -75,7 +71,7 @@ exporters:
 service:
   pipelines:
     metrics:
-      receivers: [otlp, prometheus, docker_stats]
+      receivers: [otlp, prometheus]
       processors: [memory_limiter, resource, batch]
       exporters: [prometheusremotewrite]
 
