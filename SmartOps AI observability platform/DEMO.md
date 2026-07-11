@@ -40,13 +40,28 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-**Terminal 4 — Simulator** *(keep this visible during the demo)*
+**Terminal 4 — Kafka producer** *(keep this visible during the demo)*
 ```bash
 pnpm simulate
 ```
 
 > ℹ️ On first run the simulator prints `[DB] Seed skipped` — this is harmless. The database
-> is already seeded from previous runs. Metrics still push to VictoriaMetrics normally.
+> is already seeded from previous runs. Metrics still publish to Kafka normally.
+
+**Terminal 5 — VictoriaMetrics consumer**
+```bash
+pnpm simulate:consumer
+```
+
+**Terminal 6 — Elasticsearch consumer**
+```bash
+pnpm simulate:es-consumer
+```
+
+> ℹ️ All three must be running for the full pipeline: producer publishes to Kafka,
+> consumers fan out to VictoriaMetrics (dashboard) and Elasticsearch (RCA logs).
+> The OTel Collector must also be running (`pnpm stack:up`) — logs go directly from
+> the simulator to OTel on port 4318, bypassing Kafka.
 
 **Browser tabs to have open:**
 | Tab | URL |
@@ -96,6 +111,12 @@ Error Rate — each with a sparkline updating every 5 seconds. A green "Live" do
 > "This is the dashboard — real-time telemetry from three regions: EU West, US East, AP South.
 > The data you're seeing is coming from VictoriaMetrics, refreshing over a Server-Sent Events
 > stream every 2 seconds.
+>
+> The metric pipeline is: the simulator publishes a structured JSON event to a Kafka topic every
+> 5 seconds. A consumer in a separate process reads that topic and remote-writes to VictoriaMetrics.
+> A second consumer — different consumer group, completely independent — bulk-indexes the same
+> events to Elasticsearch. That's the Kafka fan-out pattern: one producer, multiple sinks,
+> neither consumer knows about the other.
 >
 > I chose VictoriaMetrics over Prometheus for a specific reason. It exposes the exact same
 > PromQL API, so any Grafana dashboard works without changes. But VictoriaMetrics gives you
@@ -240,15 +261,17 @@ and 2–3 specific remediation actions. Two buttons: Approve and Reject.*
 > In a fully connected environment with real Elasticsearch and Jaeger, you'd see specific
 > error messages and slow service spans named here.
 >
-> Notice the confidence score — typically around 40%. The RCA agent runs three evidence
-> queries in parallel: VictoriaMetrics for related metrics, Elasticsearch for error logs,
-> and a trace store for distributed spans. In this demo, Elasticsearch starts but has no
-> pre-seeded log index, so those two sources return empty. Claude has metric evidence only —
-> it can see the CPU spike but has no correlated logs or traces to back up its hypothesis,
-> so it scores itself honestly at ~40%. In a production setup with real log data, you'd see
-> 75–80% confidence with specific log lines and trace IDs in the suggested actions.
-> I'd rather surface a low-confidence alert and let the human decide than pretend the AI
-> is more certain than it is. That's a deliberate design choice.
+> Notice the confidence score. The formula is `0.40 base + errorLogs × 0.02 + traceSpans × 0.03`.
+> With a fresh stack and no log history you'll see ~40%. After the simulator has run through
+> one or two anomaly cycles — typically 2–3 minutes — the Elasticsearch log index has enough
+> error-level entries from this region that the score rises to 60–80%.
+>
+> The RCA agent runs three evidence queries in parallel: VictoriaMetrics for related metrics,
+> Elasticsearch for error logs from the same region and time window, and a trace store for
+> slow spans. All three run concurrently — if one fails or times out, the workflow continues
+> with whatever evidence came back. The confidence score communicates data quality honestly
+> to the human reviewer. I'd rather surface a lower score and let a person decide than have
+> the system project false certainty."
 >
 > And the remediation actions — specific to what the agent found. 'SSH into node-01, run
 > ps aux sorted by CPU to find the offending process.' That's actionable. Not 'check your
@@ -313,11 +336,15 @@ minutes ago is clearly visible as a peak in the CPU panel.*
 > workflow endpoints require the operator or admin role — a viewer account can see incidents
 > but can't trigger workflows or approve them.
 >
-> If I were taking this to production: VictoriaMetrics Cluster for horizontal scaling, a real
-> Elasticsearch cluster for log correlation, Kafka as the event bus between the metric pipeline
-> and the AI detection layer, and a Redis-backed job queue for workflows instead of the
-> in-process Mastra runner. The architecture separates detection, analysis, and approval
-> cleanly — each scales independently."
+> The metric pipeline is already Kafka-backed — the simulator publishes JSON events to a topic,
+> two consumer groups fan out independently to VictoriaMetrics and Elasticsearch. Adding a third
+> sink is a new consumer file; the producer doesn't change.
+>
+> To take this to production: VictoriaMetrics Cluster for horizontal metric scaling, a dedicated
+> Elasticsearch cluster for log correlation at volume, a Kafka Schema Registry to enforce the
+> MetricMessage contract between producers and consumers, and a Redis-backed workflow store
+> instead of the in-process Mastra SQLite runner — so any API replica can resume a suspended
+> workflow, not just the one that started it."
 
 ---
 
@@ -354,11 +381,11 @@ minutes ago is clearly visible as a peak in the CPU panel.*
 
 **"How would you scale this to production?"**
 
-> "VictoriaMetrics Cluster for the metrics layer. Kafka between the metric pipeline and the AI
-> detection so you can replay events and add consumers without changing producers. Dedicated
-> Elasticsearch cluster for real log correlation. The Mastra workflow runner moves from
-> in-process SQLite to a Redis-backed queue — same API, different persistence. The Fastify
-> API and Next.js frontend are already stateless so they scale horizontally as-is."
+> "Kafka is already in the stack — metric events are published once and two consumer groups
+> fan out independently. Adding more consumers doesn't touch the producer. For the rest:
+> VictoriaMetrics Cluster for horizontal metric storage, a dedicated Elasticsearch cluster,
+> and a Redis-backed Mastra workflow store so any API replica can resume a suspended run.
+> The Fastify API and Next.js frontend are already stateless — they scale horizontally as-is."
 
 ---
 
@@ -373,35 +400,49 @@ minutes ago is clearly visible as a peak in the CPU panel.*
 
 **"What would you do differently if you started over?"**
 
-> "I'd add Kafka earlier rather than treating it as a scaling concern. The event-sourcing
-> pattern it enables — where every metric reading is a persistent, replayable event — makes
-> the AI detection layer much more robust. You can replay a time window to re-analyze
-> incidents with a newer model, or run multiple detection strategies in parallel as consumers.
-> Right now the simulator pushes directly to VictoriaMetrics; adding Kafka in between would
-> decouple the collection, storage, and analysis pipeline cleanly."
+> "I'd add a Kafka Schema Registry from day one. Right now the MetricMessage contract between
+> the simulator and both consumers is a TypeScript interface — it's enforced at compile time
+> but nothing catches a breaking change at runtime if a consumer is on an older build. A
+> Schema Registry with Avro would make schema evolution explicit and versioned.
+>
+> I'd also wire up OpenTelemetry spans around each agent.generate() call. The platform is
+> built to observe infrastructure — but the AI layer itself is a black box. Tracing LLM
+> latency and tool call counts with the same OTel stack that traces everything else would
+> be a natural fit and close an obvious irony."
 
 ---
 
-**"Why is the confidence score only 40%?"**
+**"Why is the confidence score only 40%?" / "What raises it?"**
 
-> "Specific answer to a specific question — I like it. The RCA agent queries three sources
-> in parallel: VictoriaMetrics for correlated metrics, Elasticsearch for error logs, and
-> a trace store for slow spans. In this demo environment, Elasticsearch starts but has no
-> pre-seeded log index, so the log and trace queries return empty. Claude is reasoning
-> from metric evidence alone — it can see the CPU spike but has nothing to correlate it
-> against. So it reports 40% rather than inventing certainty it doesn't have.
+> "The confidence formula is `0.40 + errorLogs × 0.02 + traceSpans × 0.03`. Base is 40% —
+> metric evidence only. Each error-level log from the same region and time window adds 2 points;
+> each correlated trace span adds 3.
 >
-> That's intentional. The confidence score is honest signal for the human reviewer.
-> In a fully wired environment — real Elasticsearch with application logs, Jaeger with
-> trace data — you'd see 75–80% with specific error messages and slow service spans
-> named in the suggested actions. The architecture supports that; the demo just doesn't
-> have the data."
+> The demo is wired to push this above 40%. The OTel Collector uses ECS field mapping so
+> simulator logs land with the field names the RCA agent queries — `message`, `log.level`,
+> `labels.region`. The second Kafka consumer bulk-indexes the same metric events to
+> Elasticsearch. Once the simulator has run through one or two anomaly cycles, the RCA agent
+> finds 10–20 error-level logs in the 12-minute correlation window and confidence rises
+> to 60–80%.
+>
+> The design principle: confidence is honest signal, not marketing. A score below 75% tells
+> the human reviewer the AI is working from limited evidence and they should verify independently.
+> That transparency is intentional — I'd rather surface a low-confidence alert than let the
+> system project false certainty."
 
 ---
 
 ## TROUBLESHOOTING
 
 Common issues and how to handle them during the demo.
+
+**Dashboard shows no data / values are all zero**
+
+The metric pipeline requires three processes: the Kafka producer (`pnpm simulate`), the
+VictoriaMetrics consumer (`pnpm simulate:consumer`), and the infrastructure stack (`pnpm stack:up`).
+If the consumer isn't running, metrics are published to Kafka but never reach VictoriaMetrics,
+so the dashboard shows nothing. Start all three and wait ~10 seconds for the consumer to
+catch up on any buffered messages.
 
 **Dashboard values lag behind the simulator terminal**
 

@@ -19,12 +19,15 @@ infra/
   docker/       Docker Compose — brings up the full observability stack locally
   helm/         Helm chart for Kubernetes deployment
   grafana/      Provisioned dashboards (golden signals, log explorer, asset audit)
-  otel/         OTel Collector config (OTLP → VictoriaMetrics + Elasticsearch)
-  vector/       Vector log pipeline (Docker logs → Elasticsearch)
+  otel/         OTel Collector config (OTLP → Elasticsearch, ECS log mapping)
+  vector/       Vector log pipeline (Docker container logs → Elasticsearch)
   victoria/     VictoriaMetrics scrape config + VMAlert rules
 
 e2e/            Playwright end-to-end test suite
-scripts/        Infrastructure simulator (generates synthetic metrics/logs/traces)
+scripts/
+  simulate-infra.ts    Kafka producer — publishes JSON metric events, pushes OTel logs
+  metrics-consumer.ts  Consumer group smartops-vm-writer → VictoriaMetrics remote-write
+  es-consumer.ts       Consumer group smartops-es-writer → Elasticsearch bulk index
 ```
 
 ---
@@ -45,7 +48,7 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant SN as ServiceNow
 
-    Note over VM: Simulator pushes metrics every 5 s
+    Note over VM: Simulator → Kafka → metrics-consumer → VM (every 5 s)
 
     U->>W: Click "Run AI Scan"
     W->>A: GET /ai/insights
@@ -90,21 +93,23 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    subgraph SIM["Traffic Simulator"]
-        S["scripts/simulate-infra.ts\nmetrics every 5 s · anomaly every ~60 s"]
+    subgraph SIM["Scripts (run on host)"]
+        PROD["simulate-infra.ts\nKafka producer · OTel logs every 5 s"]
+        VMC["metrics-consumer.ts\ngroupId: smartops-vm-writer"]
+        ESC["es-consumer.ts\ngroupId: smartops-es-writer\nbulk index · 50 docs/flush"]
     end
 
     subgraph INFRA["Infrastructure (Docker Compose)"]
+        KAFKA["Kafka :9092 · KRaft mode\ntopic: smartops.metrics\n2 independent consumer groups"]
         VM["VictoriaMetrics :8428\ntime-series metrics (PromQL)"]
-        ES["Elasticsearch :9200\nlogs + trace spans"]
+        ES["Elasticsearch :9200\nlogs (OTel ECS) · metrics (Kafka) · traces"]
         PG["PostgreSQL :5433\nincidents · assets · alert rules · users"]
         GF["Grafana :3002\nprovisioned dashboards"]
-        OTEL["OTel Collector :4317/:4318\nOTLP ingestion"]
+        OTEL["OTel Collector :4318\nOTLP ingestion · ECS log mapping"]
     end
 
     subgraph APPAPI["API — Fastify 4 (:3000)"]
         ROUTES["REST routes + Swagger"]
-        AUTH["JWT RS256 · RBAC preHandler"]
         SSE["SSE /metrics/stream"]
         AIMOD["@smartops/ai-agents\nMastra workflows + agents"]
     end
@@ -120,9 +125,13 @@ flowchart TD
         SNOW["ServiceNow\nincident creation"]
     end
 
-    S -->|"Prometheus exposition"| VM
-    S -->|"OTLP HTTP"| OTEL
-    OTEL --> ES
+    PROD -->|"JSON MetricMessage"| KAFKA
+    PROD -->|"OTLP HTTP"| OTEL
+    KAFKA -->|"fan-out"| VMC
+    KAFKA -->|"fan-out"| ESC
+    VMC -->|"Prometheus remote-write"| VM
+    ESC -->|"bulk API"| ES
+    OTEL -->|"ECS mapping"| ES
     VM --> GF
     VM -->|"PromQL"| AIMOD
     ES -->|"Search API"| AIMOD
@@ -145,8 +154,9 @@ flowchart TD
 | API | Fastify 4, Drizzle ORM, PostgreSQL 16, JWT |
 | Frontend | Next.js 14 App Router, Tailwind CSS, Recharts, SWR |
 | AI Agents | Mastra, Anthropic Claude (`@ai-sdk/anthropic`) |
+| Message broker | Kafka 3.7 (KRaft, no ZooKeeper) — metric fan-out to VM + ES |
 | Metrics | VictoriaMetrics + VMAlert + Alertmanager |
-| Logs & Traces | Elasticsearch 8 + OTel Collector + Vector pipeline |
+| Logs & Traces | Elasticsearch 8 + OTel Collector (ECS mapping) + Vector pipeline |
 | Telemetry | OpenTelemetry Collector (OTLP gRPC :4317 / HTTP :4318) |
 | Dashboards | Grafana 10 (provisioned, reads from VictoriaMetrics) |
 | Monorepo | pnpm workspaces + Turborepo |
@@ -199,14 +209,20 @@ pnpm dev:api      # Fastify on :3000
 pnpm dev:web      # Next.js on :3001
 ```
 
-### 6. Start the simulator
+### 6. Start the metric pipeline (three terminals)
 
 ```bash
+# Terminal A — Kafka producer: publishes JSON metric events + OTel logs
 pnpm simulate
+
+# Terminal B — VictoriaMetrics consumer: reads topic → remote-write to VM
+pnpm simulate:consumer
+
+# Terminal C — Elasticsearch consumer: reads topic → bulk-index to smartops-metrics-*
+pnpm simulate:es-consumer
 ```
 
-Pushes synthetic metrics to VictoriaMetrics and logs to Elasticsearch every 5 seconds.
-Injects a CPU anomaly spike into a random region every ~60 seconds.
+The simulator publishes a `MetricMessage` to the `smartops.metrics` Kafka topic every 5 seconds per region. The two consumers read from independent consumer groups — stopping one doesn't affect the other. OTel logs go directly from the simulator to the OTel Collector (port 4318) and land in Elasticsearch under `smartops-logs` with ECS field mapping.
 
 ---
 
@@ -218,6 +234,7 @@ Injects a CPU anomaly spike into a random region every ~60 seconds.
 | Swagger | http://localhost:3000/api/docs | — |
 | Web dashboard | http://localhost:3001 | `admin@smartops.local` / `smartops_dev` |
 | Grafana | http://localhost:3002 | `admin` / `smartops_dev` |
+| Kafka broker | localhost:9092 | — (no UI; use `kafka-topics.sh --bootstrap-server localhost:9092 --list`) |
 | VictoriaMetrics | http://localhost:8428 | — |
 | Elasticsearch | http://localhost:9200 | — |
 | Alertmanager | http://localhost:9093 | — |
@@ -288,29 +305,31 @@ The one limitation: SSE is text-only. If the metrics payload grew to the point w
 
 ### 8. What I'd change with more time
 
-**Add Kafka between the simulator and VictoriaMetrics.** Right now the simulator pushes directly. Adding Kafka as the event bus decouples collection from storage and enables event replay — running the AI detection against a historical window without re-simulating. Multiple consumers (anomaly detection, alerting, audit log) can subscribe independently without the simulator knowing about them.
+**Add a Kafka Schema Registry.** The `MetricMessage` contract between the simulator and both consumers is currently a TypeScript interface shared by convention — nothing enforces schema compatibility at runtime. A Schema Registry (Confluent or Redpanda) with Avro or Protobuf would catch breaking changes before they reach consumers in production, and enable schema evolution without coordinated deploys.
 
-**Wire up real Elasticsearch and Jaeger.** The RCA agent is designed for them; the tool implementations are complete. In the current demo setup both services start but the log index mapping isn't pre-seeded, which causes query errors that fall back to empty results. A proper index template and some seed log data would push RCA confidence from ~0.40 to ~0.75+ and make the suggested actions concretely evidence-based.
+**Instrument the agent calls with OpenTelemetry.** The API is already wired to the OTel Collector. Wrapping each `agent.generate()` call in an OTel span would produce traces showing LLM latency, tool call counts, and retry attempts — making the AI layer observable with the same tooling as the rest of the platform. Currently the Claude calls are a black box inside an observability platform, which is an irony worth fixing.
 
-**Instrument the agent calls with OpenTelemetry.** The API is already wired to the OTel Collector. Wrapping each `agent.generate()` call in an OTel span would produce traces showing LLM latency, tool call counts, and retry attempts — making the AI layer observable with the same tooling as the rest of the platform. Currently it's a black box within an observability platform, which is an irony worth fixing.
+**Replace in-process Mastra state with a Redis-backed workflow store.** SQLite is fine for a single-process local setup. For horizontal scaling — multiple API instances behind a load balancer — the workflow state needs to be shared so any instance can resume a suspended run. Mastra supports external storage backends; wiring up Redis or a Postgres-backed store would be the production path.
 
-**Replace in-process Mastra state with a Redis-backed queue.** SQLite is fine for a single-process local setup. For horizontal scaling — multiple API instances behind a load balancer — the workflow state needs to be shared. Mastra supports external storage backends; wiring up Redis or a Postgres-backed workflow store would be the production path.
+**Add a dead-letter topic for failed consumer messages.** Both Kafka consumers silently re-queue on ES/VM errors. A dead-letter topic (`smartops.metrics.dlq`) would capture failed messages for inspection and replay without blocking the main consumer group — standard production Kafka practice.
 
 ---
 
 ## Scripts
 
 ```bash
-pnpm dev              # Run all apps in watch mode
-pnpm build            # Build all packages
-pnpm typecheck        # TypeScript check across all packages
-pnpm lint             # Lint all packages
-pnpm simulate         # Run infrastructure traffic simulator
-pnpm db:generate      # Generate Drizzle migrations
-pnpm db:migrate       # Apply migrations
-pnpm stack:up         # Start Docker Compose infrastructure
-pnpm stack:down       # Stop infrastructure
-pnpm stack:logs       # Tail infrastructure logs
+pnpm dev                  # Run all apps in watch mode
+pnpm build                # Build all packages
+pnpm typecheck            # TypeScript check across all packages
+pnpm lint                 # Lint all packages
+pnpm simulate             # Kafka producer: publishes metric events + OTel logs
+pnpm simulate:consumer    # Kafka consumer → VictoriaMetrics remote-write
+pnpm simulate:es-consumer # Kafka consumer → Elasticsearch bulk index
+pnpm db:generate          # Generate Drizzle migrations
+pnpm db:migrate           # Apply migrations
+pnpm stack:up             # Start Docker Compose infrastructure (includes Kafka)
+pnpm stack:down           # Stop infrastructure
+pnpm stack:logs           # Tail infrastructure logs
 ```
 
 ---
