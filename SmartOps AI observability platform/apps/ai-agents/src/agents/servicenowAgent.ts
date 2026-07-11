@@ -12,7 +12,7 @@ Given an RCA summary, correlated evidence, and suggested actions, produce:
 - A full description incorporating the RCA narrative and evidence
 - An urgency level: "1" (high) if confidence > 0.8 or critical service impact, "2" (medium) otherwise, "3" (low) for minor issues
 Call the create-servicenow-ticket tool with these fields once drafted.`,
-  model: anthropic("claude-3-5-haiku-20241022"),
+  model: anthropic("claude-haiku-4-5-20251001"),
   tools: { createSnowTicketTool },
 });
 

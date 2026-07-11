@@ -14,7 +14,7 @@ import { Client } from "pg";
 // ── Config ────────────────────────────────────────────────────
 const VM_URL      = process.env.VICTORIAMETRICS_URL ?? "http://localhost:8428";
 const OTEL_URL    = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318";
-const DB_URL      = process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5432/smartops";
+const DB_URL      = process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5433/smartops";
 const INTERVAL_MS = 5_000;
 const ANOMALY_INTERVAL_MS = 60_000;
 
@@ -155,16 +155,19 @@ function tick(regionName: string): void {
   const baseTarget = { cpu: 35, mem: 55, disk: 45, rps: 250, p99: 100, errorRate: 1.0 };
 
   if (s.anomalyActive) {
-    s.cpu = clamp(drift(s.cpu, 95, 0.3), 0, 100);
-    s.p99 = clamp(drift(s.p99, 3000, 0.2), 0, 10000);
-    s.errorRate = clamp(drift(s.errorRate, 8, 0.2), 0, 100);
+    s.cpu = clamp(drift(s.cpu, 95, 0.5), 0, 100);
+    s.p99 = clamp(drift(s.p99, 3000, 0.4), 0, 10000);
+    s.errorRate = clamp(drift(s.errorRate, 8, 0.3), 0, 100);
   } else {
-    s.cpu       = clamp(jitter(drift(s.cpu,       baseTarget.cpu,       0.02), 3), 0,     100);
+    // Use faster drift speed when recovering from a spike so the dashboard
+    // reflects resolution within a few ticks rather than 5+ minutes.
+    const recovering = (v: number, target: number) => v > target + 15 ? 0.2 : 0.02;
+    s.cpu       = clamp(jitter(drift(s.cpu,       baseTarget.cpu,       recovering(s.cpu, baseTarget.cpu)), 3), 0,     100);
     s.mem       = clamp(jitter(drift(s.mem,       baseTarget.mem,       0.01), 2), 0,     100);
     s.disk      = clamp(jitter(drift(s.disk,      baseTarget.disk,      0.005), 1), 0,    100);
     s.rps       = clamp(jitter(drift(s.rps,       baseTarget.rps,       0.03), 10), 0,   2000);
-    s.p99       = clamp(jitter(drift(s.p99,       baseTarget.p99,       0.05), 15), 5,   5000);
-    s.errorRate = clamp(jitter(drift(s.errorRate, baseTarget.errorRate, 0.04), 20), 0,     10);
+    s.p99       = clamp(jitter(drift(s.p99,       baseTarget.p99,       recovering(s.p99, baseTarget.p99)), 15), 5,   5000);
+    s.errorRate = clamp(jitter(drift(s.errorRate, baseTarget.errorRate, recovering(s.errorRate, baseTarget.errorRate)), 20), 0, 10);
     s.netIn     = clamp(jitter(s.netIn, 8), 0, 1000);
     s.netOut    = clamp(jitter(s.netOut, 8), 0, 1000);
   }
@@ -230,6 +233,11 @@ async function loop(): Promise<void> {
     anomalyTimer = 0;
     const target = REGIONS[Math.floor(Math.random() * REGIONS.length)];
     state[target.name].anomalyActive = true;
+    // Kick-start so the first VM push is already elevated — without this,
+    // a region at 40% baseline takes the full 25-second spike duration just
+    // to ramp up to detectable levels, leaving nothing for the demo to catch.
+    state[target.name].cpu = Math.max(state[target.name].cpu, 72);
+    state[target.name].p99 = Math.max(state[target.name].p99, 600);
     console.log(`\n[ANOMALY] Injecting CPU spike into ${target.name}`);
     setTimeout(() => {
       state[target.name].anomalyActive = false;

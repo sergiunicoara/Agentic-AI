@@ -54,10 +54,17 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
       security: [{ bearerAuth: [] }],
     },
   });
-  await app.register(swaggerUi, {
-    routePrefix: "/api/docs",
-    uiConfig: { docExpansion: "list", deepLinking: false },
-  });
+  // Register swagger-ui inside an /api scope so routePrefix "/docs" generates
+  // paths like "./docs/static/..." which, from a page served at /api/docs,
+  // resolve to /api/docs/static/... — avoiding the double-prefix bug that
+  // occurs when routePrefix "/api/docs" generates "./api/docs/static/..."
+  // relative to a page at /api/docs (parent dir /api/ → /api/api/docs/...).
+  await app.register(async (scope) => {
+    await scope.register(swaggerUi, {
+      routePrefix: "/docs",
+      uiConfig: { docExpansion: "list", deepLinking: false },
+    });
+  }, { prefix: "/api" });
 
   // ── Auth + RBAC + Audit plugins ──────────────────────────────
   await app.register(authPlugin);

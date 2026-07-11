@@ -42,35 +42,39 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
   });
 
   // ── POST /ai/workflows/alert-to-ticket ─────────────────────
-  fastify.post<{ Body: { metric: string; region: string } }>("/workflows/alert-to-ticket", {
+  fastify.post<{ Body: { metric: string; region: string; anomaly?: Record<string, unknown> } }>("/workflows/alert-to-ticket", {
     schema: {
       tags: ["ai"],
       summary: "Run anomaly detection -> RCA -> suspend for human approval",
       body: {
         type: "object",
         required: ["metric", "region"],
-        properties: { metric: { type: "string" }, region: { type: "string" } },
+        properties: {
+          metric: { type: "string" },
+          region: { type: "string" },
+          anomaly: { type: "object", additionalProperties: true },
+        },
       },
     },
     preHandler: [fastify.verifyJWT, fastify.requireRole(["admin", "operator"])],
     async handler(request, reply) {
-      const { metric, region } = request.body;
+      const { metric, region, anomaly } = request.body;
       const workflow = mastra.getWorkflow("alertToTicketWorkflow");
       const run = await workflow.createRun();
 
-      const result = await run.start({ inputData: { metric, region } });
+      const result = await run.start({ inputData: { metric, region, preDetectedAnomaly: anomaly as never } });
 
       if (result.status === "suspended") {
-        const suspendPayload = result.suspendPayload as
-          | { anomaly: { id: string }; rca: { summary: string; confidence: number } }
-          | undefined;
+        // Mastra nests the suspend payload under the step id: { "await-approval": { anomaly, rca } }
+        const raw = result.suspendPayload as Record<string, { anomaly: Record<string, unknown>; rca: { summary: string; confidence: number; correlatedLogs: string[]; correlatedTraces: string[]; suggestedActions: string[] } } | undefined> | undefined;
+        const stepPayload = raw?.["await-approval"];
 
-        if (suspendPayload) {
+        if (stepPayload?.rca?.summary) {
           await db.insert(incidents).values({
             anomalyMetric:  metric,
             region,
-            rcaSummary:     suspendPayload.rca.summary,
-            confidence:     Math.round(suspendPayload.rca.confidence * 100),
+            rcaSummary:     stepPayload.rca.summary,
+            confidence:     Math.round(stepPayload.rca.confidence * 100),
             workflowRunId:  run.runId,
             status:         "pending_approval",
           });
@@ -79,7 +83,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
         return reply.send({
           runId: run.runId,
           status: "suspended",
-          rca: suspendPayload?.rca ?? null,
+          rca: stepPayload?.rca ?? null,
         });
       }
 

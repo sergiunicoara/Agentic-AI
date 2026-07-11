@@ -9,7 +9,7 @@ export const forecastingAgent = new Agent({
 history and a computed linear trend, write a 1-2 sentence plain-English forecast about
 whether and when the resource is likely to reach saturation (100% for percent metrics),
 and whether action is needed soon. Be direct and quantify time-to-saturation when possible.`,
-  model: anthropic("claude-3-5-haiku-20241022"),
+  model: anthropic("claude-haiku-4-5-20251001"),
   tools: { queryVictoriaMetricsTool },
 });
 

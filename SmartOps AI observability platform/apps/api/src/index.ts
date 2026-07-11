@@ -1,3 +1,6 @@
+// Load .env before anything else (Node 20.12+ built-in)
+try { (process as NodeJS.Process & { loadEnvFile?: (p: string) => void }).loadEnvFile?.(".env"); } catch {}
+
 import { buildApp } from "./app.js";
 import { config } from "./config.js";
 import { db } from "./db/client.js";

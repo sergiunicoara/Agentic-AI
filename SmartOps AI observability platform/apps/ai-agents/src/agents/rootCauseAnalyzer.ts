@@ -18,7 +18,7 @@ Produce a concise, specific root-cause narrative in the style:
 "CPU spike at {time} in {region} correlates with {N} {error type} and slow spans in {service}."
 Be concrete — cite actual counts and service names found in the tool results, not generic statements.
 Also suggest 1-3 short, actionable remediation steps.`,
-  model: anthropic("claude-3-5-sonnet-20241022"),
+  model: anthropic("claude-sonnet-4-6"),
   tools: { queryVictoriaMetricsTool, searchElasticsearchTool, fetchTracesTool },
 });
 
@@ -27,9 +27,15 @@ export async function analyzeRootCause(anomaly: AnomalyEvent): Promise<RCAResult
   const startTime = new Date(detectedAt.getTime() - 10 * 60 * 1000).toISOString();
   const endTime   = new Date(detectedAt.getTime() + 2 * 60 * 1000).toISOString();
 
+  const withFallback = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+    Promise.race([
+      p.catch(() => fallback),
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+    ]);
+
   const [logResult, traceSpans] = await Promise.all([
-    searchLogs("error", anomaly.region, startTime, endTime, 100),
-    fetchTracesByRegion(anomaly.region, startTime, endTime, 20),
+    withFallback(searchLogs("error", anomaly.region, startTime, endTime, 100), 5000, { total: 0, hits: [] }),
+    withFallback(fetchTracesByRegion(anomaly.region, startTime, endTime, 20), 5000, []),
   ]);
 
   const errorLogs = logResult.hits.filter((h) => h.logLevel === "error");

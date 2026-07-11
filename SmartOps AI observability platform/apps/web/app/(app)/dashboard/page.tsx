@@ -32,7 +32,7 @@ export default function DashboardPage() {
       <div className="flex gap-2 flex-wrap">
         {REGIONS.map((r) => {
           const s = snapshots[r];
-          const hasAlert = s && (s.cpu > 85 || s.memory > 90 || s.p99 > 2000);
+          const hasAlert = s && (s.cpu > 85 || s.memory > 90 || s.p99 > 2000); // critical only
           return (
             <button
               key={r}
@@ -59,20 +59,20 @@ export default function DashboardPage() {
               label="CPU Usage"
               value={snap.cpu}
               history={hist.map((h) => ({ value: h.cpu }))}
-              thresholds={{ warning: 70, critical: 85 }}
+              thresholds={{ warning: 80, critical: 85 }}
             />
             <MetricCard
               label="Memory Usage"
               value={snap.memory}
               history={hist.map((h) => ({ value: h.memory }))}
-              thresholds={{ warning: 75, critical: 90 }}
+              thresholds={{ warning: 82, critical: 90 }}
             />
             <MetricCard
               label="P99 Latency"
               value={snap.p99}
               unit=" ms"
               history={hist.map((h) => ({ value: h.p99 }))}
-              thresholds={{ warning: 500, critical: 2000 }}
+              thresholds={{ warning: 1500, critical: 2000 }}
             />
             <MetricCard
               label="Req / sec"
@@ -117,7 +117,7 @@ export default function DashboardPage() {
                 {REGIONS.map((r) => {
                   const s = snapshots[r];
                   const crit = s && (s.cpu > 85 || s.memory > 90 || s.p99 > 2000);
-                  const warn = s && !crit && (s.cpu > 70 || s.memory > 75 || s.p99 > 500);
+                  const warn = s && !crit && (s.cpu > 80 || s.memory > 82 || s.p99 > 1500);
                   return (
                     <tr
                       key={r}

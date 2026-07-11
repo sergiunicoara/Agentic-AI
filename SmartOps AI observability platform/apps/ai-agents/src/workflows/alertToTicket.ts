@@ -18,9 +18,14 @@ const rcaResultSchema = z.object({
 // ── Step 1: detect anomaly ────────────────────────────────────
 const detectAnomalyStep = createStep({
   id: "detect-anomaly",
-  inputSchema: z.object({ metric: z.string(), region: z.string() }),
+  inputSchema: z.object({
+    metric: z.string(),
+    region: z.string(),
+    preDetectedAnomaly: anomalyEventSchema.optional(),
+  }),
   outputSchema: z.object({ anomaly: anomalyEventSchema.nullable() }),
   execute: async ({ inputData }) => {
+    if (inputData.preDetectedAnomaly) return { anomaly: inputData.preDetectedAnomaly };
     const anomalies = await detectAnomalies(inputData.metric, inputData.region);
     return { anomaly: anomalies[0] ?? null };
   },
@@ -95,7 +100,7 @@ const createTicketStep = createStep({
 
 export const alertToTicketWorkflow = createWorkflow({
   id: "alert-to-ticket",
-  inputSchema: z.object({ metric: z.string(), region: z.string() }),
+  inputSchema: z.object({ metric: z.string(), region: z.string(), preDetectedAnomaly: anomalyEventSchema.optional() }),
   outputSchema: z.object({
     status: z.enum(["ticketed", "rejected", "no_anomaly"]),
     ticket: z.object({

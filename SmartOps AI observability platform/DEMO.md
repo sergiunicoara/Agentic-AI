@@ -1,24 +1,32 @@
-# SmartOps Demo Guide
+# SmartOps — Interview Demo Script
 
-## Prerequisites
+> **Runtime:** ~12 minutes  
+> **Preparation:** 10 minutes before the call  
+> **Login:** `admin@smartops.local` / `smartops_dev`  
+> **Anomaly cycle:** every ~60 s, random region, lasts 25 s
 
-- Node.js ≥ 20, pnpm ≥ 9
-- Docker Desktop running
+---
 
-## Setup (one-time)
+## BEFORE THE CAMERAS ROLL
 
-```bash
-pnpm install
-cp .env.example .env
-# SERVICENOW_MOCK=true is already set — no real SN instance needed
-```
+Do this 10 minutes before the interview. The simulator needs at least 90 seconds of baseline
+data in VictoriaMetrics before z-score detection can fire reliably.
 
-## Run (4 terminals)
+> ⚠️ **Every command below must be run from the SmartOps project root.**
+> This repo is a monorepo — running `pnpm stack:up` from any other project directory
+> (e.g. TradeArena) will fail with `Command "stack:up" not found`.
+>
+> ```powershell
+> cd "C:\Users\Sergiu\Desktop\Projects\Agentic-AI\SmartOps AI observability platform"
+> ```
+>
+> Verify you're in the right place: `cat package.json | findstr stack` should return the
+> `docker compose` line.
 
-**Terminal 1 — infrastructure**
+**Terminal 1 — Infrastructure**
 ```bash
 pnpm stack:up
-# wait ~30s for health checks, then:
+# wait ~30s for health checks
 pnpm db:migrate
 ```
 
@@ -27,37 +35,423 @@ pnpm db:migrate
 pnpm dev:api
 ```
 
-**Terminal 3 — web dashboard**
+**Terminal 3 — Web**
 ```bash
 pnpm dev:web
 ```
 
-**Terminal 4 — traffic simulator**
+**Terminal 4 — Simulator** *(keep this visible during the demo)*
 ```bash
 pnpm simulate
 ```
 
-## Open in browser
+> ℹ️ On first run the simulator prints `[DB] Seed skipped` — this is harmless. The database
+> is already seeded from previous runs. Metrics still push to VictoriaMetrics normally.
 
-| URL | What it is |
+**Browser tabs to have open:**
+| Tab | URL |
 |---|---|
-| http://localhost:3001 | SmartOps dashboard |
-| http://localhost:3002 | Grafana (admin / `smartops_dev`) |
-| http://localhost:3000/api/docs | API Swagger docs |
+| SmartOps | http://localhost:3001 |
+| Grafana | http://localhost:3002 |
+| API Docs | http://localhost:3000/api/docs |
 
-**Login:** `admin@smartops.local` — any password
+> ℹ️ **Swagger UI** at `/api/docs` fully renders all endpoints — useful to show during the API
+> architecture section. If it appears blank, hard-refresh (Ctrl+Shift+R).
 
-## What to show
+1. Log in at `localhost:3001` → `admin@smartops.local` / `smartops_dev`
+2. Confirm live metric values appear on the Dashboard (not dashes).
+3. Watch Terminal 4. The simulator prints `[ANOMALY] Injecting CPU spike into {region}` every ~60 s. That's your cue for Scene 4.
 
-1. **Dashboard** — live metrics for 3 regions (EU West, US East, AP South), updating every 5s
-2. **Anomaly** — every ~60s the simulator spikes CPU in a random region; watch the region tab turn red
-3. **AI Insights → Run AI Scan** — detects the anomaly with z-score
-4. **Trigger RCA** — correlates metrics + logs + traces, shows confidence score and suggested actions
-5. **Approve & Create Ticket** — creates a mock ServiceNow incident
-6. **Grafana** — Golden Signals dashboard shows the same spike from the infra side
-7. **Assets** — pre-seeded servers, containers, databases, load balancers per region
+---
 
-## Stop
+## COLD OPEN — Setting the Stage (1 min)
+
+*Before touching anything — establish the problem first.*
+
+**YOU SAY:**
+
+> "The problem I wanted to solve is this: in a real production environment, you have dashboards
+> showing you hundreds of metrics. Something spikes. An on-call engineer gets paged. They open
+> four different tools — Grafana, Kibana, Jaeger, the runbook — and try to manually correlate
+> what happened. That takes 20 to 40 minutes on a good night.
+>
+> SmartOps compresses that loop. The platform detects anomalies automatically, runs a root cause
+> analysis by pulling correlated evidence from metrics, logs, and traces simultaneously, and
+> surfaces a specific hypothesis for a human to review — not a dashboard to dig through.
+> The human approves or rejects. If approved, a ServiceNow ticket is created. The whole flow
+> takes about 30 seconds."
+
+---
+
+## SCENE 1 — THE WORLD (2 min)
+
+**ACTION:** Navigate to `http://localhost:3001/dashboard`
+Click the **eu-west** region tab, then cycle through **us-east** and **ap-south**.
+
+*On screen: Three region tabs. The active region shows four metric cards — CPU, Memory, P99 Latency,
+Error Rate — each with a sparkline updating every 5 seconds. A green "Live" dot in the top right.*
+
+**YOU SAY:**
+
+> "This is the dashboard — real-time telemetry from three regions: EU West, US East, AP South.
+> The data you're seeing is coming from VictoriaMetrics, refreshing over a Server-Sent Events
+> stream every 2 seconds.
+>
+> I chose VictoriaMetrics over Prometheus for a specific reason. It exposes the exact same
+> PromQL API, so any Grafana dashboard works without changes. But VictoriaMetrics gives you
+> 10 to 40 times better storage compression and doesn't have the cardinality explosion problem
+> that kills production Prometheus instances. One binary, no sidecar.
+>
+> These four metrics are the Google SRE Golden Signals: latency, traffic, errors, saturation.
+> If you can only watch four things in a production system, these are the four. The sparklines
+> give you the last 10 minutes of context at a glance — not just the current value.
+>
+> The transport is SSE — Server-Sent Events. I chose SSE over WebSockets here because the
+> data flow is one-directional: server pushes metrics to the browser. SSE is simpler,
+> reconnects automatically, and works through HTTP/2 proxies without extra protocol negotiation."
+
+---
+
+## SCENE 2 — THE FOUNDATION (2 min)
+
+**ACTION:** Click **Assets** in the left nav. Scroll briefly. Then click **Alert Rules**.
+
+*On screen: Assets — a table of servers, containers, databases, and load balancers per region,
+each with status chips and IP addresses. Alert Rules — a list of threshold-based rules with
+severity badges.*
+
+**YOU SAY:**
+
+> "The platform has two detection layers. This first one — Alert Rules — is traditional threshold
+> alerting. CPU above 75% fires a warning. CPU above 85% fires a critical. These rules are stored
+> in PostgreSQL, managed through Fastify endpoints, and evaluated deterministically. No model
+> involved. Fast, auditable, zero false-positive ambiguity.
+>
+> The second layer is the AI detection you'll see in a moment — z-score anomaly detection that
+> catches sustained deviations even when values stay below the absolute threshold. The two layers
+> are independent but complementary. Static thresholds catch the obvious fires. Z-score catches
+> the slow burns.
+>
+> The schema here is Drizzle ORM with PostgreSQL. I chose Drizzle over Prisma because Drizzle
+> generates raw SQL that you can read and audit. No query magic behind the scenes. The migration
+> files are plain SQL — you can run them in psql directly if you need to."
+
+---
+
+## SCENE 3 — THE INCIDENT (up to 60 s wait)
+
+**ACTION:** Click **AI Insights** in the left nav.
+Keep one eye on Terminal 4. You're waiting for: `[ANOMALY] Injecting CPU spike into {region}`
+**Do NOT click Run AI Scan yet.** Set the scene first.
+
+*On screen: The AI Insights page with a "Run AI Scan" button, a grid of six manual trigger
+cards (3 regions × 2 metrics), and an Incident History table.*
+
+**YOU SAY:**
+
+> "The simulator is pushing fresh metrics every 5 seconds to VictoriaMetrics. In a few seconds —
+> roughly every 60 — it's going to inject a CPU spike into a random region. CPU will ramp toward
+> 95% over about 10 seconds and stay there for 25 seconds before resolving. That spike is what
+> I'm waiting for.
+>
+> The detection logic when I click Run AI Scan: it queries the last 10 minutes of data for each
+> metric-region combination — 6 queries in parallel. For each series, it takes the oldest 80% of
+> data points as the baseline, computes mean and standard deviation, and asks: is the current
+> value more than 2 standard deviations above the mean, and also above the warning threshold?
+>
+> That's a z-score. No neural network, no fine-tuned model, no training data. Deterministic,
+> explainable, reproducible. If CPU is at 92% and the 10-minute baseline mean is 35%, the
+> z-score is around 3.8. There's also an absolute backstop: if the latest value exceeds 85%,
+> it fires regardless of the z-score — catches spikes that happen in the first minute before
+> baseline history builds up."
+
+*⏳ Wait until Terminal 4 shows the anomaly injection. Then wait **5–10 seconds** for the spike
+to build. The simulator kicks CPU to 72% immediately on injection, then ramps to 90%+ within
+two 5-second ticks — so you don't need to wait long.*
+
+---
+
+## SCENE 4 — THE AI SEES IT FIRST (30 s)
+
+**ACTION:** Click **Run AI Scan**.
+
+*On screen: A red anomaly card with the affected region, the metric name, current value vs.
+baseline, and the z-score. A pulsing red dot. A "Trigger RCA" button.*
+
+**YOU SAY:**
+
+> "There it is. CPU in EU West — or whichever region — at 92%, against a 10-minute baseline of
+> 35%. Z-score 3.8. Both detection checks passed: absolute threshold exceeded and z-score above 2.
+>
+> Notice this took under a second. All 6 detection queries ran in parallel using
+> Promise.allSettled — one failed query doesn't block the others. This is the fast path:
+> deterministic math, no model latency. The LLM only enters the picture in the next step,
+> when I ask it to reason about *why* this happened."
+
+> **If no anomaly appears:** "The spike just resolved — the simulator runs them for 25 seconds.
+> That's intentionally short to simulate a real burst. Let me trigger the workflow manually
+> for the region I saw spike in the terminal." Then click the relevant manual card.
+
+---
+
+## SCENE 5 — THE INVESTIGATION (~30 s loading)
+
+**ACTION:** Click **Trigger RCA** on the anomaly card.
+The button shows "Running…". Fill the wait with explanation — you have 25–35 seconds.
+
+**YOU SAY:**
+
+> "What just happened under the hood: the anomaly object — metric, region, host, current value,
+> baseline, z-score, timestamp — was sent to a Fastify endpoint that kicks off a Mastra workflow.
+> I'm using Mastra rather than LangChain for one specific reason: suspend and resume.
+>
+> The workflow has four steps. Step one: detect the anomaly. Because I passed the pre-detected
+> anomaly directly from the scan results, step one is a no-op — it passes the object forward.
+> This was an important optimization. The spike lasts 25 seconds; if the workflow re-queried
+> VictoriaMetrics from scratch, there's a real chance the spike would resolve before the
+> detection query runs. By passing the already-detected anomaly, we bypass that race condition.
+>
+> Step two — running right now — is the RCA agent. It's a Claude model call with three tools:
+> query VictoriaMetrics for related metrics, search Elasticsearch for error logs in the same
+> region and time window, and fetch distributed trace spans from Jaeger. These three tool calls
+> run in parallel. The agent then synthesizes all the correlated evidence into a root-cause
+> narrative.
+>
+> Step three, which comes next, suspends the workflow. The workflow literally pauses
+> mid-execution, persists its state, and waits for a human to resume it."
+
+---
+
+## SCENE 6 — THE REVEAL (2 min)
+
+*On screen: An approval modal with an RCA summary, a confidence score, correlated evidence,
+and 2–3 specific remediation actions. Two buttons: Approve and Reject.*
+
+**YOU SAY:**
+
+> "The workflow suspended. This incident is now written to PostgreSQL with status
+> 'pending_approval.' The workflow run ID is persisted — even if the API restarts,
+> the workflow can be resumed from exactly where it left off.
+>
+> *(Read a line or two from the RCA summary)*
+>
+> The RCA agent looked at the CPU saturation pattern across the 10-minute window, correlated
+> it with whatever logs and traces are available, and produced a specific hypothesis.
+> In a fully connected environment with real Elasticsearch and Jaeger, you'd see specific
+> error messages and slow service spans named here.
+>
+> Notice the confidence score — typically around 40%. The RCA agent runs three evidence
+> queries in parallel: VictoriaMetrics for related metrics, Elasticsearch for error logs,
+> and a trace store for distributed spans. In this demo, Elasticsearch starts but has no
+> pre-seeded log index, so those two sources return empty. Claude has metric evidence only —
+> it can see the CPU spike but has no correlated logs or traces to back up its hypothesis,
+> so it scores itself honestly at ~40%. In a production setup with real log data, you'd see
+> 75–80% confidence with specific log lines and trace IDs in the suggested actions.
+> I'd rather surface a low-confidence alert and let the human decide than pretend the AI
+> is more certain than it is. That's a deliberate design choice.
+>
+> And the remediation actions — specific to what the agent found. 'SSH into node-01, run
+> ps aux sorted by CPU to find the offending process.' That's actionable. Not 'check your
+> infrastructure.'"
+
+---
+
+## SCENE 7 — THE DECISION (30 s)
+
+**ACTION:** Click **Approve** in the modal.
+
+*On screen: Modal closes. Incident History table updates — the pending row now shows "ticketed"
+with a ServiceNow ticket ID.*
+
+**YOU SAY:**
+
+> "The workflow resumed from the suspend point, ran step four — the ServiceNow agent — and
+> the ticket is created. In this demo it's mocked, but the createSnowTicket function is wired
+> to the actual ServiceNow REST API. The incident row in PostgreSQL is updated with the
+> ticket ID and a resolved timestamp.
+>
+> The AI never auto-creates tickets. It never takes action without a human in the loop.
+> That's not a safety feature tacked on afterwards — it's the core design. Mastra's
+> suspend-resume primitive is what makes that pattern possible without polling, without
+> callbacks, and without state machines hand-coded in the application layer."
+
+---
+
+## SCENE 8 — THE EVIDENCE (1 min)
+
+**ACTION:** Switch to `localhost:3002`. Login: **admin** / **smartops_dev**
+Navigate to **Dashboards → SmartOps Golden Signals**.
+
+*On screen: Time series panels for CPU, memory, P99, error rate. The spike from a few
+minutes ago is clearly visible as a peak in the CPU panel.*
+
+**YOU SAY:**
+
+> "Here's the same spike from the infrastructure side. Grafana is reading from VictoriaMetrics
+> directly over PromQL — the same data source the SmartOps anomaly detector queries.
+> Both views are consuming the same ground truth.
+>
+> This is what an on-call engineer would see in a traditional setup: a spike on a dashboard.
+> Then they'd open Kibana, open Jaeger, cross-reference timestamps manually. SmartOps
+> collapses that loop to one button click and 30 seconds of AI-assisted triage."
+
+---
+
+## SCENE 9 — THE WRAP (2 min)
+
+**ACTION:** Switch back to `localhost:3001/dashboard`.
+
+**YOU SAY:**
+
+> "To summarize what you just saw: Fastify 4 API on port 3000, Next.js 14 App Router on 3001,
+> VictoriaMetrics for time-series on 8428, PostgreSQL on 5433 via Docker. The AI agents live
+> in a shared workspace package — @smartops/ai-agents — consumed by the API as a module.
+> Mastra manages workflow state in SQLite for local dev; in production that would be a
+> PostgreSQL-backed workflow store.
+>
+> The auth layer is JWT with RS256, RBAC enforced at the Fastify preHandler level. The AI
+> workflow endpoints require the operator or admin role — a viewer account can see incidents
+> but can't trigger workflows or approve them.
+>
+> If I were taking this to production: VictoriaMetrics Cluster for horizontal scaling, a real
+> Elasticsearch cluster for log correlation, Kafka as the event bus between the metric pipeline
+> and the AI detection layer, and a Redis-backed job queue for workflows instead of the
+> in-process Mastra runner. The architecture separates detection, analysis, and approval
+> cleanly — each scales independently."
+
+---
+
+## ANTICIPATED QUESTIONS
+
+**"Why Mastra and not LangChain?"**
+
+> "The specific capability I needed — a workflow that literally suspends mid-execution and
+> resumes from a different HTTP request — isn't a first-class primitive in LangChain.
+> The TypeScript SDK is a port of the Python library and lags behind. In Mastra, suspend-resume
+> is the core execution model. That single feature determines the entire human-in-the-loop
+> architecture, so it wasn't a marginal difference."
+
+---
+
+**"Why Fastify instead of Express?"**
+
+> "Fastify validates request bodies against JSON Schema at the route level. Invalid payloads
+> never reach handler code. Express requires you to bolt that on separately. Fastify also
+> benchmarks at roughly twice Express's throughput. For a metrics ingestion API that handles
+> bursts of telemetry, that matters."
+
+---
+
+**"Why z-score and not a machine learning model?"**
+
+> "No training data required, no model drift, and it's auditable. I can tell you exactly why
+> any given anomaly fired — here's the mean, here's the standard deviation, here's the z-score.
+> With a neural network I'd need labeled historical incidents, a training pipeline, and I still
+> couldn't explain individual decisions cleanly. Z-score is the right tool for the detection
+> layer. The LLM handles the reasoning step, where statistical explainability doesn't apply anyway."
+
+---
+
+**"How would you scale this to production?"**
+
+> "VictoriaMetrics Cluster for the metrics layer. Kafka between the metric pipeline and the AI
+> detection so you can replay events and add consumers without changing producers. Dedicated
+> Elasticsearch cluster for real log correlation. The Mastra workflow runner moves from
+> in-process SQLite to a Redis-backed queue — same API, different persistence. The Fastify
+> API and Next.js frontend are already stateless so they scale horizontally as-is."
+
+---
+
+**"Is it safe to have AI touching production incidents?"**
+
+> "The AI touches nothing in production. It reads telemetry and produces a hypothesis. A human
+> with the operator or admin role approves every action. The Mastra suspend-resume pattern
+> enforces this at the workflow level — it's not a UI convention that can be bypassed, it's
+> the execution model. I'd call that more auditable than most existing on-call tooling."
+
+---
+
+**"What would you do differently if you started over?"**
+
+> "I'd add Kafka earlier rather than treating it as a scaling concern. The event-sourcing
+> pattern it enables — where every metric reading is a persistent, replayable event — makes
+> the AI detection layer much more robust. You can replay a time window to re-analyze
+> incidents with a newer model, or run multiple detection strategies in parallel as consumers.
+> Right now the simulator pushes directly to VictoriaMetrics; adding Kafka in between would
+> decouple the collection, storage, and analysis pipeline cleanly."
+
+---
+
+**"Why is the confidence score only 40%?"**
+
+> "Specific answer to a specific question — I like it. The RCA agent queries three sources
+> in parallel: VictoriaMetrics for correlated metrics, Elasticsearch for error logs, and
+> a trace store for slow spans. In this demo environment, Elasticsearch starts but has no
+> pre-seeded log index, so the log and trace queries return empty. Claude is reasoning
+> from metric evidence alone — it can see the CPU spike but has nothing to correlate it
+> against. So it reports 40% rather than inventing certainty it doesn't have.
+>
+> That's intentional. The confidence score is honest signal for the human reviewer.
+> In a fully wired environment — real Elasticsearch with application logs, Jaeger with
+> trace data — you'd see 75–80% with specific error messages and slow service spans
+> named in the suggested actions. The architecture supports that; the demo just doesn't
+> have the data."
+
+---
+
+## TROUBLESHOOTING
+
+Common issues and how to handle them during the demo.
+
+**Dashboard values lag behind the simulator terminal**
+
+The dashboard polls VictoriaMetrics every 2 seconds via SSE; the simulator pushes every
+5 seconds. There is up to 2 seconds of lag — normal. If you see a much larger gap
+(e.g., 46% in terminal, 72% on screen), the API server needs a restart:
+
+```bash
+# Ctrl+C the pnpm dev:api terminal, then:
+pnpm dev:api
+```
+
+**"[DB] Seed skipped" in the simulator output**
+
+Harmless. The database is already seeded. Metrics still push to VictoriaMetrics normally.
+
+**Anomaly appears in terminal but dashboard doesn't spike**
+
+The simulator kicks CPU to 72% immediately on injection. The dashboard should show the
+spike within 2–5 seconds. If it doesn't, confirm `pnpm dev:api` is running (SSE requires
+the API to be up) and that you're logged in (the SSE stream requires a valid JWT).
+
+**Anomaly resolved but dashboard still shows high CPU**
+
+Expected — the CPU drifts back toward baseline (~35%) over 30–40 seconds after resolution.
+The `[ANOMALY] Resolved` message means the injection stopped, not that CPU snapped back
+instantly. Watch the dashboard — it will visibly decrease every few seconds.
+
+**Incident appears in history with no summary ("—")**
+
+Happens when you trigger the RCA workflow before the CPU spike has ramped up (e.g., at
+40%). Claude received a weak anomaly signal, returned an incomplete RCA, and the row was
+written with null fields. Fixed in current code — the API now only writes the incident
+row when Claude produces a non-empty summary. Old rows are harmless; ignore them.
+
+**How to browse the database**
+
+Port 5433 is PostgreSQL's binary protocol — it is not an HTTP interface.
+To browse tables in a web UI:
+```bash
+pnpm db:studio   # opens https://local.drizzle.studio
+```
+Or via psql:
+```bash
+psql postgresql://smartops:smartops_dev@localhost:5433/smartops
+```
+
+---
+
+## STOP
 
 ```bash
 pnpm stack:down

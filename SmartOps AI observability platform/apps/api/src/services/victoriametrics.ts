@@ -62,10 +62,7 @@ export async function queryRange(
 }
 
 export async function queryInstant(query: string): Promise<MetricSeries[]> {
-  const key = `instant:${query}`;
-  const cached = fromCache(key);
-  if (cached) return cached;
-
+  // No cache — instant queries feed the live SSE dashboard and must never return stale values.
   const url = new URL(`${config.victoriaMetricsUrl}/api/v1/query`);
   url.searchParams.set("query", query);
 
@@ -73,7 +70,5 @@ export async function queryInstant(query: string): Promise<MetricSeries[]> {
   if (!res.ok) throw new Error(`VictoriaMetrics error: ${res.status}`);
 
   const body: VmResponse = await res.json() as VmResponse;
-  const series = toSeries(body.data.result, true);
-  toCache(key, series);
-  return series;
+  return toSeries(body.data.result, true);
 }

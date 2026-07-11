@@ -75,5 +75,5 @@ async function startBroadcast(): Promise<void> {
     } catch {
       // VM may not be up — silently skip
     }
-  }, 5_000);
+  }, 2_000);
 }

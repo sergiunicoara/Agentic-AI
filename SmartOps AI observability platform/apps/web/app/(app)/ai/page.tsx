@@ -51,35 +51,44 @@ const REGIONS = ["eu-west", "us-east", "ap-south"];
 
 export default function AIPage() {
   const [scanning, setScanning]       = useState(false);
+  const [scanDone, setScanDone]       = useState(false);
   const [liveAnomalies, setLive]      = useState<AnomalyEvent[]>([]);
   const [triggering, setTriggering]   = useState<string | null>(null);
   const [modal, setModal]             = useState<WorkflowResult | null>(null);
   const [triggerError, setTriggerErr] = useState("");
+  const [noAnomalyMsg, setNoAnomalyMsg] = useState("");
 
   const { data, mutate } = useSWR("/ai/anomalies", fetcher, { refreshInterval: 15_000 });
   const incidents = data?.anomalies ?? [];
 
   async function runScan() {
     setScanning(true);
+    setScanDone(false);
     setLive([]);
+    setNoAnomalyMsg("");
     try {
       const res = await api.get<{ insights: AnomalyEvent[] }>("/ai/insights");
       setLive(res.insights);
+      setScanDone(true);
     } catch (err) {
       console.error(err);
+      setTriggerErr(err instanceof Error ? err.message : "Scan failed");
     } finally {
       setScanning(false);
     }
   }
 
-  async function triggerWorkflow(metric: string, region: string) {
+  async function triggerWorkflow(metric: string, region: string, anomaly?: AnomalyEvent) {
     const key = `${metric}:${region}`;
     setTriggering(key);
     setTriggerErr("");
+    setNoAnomalyMsg("");
     try {
-      const res = await api.post<WorkflowResult>("/ai/workflows/alert-to-ticket", { metric, region });
+      const res = await api.post<WorkflowResult>("/ai/workflows/alert-to-ticket", { metric, region, anomaly });
       if (res.status === "suspended") {
         setModal(res);
+      } else {
+        setNoAnomalyMsg(`No anomaly detected for ${metric.replace("smartops_", "").replace(/_/g, " ")} in ${region} — system healthy.`);
       }
       await mutate();
     } catch (err) {
@@ -121,6 +130,26 @@ export default function AIPage() {
         </button>
       </div>
 
+      {/* Scan empty state */}
+      {scanDone && liveAnomalies.length === 0 && (
+        <div className="flex items-center gap-3 bg-green-950/20 border border-green-900/40 rounded-xl px-5 py-4 text-green-400 text-sm">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          No anomalies detected — all regions healthy.
+        </div>
+      )}
+
+      {/* No anomaly from manual workflow */}
+      {noAnomalyMsg && (
+        <div className="flex items-center gap-3 bg-gray-800/60 border border-gray-700 rounded-xl px-5 py-4 text-gray-400 text-sm">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {noAnomalyMsg}
+        </div>
+      )}
+
       {/* Live scan results */}
       {liveAnomalies.length > 0 && (
         <section>
@@ -143,7 +172,7 @@ export default function AIPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => triggerWorkflow(a.metric, a.region)}
+                  onClick={() => triggerWorkflow(a.metric, a.region, a)}
                   disabled={!!triggering}
                   className="flex-shrink-0 text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition font-medium"
                 >

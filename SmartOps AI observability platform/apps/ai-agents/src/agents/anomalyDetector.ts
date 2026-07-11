@@ -10,7 +10,7 @@ export const anomalyDetector = new Agent({
 Given a metric name and region, use the query-victoria-metrics tool in "range" mode
 to pull the last 30 minutes of data, then reason about whether the values represent
 a genuine anomaly (sustained deviation, not noise). Explain your reasoning briefly.`,
-  model: anthropic("claude-3-5-haiku-20241022"),
+  model: anthropic("claude-haiku-4-5-20251001"),
   tools: { queryVictoriaMetricsTool },
 });
 
@@ -19,9 +19,16 @@ a genuine anomaly (sustained deviation, not noise). Explain your reasoning brief
  * The agent above is used only when a natural-language explanation is wanted;
  * this function is the fast path called by /ai/insights and the workflow.
  */
+// Absolute thresholds — always flag these regardless of history
+const ABSOLUTE_THRESHOLDS: Record<string, { warn: number; critical: number }> = {
+  smartops_cpu_usage_percent:    { warn: 75, critical: 85 },
+  smartops_memory_usage_percent: { warn: 80, critical: 90 },
+  smartops_http_latency_p99_ms:  { warn: 800, critical: 2000 },
+};
+
 export async function detectAnomalies(metric: string, region: string): Promise<AnomalyEvent[]> {
   const end = Math.floor(Date.now() / 1000);
-  const start = end - 30 * 60;
+  const start = end - 10 * 60;
   const series = await vmQueryRange(
     `${metric}{region="${region}"}`,
     String(start),
@@ -30,20 +37,42 @@ export async function detectAnomalies(metric: string, region: string): Promise<A
   );
 
   const anomalies: AnomalyEvent[] = [];
+  const abs = ABSOLUTE_THRESHOLDS[metric];
 
   for (const s of series) {
     const values = s.samples.map((sample) => sample.value);
     if (values.length < 5) continue;
 
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
-    const stdDev = Math.sqrt(variance);
-    if (stdDev === 0) continue;
-
     const latest = values[values.length - 1];
-    const zScore = (latest - mean) / stdDev;
 
-    if (Math.abs(zScore) > 3) {
+    // Absolute threshold check — catches active spikes even if history is noisy
+    if (abs && latest >= abs.critical) {
+      const baselineValues = values.slice(0, Math.floor(values.length * 0.8));
+      const mean = baselineValues.reduce((a, b) => a + b, 0) / baselineValues.length;
+      const variance = baselineValues.reduce((a, b) => a + (b - mean) ** 2, 0) / baselineValues.length;
+      const zScore = Math.sqrt(variance) > 0 ? (latest - mean) / Math.sqrt(variance) : 0;
+      anomalies.push({
+        id: `${metric}-${region}-${Date.now()}`,
+        region,
+        host: s.labels.host ?? `${region}-host-01`,
+        metric,
+        value: latest,
+        baseline: mean,
+        zScore,
+        detectedAt: new Date().toISOString(),
+      });
+      continue;
+    }
+
+    // Z-score check — catches sustained deviations below the critical threshold
+    const baselineValues = values.slice(0, Math.floor(values.length * 0.8));
+    const mean = baselineValues.reduce((a, b) => a + b, 0) / baselineValues.length;
+    const variance = baselineValues.reduce((a, b) => a + (b - mean) ** 2, 0) / baselineValues.length;
+    const stdDev = Math.sqrt(variance);
+    if (stdDev < 0.5) continue;
+
+    const zScore = (latest - mean) / stdDev;
+    if (Math.abs(zScore) > 2 && (!abs || latest >= abs.warn)) {
       anomalies.push({
         id: `${metric}-${region}-${Date.now()}`,
         region,
