@@ -5,7 +5,12 @@ import { incidents } from "../../drizzle/schema.js";
 import { eq, desc } from "drizzle-orm";
 
 const REGIONS = ["eu-west", "us-east", "ap-south"];
-const WATCHED_METRICS = ["smartops_cpu_usage_percent", "smartops_memory_usage_percent"];
+const WATCHED_METRICS = [
+  "smartops_cpu_usage_percent",
+  "smartops_memory_usage_percent",
+  "smartops_http_latency_p99_ms",
+  "smartops_http_error_rate_percent",
+];
 
 export default async function aiRoutes(fastify: FastifyInstance): Promise<void> {
   // ── GET /ai/insights ────────────────────────────────────────

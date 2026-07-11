@@ -21,13 +21,15 @@ const KAFKA_BROKERS = process.env.KAFKA_BROKERS ?? "localhost:9092";
 const METRICS_TOPIC = "smartops.metrics";
 
 // ── Kafka consumer ────────────────────────────────────────────
+const GROUP_ID = "smartops-vm-writer";
+
 const kafka = new Kafka({
   clientId: "smartops-metrics-consumer",
   brokers: [KAFKA_BROKERS],
-  retry: { retries: 10, initialRetryTime: 2_000 },
+  retry: { retries: 15, initialRetryTime: 2_000, maxRetryTime: 30_000 },
 });
 
-const consumer = kafka.consumer({ groupId: "smartops-vm-writer" });
+const consumer = kafka.consumer({ groupId: GROUP_ID });
 
 // ── Message schema (must match simulate-infra.ts) ─────────────
 interface MetricMessage {
@@ -59,6 +61,7 @@ function toPrometheusText(msg: MetricMessage): string {
     `smartops_network_out_mbps{${base}} ${metrics.netOut.toFixed(2)} ${ts}`,
     `smartops_http_requests_total{${base},service="api"} ${Math.floor(metrics.rps)} ${ts}`,
     `smartops_http_errors_total{${base},service="api"} ${Math.floor(metrics.rps * metrics.errorRate / 100)} ${ts}`,
+    `smartops_http_error_rate_percent{${base},service="api"} ${metrics.errorRate.toFixed(2)} ${ts}`,
     `smartops_http_latency_p99_ms{${base},service="api"} ${metrics.p99.toFixed(2)} ${ts}`,
   ].join("\n") + "\n";
 }
@@ -75,12 +78,41 @@ async function pushToVictoriaMetrics(text: string): Promise<void> {
   }
 }
 
+// ── Startup probe ─────────────────────────────────────────────
+// The Kafka broker passes its healthcheck (topics list) before the
+// group coordinator finishes initializing __consumer_offsets.
+// Poll via describeGroups until the coordinator is ready so the
+// consumer doesn't fail immediately with COORDINATOR_NOT_AVAILABLE.
+async function waitForGroupCoordinator(timeoutMs = 120_000): Promise<void> {
+  const admin = kafka.admin();
+  await admin.connect();
+  const deadline = Date.now() + timeoutMs;
+  let attempts = 0;
+  try {
+    while (Date.now() < deadline) {
+      try {
+        await admin.describeGroups([GROUP_ID]);
+        process.stdout.write(`\n[Kafka] Group coordinator ready (${attempts + 1} probe(s))\n`);
+        return;
+      } catch {
+        attempts++;
+        process.stdout.write(`\r[Kafka] Waiting for group coordinator... (${attempts})`);
+        await new Promise((r) => setTimeout(r, 3_000));
+      }
+    }
+    throw new Error(`Group coordinator not ready after ${timeoutMs / 1000}s`);
+  } finally {
+    await admin.disconnect().catch(() => {});
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────
 async function main(): Promise<void> {
   console.log("SmartOps Metrics Consumer");
   console.log(`  Kafka   : ${KAFKA_BROKERS}  topic=${METRICS_TOPIC}`);
   console.log(`  VM sink : ${VM_URL}\n`);
 
+  await waitForGroupCoordinator();
   await consumer.connect();
   await consumer.subscribe({ topic: METRICS_TOPIC, fromBeginning: false });
   console.log("[Kafka] Consumer connected — waiting for messages...\n");

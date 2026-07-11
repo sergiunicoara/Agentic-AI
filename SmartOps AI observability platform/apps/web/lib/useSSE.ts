@@ -8,6 +8,7 @@ export interface RegionSnapshot {
   memory: number;
   p99: number;
   rps: number;
+  errorRate: number;
   timestamp: number;
 }
 

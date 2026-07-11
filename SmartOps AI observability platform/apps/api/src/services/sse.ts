@@ -51,11 +51,13 @@ async function startBroadcast(): Promise<void> {
     if (subscribers.size === 0) return;
 
     try {
-      const [cpuSeries, memSeries, p99Series, rpsSeries] = await Promise.all([
+      const [cpuSeries, memSeries, p99Series, rpsSeries, errSeries] = await Promise.all([
         queryInstant("avg by (region) (smartops_cpu_usage_percent)"),
         queryInstant("avg by (region) (smartops_memory_usage_percent)"),
         queryInstant("avg by (region) (smartops_http_latency_p99_ms)"),
-        queryInstant("sum by (region) (rate(smartops_http_requests_total[1m]))"),
+        // gauge metric — raw avg, not rate()
+        queryInstant("avg by (region) (smartops_http_requests_total)"),
+        queryInstant("avg by (region) (smartops_http_error_rate_percent)"),
       ]);
 
       const metrics = REGIONS.map((region) => {
@@ -63,10 +65,11 @@ async function startBroadcast(): Promise<void> {
           series.find((s) => s.labels.region === region)?.samples[0]?.value ?? 0;
         return {
           region,
-          cpu:    get(cpuSeries),
-          memory: get(memSeries),
-          p99:    get(p99Series),
-          rps:    get(rpsSeries),
+          cpu:       get(cpuSeries),
+          memory:    get(memSeries),
+          p99:       get(p99Series),
+          rps:       get(rpsSeries),
+          errorRate: get(errSeries),
           timestamp: Date.now(),
         };
       });

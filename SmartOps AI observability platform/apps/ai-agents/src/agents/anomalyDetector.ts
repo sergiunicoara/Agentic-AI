@@ -21,9 +21,10 @@ a genuine anomaly (sustained deviation, not noise). Explain your reasoning brief
  */
 // Absolute thresholds — always flag these regardless of history
 const ABSOLUTE_THRESHOLDS: Record<string, { warn: number; critical: number }> = {
-  smartops_cpu_usage_percent:    { warn: 75, critical: 85 },
-  smartops_memory_usage_percent: { warn: 80, critical: 90 },
-  smartops_http_latency_p99_ms:  { warn: 800, critical: 2000 },
+  smartops_cpu_usage_percent:        { warn: 75, critical: 85 },
+  smartops_memory_usage_percent:     { warn: 80, critical: 90 },
+  smartops_http_latency_p99_ms:      { warn: 800, critical: 2000 },
+  smartops_http_error_rate_percent:  { warn: 2, critical: 5 },
 };
 
 export async function detectAnomalies(metric: string, region: string): Promise<AnomalyEvent[]> {

@@ -21,6 +21,7 @@ import { Client } from "@elastic/elasticsearch";
 const ES_URL        = process.env.ELASTICSEARCH_URL ?? "http://localhost:9200";
 const KAFKA_BROKERS = process.env.KAFKA_BROKERS ?? "localhost:9092";
 const METRICS_TOPIC = "smartops.metrics";
+const GROUP_ID      = "smartops-es-writer";
 const BATCH_SIZE    = 50;    // flush to ES after this many messages
 const FLUSH_MS      = 1_000; // or after this many milliseconds
 
@@ -28,10 +29,10 @@ const FLUSH_MS      = 1_000; // or after this many milliseconds
 const kafka = new Kafka({
   clientId: "smartops-es-consumer",
   brokers: [KAFKA_BROKERS],
-  retry: { retries: 10, initialRetryTime: 2_000 },
+  retry: { retries: 15, initialRetryTime: 2_000, maxRetryTime: 30_000 },
 });
 
-const consumer = kafka.consumer({ groupId: "smartops-es-writer" });
+const consumer = kafka.consumer({ groupId: GROUP_ID });
 
 const esClient = new Client({ node: ES_URL });
 
@@ -125,6 +126,30 @@ function scheduleFlush(): void {
   }, FLUSH_MS);
 }
 
+// ── Startup probe ─────────────────────────────────────────────
+async function waitForGroupCoordinator(timeoutMs = 120_000): Promise<void> {
+  const admin = kafka.admin();
+  await admin.connect();
+  const deadline = Date.now() + timeoutMs;
+  let attempts = 0;
+  try {
+    while (Date.now() < deadline) {
+      try {
+        await admin.describeGroups([GROUP_ID]);
+        process.stdout.write(`\n[Kafka] Group coordinator ready (${attempts + 1} probe(s))\n`);
+        return;
+      } catch {
+        attempts++;
+        process.stdout.write(`\r[Kafka] Waiting for group coordinator... (${attempts})`);
+        await new Promise((r) => setTimeout(r, 3_000));
+      }
+    }
+    throw new Error(`Group coordinator not ready after ${timeoutMs / 1000}s`);
+  } finally {
+    await admin.disconnect().catch(() => {});
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────
 async function main(): Promise<void> {
   console.log("SmartOps ES Metrics Consumer");
@@ -132,6 +157,7 @@ async function main(): Promise<void> {
   console.log(`  ES sink : ${ES_URL}`);
   console.log(`  Batch   : up to ${BATCH_SIZE} docs, flushed every ${FLUSH_MS}ms\n`);
 
+  await waitForGroupCoordinator();
   await consumer.connect();
   await consumer.subscribe({ topic: METRICS_TOPIC, fromBeginning: false });
   console.log("[Kafka] Consumer connected — waiting for messages...\n");

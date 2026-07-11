@@ -52,7 +52,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">
         {snap ? (
           <>
             <MetricCard
@@ -73,6 +73,13 @@ export default function DashboardPage() {
               unit=" ms"
               history={hist.map((h) => ({ value: h.p99 }))}
               thresholds={{ warning: 1500, critical: 2000 }}
+            />
+            <MetricCard
+              label="Error Rate"
+              value={snap.errorRate}
+              unit="%"
+              history={hist.map((h) => ({ value: h.errorRate }))}
+              thresholds={{ warning: 2, critical: 5 }}
             />
             <MetricCard
               label="Req / sec"
@@ -100,7 +107,7 @@ export default function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800">
-                  {["Region", "CPU", "Memory", "P99 Latency", "RPS", "Status"].map((h) => (
+                  {["Region", "CPU", "Memory", "P99 Latency", "Err %", "RPS", "Status"].map((h) => (
                     <th
                       key={h}
                       className={clsx(
@@ -128,6 +135,7 @@ export default function DashboardPage() {
                       <td className="px-4 py-3 text-right tabular-nums text-gray-200">{s ? `${s.cpu.toFixed(1)}%` : "—"}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-gray-200">{s ? `${s.memory.toFixed(1)}%` : "—"}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-gray-200">{s ? `${s.p99.toFixed(0)} ms` : "—"}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-gray-200">{s ? `${s.errorRate.toFixed(1)}%` : "—"}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-gray-200">{s ? s.rps.toFixed(1) : "—"}</td>
                       <td className="px-4 py-3 text-right">
                         {!s ? (
