@@ -100,7 +100,7 @@ flowchart TD
     end
 
     subgraph INFRA["Infrastructure (Docker Compose)"]
-        KAFKA["Kafka :9092 · KRaft mode\ntopic: smartops.metrics\n2 independent consumer groups"]
+        KAFKA["Kafka :9092 · KRaft · bitnami/kafka\ntopic: smartops.metrics\n2 independent consumer groups"]
         VM["VictoriaMetrics :8428\ntime-series metrics (PromQL)"]
         ES["Elasticsearch :9200\nlogs (OTel ECS) · metrics (Kafka) · traces"]
         PG["PostgreSQL :5433\nincidents · assets · alert rules · users"]
@@ -154,7 +154,7 @@ flowchart TD
 | API | Fastify 4, Drizzle ORM, PostgreSQL 16, JWT |
 | Frontend | Next.js 14 App Router, Tailwind CSS, Recharts, SWR |
 | AI Agents | Mastra, Anthropic Claude (`@ai-sdk/anthropic`) |
-| Message broker | Kafka 3.7 (KRaft, no ZooKeeper) — metric fan-out to VM + ES |
+| Message broker | Kafka (bitnami, KRaft, no ZooKeeper) — metric fan-out to VM + ES |
 | Metrics | VictoriaMetrics + VMAlert + Alertmanager |
 | Logs & Traces | Elasticsearch 8 + OTel Collector (ECS mapping) + Vector pipeline |
 | Telemetry | OpenTelemetry Collector (OTLP gRPC :4317 / HTTP :4318) |
