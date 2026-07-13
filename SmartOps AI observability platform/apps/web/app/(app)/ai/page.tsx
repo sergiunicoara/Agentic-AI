@@ -87,6 +87,7 @@ export default function AIPage() {
       const res = await api.post<WorkflowResult>("/ai/workflows/alert-to-ticket", { metric, region, anomaly });
       if (res.status === "suspended") {
         setModal(res);
+        setLive((prev) => prev.filter((a) => !(a.metric === metric && a.region === region)));
       } else {
         setNoAnomalyMsg(`No anomaly detected for ${metric.replace("smartops_", "").replace(/_/g, " ")} in ${region} — system healthy.`);
       }
