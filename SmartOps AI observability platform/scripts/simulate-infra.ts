@@ -11,14 +11,83 @@
 
 import { Client } from "pg";
 import { Kafka, Partitioners, type Producer } from "kafkajs";
+import { Client as ESClient } from "@elastic/elasticsearch";
 
 // ── Config ────────────────────────────────────────────────────
-const KAFKA_BROKERS      = process.env.KAFKA_BROKERS ?? "localhost:9092";
-const METRICS_TOPIC      = "smartops.metrics";
-const OTEL_URL           = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318";
-const DB_URL             = process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5433/smartops";
-const INTERVAL_MS        = 5_000;
+const KAFKA_BROKERS       = process.env.KAFKA_BROKERS ?? "localhost:9092";
+const METRICS_TOPIC       = "smartops.metrics";
+const OTEL_URL            = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318";
+const DB_URL              = process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5433/smartops";
+const ES_URL              = process.env.ELASTICSEARCH_URL ?? "http://localhost:9200";
+const INTERVAL_MS         = 5_000;
 const ANOMALY_INTERVAL_MS = 60_000;
+const TRACE_EVERY_N_TICKS = 2; // emit traces every 10s (2 × 5s ticks)
+
+// ── Elasticsearch client ──────────────────────────────────────
+const esClient = new ESClient({ node: ES_URL });
+
+// ── Trace span generation ─────────────────────────────────────
+const TRACE_SERVICES: Array<{ name: string; ops: string[] }> = [
+  { name: "api-gateway",     ops: ["POST /api/payment", "GET /api/orders", "POST /api/auth/login"] },
+  { name: "payment-service", ops: ["processPayment", "validateCard", "chargeAccount"] },
+  { name: "auth-service",    ops: ["validateToken", "refreshSession", "checkPermissions"] },
+  { name: "db-service",      ops: ["SELECT orders WHERE region", "INSERT INTO payments", "UPDATE inventory SET qty"] },
+  { name: "cache-service",   ops: ["GET session:{id}", "SET session:{id}", "DEL expired_keys"] },
+];
+
+function randomHex(bytes: number): string {
+  return Array.from({ length: bytes }, () =>
+    Math.floor(Math.random() * 256).toString(16).padStart(2, "0")
+  ).join("");
+}
+
+function traceIndex(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `smartops-traces-${d.getFullYear()}.${mm}.${dd}`;
+}
+
+interface TraceSpanDoc {
+  "@timestamp": string; traceId: string; spanId: string;
+  name: string; serviceName: string; durationNano: number;
+  status: "OK" | "ERROR"; region: string;
+}
+
+function generateTraceSpans(regionName: string, anomalyActive: boolean): TraceSpanDoc[] {
+  const count     = anomalyActive ? 8 + Math.floor(Math.random() * 8) : 3 + Math.floor(Math.random() * 5);
+  const errorRate = anomalyActive ? 0.35 : 0.04;
+  const traceId   = randomHex(16);
+  const ts        = new Date().toISOString();
+
+  return Array.from({ length: count }, () => {
+    const svc     = TRACE_SERVICES[Math.floor(Math.random() * TRACE_SERVICES.length)];
+    const op      = svc.ops[Math.floor(Math.random() * svc.ops.length)];
+    const isError = Math.random() < errorRate;
+    const ms      = anomalyActive
+      ? (isError ? 800 + Math.random() * 4200 : 300 + Math.random() * 2000)
+      : (isError ? 200 + Math.random() * 300  : 20  + Math.random() * 180);
+    return {
+      "@timestamp": ts, traceId, spanId: randomHex(8),
+      name: op, serviceName: svc.name,
+      durationNano: Math.round(ms * 1_000_000),
+      status: isError ? "ERROR" : "OK", region: regionName,
+    };
+  });
+}
+
+async function pushTraces(): Promise<void> {
+  const spans: TraceSpanDoc[] = [];
+  for (const region of REGIONS) {
+    spans.push(...generateTraceSpans(region.name, state[region.name].anomalyActive));
+  }
+  const body = spans.flatMap((s) => [{ index: { _index: traceIndex() } }, s]);
+  try {
+    await esClient.bulk({ body, refresh: false });
+  } catch {
+    // ES may not be ready — silently skip
+  }
+}
 
 // ── Kafka producer ────────────────────────────────────────────
 const kafka = new Kafka({
@@ -237,9 +306,11 @@ async function seedPostgres(): Promise<void> {
 
 // ── Main loop ─────────────────────────────────────────────────
 let anomalyTimer = 0;
+let tickCount    = 0;
 
 async function loop(): Promise<void> {
   anomalyTimer += INTERVAL_MS;
+  tickCount++;
 
   // Inject anomaly every ~60s in a random region
   if (anomalyTimer >= ANOMALY_INTERVAL_MS) {
@@ -277,6 +348,8 @@ async function loop(): Promise<void> {
       }));
     }
   }
+
+  if (tickCount % TRACE_EVERY_N_TICKS === 0) pushes.push(pushTraces());
 
   await Promise.allSettled(pushes);
 

@@ -20,9 +20,8 @@ cd "C:\Users\Sergiu\Desktop\Projects\Agentic-AI\SmartOps AI observability platfo
 | 4 | `pnpm simulate` |
 | 5 | `pnpm simulate:consumer` |
 | 6 | `pnpm simulate:es-consumer` |
-| 7 | `pnpm simulate:traces` |
 
-**Wait 2–3 minutes** before recording — Terminal 7 auto-detects CPU anomalies from VictoriaMetrics and injects slow/error spans in the affected region, pushing confidence above 60%. Watch Terminal 7 for `[ANOMALY: eu-west]` alongside Terminal 4's `[ANOMALY] Injecting CPU spike`.
+**Wait 2–3 minutes** before recording — the simulator injects error spans and slow traces automatically whenever a CPU anomaly fires, pushing RCA confidence above 60%. Watch Terminal 4 until you see at least one `[ANOMALY] Injecting CPU spike` and `[ANOMALY] Resolved` cycle complete.
 
 Browser tabs:
 - `http://localhost:3001` — SmartOps web
