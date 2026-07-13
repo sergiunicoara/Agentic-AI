@@ -28,7 +28,7 @@ Alertmanager routes fire to your configured receiver (email/PagerDuty/Slack — 
 
 1. Open SmartOps at `http://localhost:3001` (or production URL).
 2. Navigate to **Dashboard** — the affected region will show a red pulse dot on its tab.
-3. Click the region tab → verify metric cards for CPU / Memory / P99 / RPS.
+3. Click the region tab → verify metric cards for CPU / Memory / P99 / Error Rate / RPS (five golden signals).
 4. Cross-reference with Grafana Golden Signals dashboard at `:3002` (port mapped from container).
 
 ---
@@ -38,8 +38,8 @@ Alertmanager routes fire to your configured receiver (email/PagerDuty/Slack — 
 1. Navigate to **AI Insights**.
 2. Click **Run AI Scan** — SmartOps runs z-score detection across all regions and metrics.
 3. If an anomaly is detected, it appears in the Live Anomalies section with z-score.
-4. Click **Trigger RCA** on the anomaly — the alert-to-ticket workflow starts.
-5. SmartOps correlates ES error logs + distributed trace spans with the anomaly window.
+4. Click **Trigger RCA** on the anomaly — the alert-to-ticket workflow starts. The anomaly card is removed from the Live Anomalies list immediately; the incident appears in the Incident History table with status `pending_approval`.
+5. SmartOps correlates ES error logs + distributed trace spans (slow or errored spans ≥ 500 ms or status ERROR) with the anomaly window.
 6. A modal appears with the AI-generated RCA summary, confidence score, correlated evidence, and suggested actions.
 
 ---

@@ -25,7 +25,9 @@ infra/
 
 e2e/            Playwright end-to-end test suite
 scripts/
-  simulate-infra.ts    Kafka producer — publishes JSON metric events, pushes OTel logs
+  simulate-infra.ts    Kafka producer — publishes JSON metric events, pushes OTel logs,
+                       and generates distributed trace spans into Elasticsearch
+                       (smartops-traces-*) correlated with active anomaly windows
   metrics-consumer.ts  Consumer group smartops-vm-writer → VictoriaMetrics remote-write
   es-consumer.ts       Consumer group smartops-es-writer → Elasticsearch bulk index
 ```
@@ -94,7 +96,7 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     subgraph SIM["Scripts (run on host)"]
-        PROD["simulate-infra.ts\nKafka producer · OTel logs every 5 s"]
+        PROD["simulate-infra.ts\nKafka producer · OTel logs · trace spans every 5–10 s"]
         VMC["metrics-consumer.ts\ngroupId: smartops-vm-writer"]
         ESC["es-consumer.ts\ngroupId: smartops-es-writer\nbulk index · 50 docs/flush"]
     end
@@ -224,6 +226,8 @@ pnpm simulate:es-consumer
 
 The simulator publishes a `MetricMessage` to the `smartops.metrics` Kafka topic every 5 seconds per region. The two consumers read from independent consumer groups — stopping one doesn't affect the other. OTel logs go directly from the simulator to the OTel Collector (port 4318) and land in Elasticsearch under `smartops-logs` with ECS field mapping.
 
+Every 10 seconds the simulator also bulk-indexes distributed trace spans into `smartops-traces-{date}`. When a CPU anomaly is active, the affected region's spans shift to a 35% error rate and 300 ms–5 s latency, matching the anomaly window. These spans feed the RCA confidence score — each slow or errored span found adds `+0.03` to the baseline `0.40`, pushing confidence to 60–88% during a live incident.
+
 ---
 
 ## Service URLs
@@ -307,7 +311,7 @@ The one limitation: SSE is text-only. If the metrics payload grew to the point w
 
 **Add a Kafka Schema Registry.** The `MetricMessage` contract between the simulator and both consumers is currently a TypeScript interface shared by convention — nothing enforces schema compatibility at runtime. A Schema Registry (Confluent or Redpanda) with Avro or Protobuf would catch breaking changes before they reach consumers in production, and enable schema evolution without coordinated deploys.
 
-**Instrument the agent calls with OpenTelemetry.** The API is already wired to the OTel Collector. Wrapping each `agent.generate()` call in an OTel span would produce traces showing LLM latency, tool call counts, and retry attempts — making the AI layer observable with the same tooling as the rest of the platform. Currently the Claude calls are a black box inside an observability platform, which is an irony worth fixing.
+**Instrument the agent calls with OpenTelemetry.** The OTel Collector is running and the trace pipeline routes to Elasticsearch. The simulator now generates infrastructure traces (service-level spans for api-gateway, db-service, etc.) that correlate with anomaly windows and feed the RCA confidence score. What's still missing: wrapping each `agent.generate()` call in an OTel span. That would produce traces showing LLM latency, tool call counts, and retry attempts — making the AI reasoning layer itself observable, not just the infrastructure it watches.
 
 **Replace in-process Mastra state with a Redis-backed workflow store.** SQLite is fine for a single-process local setup. For horizontal scaling — multiple API instances behind a load balancer — the workflow state needs to be shared so any instance can resume a suspended run. Mastra supports external storage backends; wiring up Redis or a Postgres-backed store would be the production path.
 
@@ -322,7 +326,7 @@ pnpm dev                  # Run all apps in watch mode
 pnpm build                # Build all packages
 pnpm typecheck            # TypeScript check across all packages
 pnpm lint                 # Lint all packages
-pnpm simulate             # Kafka producer: publishes metric events + OTel logs
+pnpm simulate             # Kafka producer: publishes metric events + OTel logs + trace spans
 pnpm simulate:consumer    # Kafka consumer → VictoriaMetrics remote-write
 pnpm simulate:es-consumer # Kafka consumer → Elasticsearch bulk index
 pnpm db:generate          # Generate Drizzle migrations
