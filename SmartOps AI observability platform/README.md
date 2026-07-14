@@ -40,7 +40,7 @@ The core feature: anomaly detection → AI root-cause analysis → human approva
 
 ```mermaid
 sequenceDiagram
-    actor U as Operator
+    participant U as Operator
     participant W as Web (Next.js)
     participant A as API (Fastify)
     participant WF as Workflow (Mastra)
