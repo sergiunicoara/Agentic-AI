@@ -223,7 +223,9 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
     # Simple confidence gate: scale-aware signal; swap for calibrated thresholds per workspace.
     top_score = float(hits[0].score) if hits else 0.0
     distinct_docs = len({h.document_id for h in hits})
-    low_confidence = (top_score < 0.15) or (distinct_docs < 1)
+    # RRF-fused scores compress to 1/(k+rank) ≈ 0.016; raw BM25/cosine scores
+    # are in 0–1+. Gate on presence of hits rather than a fixed score threshold.
+    low_confidence = (len(hits) == 0) or (distinct_docs < 1)
 
     if low_confidence:
         answer = "I don’t know based on the indexed documents in this workspace."
@@ -247,7 +249,7 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
                 [h.model_dump() for h in hits],
                 [c.model_dump() for c in citations],
             )
-            ok2, _reason2 = evidence_minimum([c.model_dump() for c in citations], min_chars=80)
+            ok2, _reason2 = evidence_minimum([c.model_dump() for c in citations], min_chars=40)
 
             groundedness = 1.0 if (ok and ok2) else 0.0
             try:
