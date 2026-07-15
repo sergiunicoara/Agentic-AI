@@ -2,63 +2,68 @@
 
 **Runtime:** ~4 min | **Stack:** FastAPI · pgvector · OpenSearch · Grafana · DSPy | **Tests:** 190 passing
 
+> **Terminal:** Use PowerShell. All commands are single-line — no `\` continuations.
+
 ---
 
 ## S01 — INT. TERMINAL — COLD OPEN `0:00 – 0:15`
 
 Screen dark. Cursor blinks. No title card. One command.
 
-**SHOT:** Full-screen terminal. Compose output animates in line by line.
+**SHOT:** Full-screen PowerShell. Compose output animates in line by line.
 
-```bash
-$ docker compose up -d
+```powershell
+docker compose up -d
+```
 
+```
 [+] Running 8/8
- ✔ Container db            Started
- ✔ Container redis          Started
- ✔ Container opensearch     Started
- ✔ Container api            Started
- ✔ Container worker         Started
- ✔ Container prometheus     Started
- ✔ Container grafana        Started
- ✔ Container alertmanager   Started
+ ✔ Container ai-native-data-platform-db-1                    Started
+ ✔ Container ai-native-data-platform-redis-1                 Started
+ ✔ Container ai-native-data-platform-opensearch-1            Healthy
+ ✔ Container ai-native-data-platform-api-1                   Started
+ ✔ Container ai-native-data-platform-worker-1                Started
+ ✔ Container ai-native-data-platform-prometheus-1            Started
+ ✔ Container ai-native-data-platform-grafana-1               Started
+ ✔ Container ai-native-data-platform-alertmanager-1          Started
 ```
 
 **V.O.:** *"A production-grade RAG platform. Eight services. One command. Let's see what it does."*
 
-> ↳ Init schema: `docker compose exec -T db psql -U app -d app < scripts/init_db.sql`
+> ↳ Init schema (first run only):
+> ```powershell
+> Get-Content scripts/init_db.sql | docker exec -i ai-native-data-platform-db-1 psql -U app -d app
+> ```
 
 ---
 
 ## S02 — INT. TERMINAL — INGESTION PIPELINE `0:15 – 0:55`
 
-Split screen: curl request left pane, worker logs right pane. Watch the chain fire.
+Split screen: curl request left pane, API logs right pane.
 
-```bash
-# LEFT PANE
-$ curl -s -X POST http://localhost:8000/ingest/transcript \
-  -H "Content-Type: application/json" \
-  -H "X-Workspace-Id: demo" \
-  -H "X-API-Key: demo" \
-  -d '{
-    "workspace_id": "demo",
-    "title": "Refund Policy",
-    "text": "Customers may request a full refund within 30 days of purchase."
-  }' | jq
+> Note: `_jobs` is an in-process queue — ingestion threads run inside the API process, so logs appear in the API container, not the worker container.
 
+```powershell
+# LEFT PANE — ingest a document
+curl.exe -s -X POST http://localhost:8000/ingest/transcript -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d '{"workspace_id":"demo","title":"Refund Policy","text":"Customers may request a full refund within 30 days of purchase."}' | python -m json.tool
+```
+
+```json
 {
   "status": "queued",
   "document_id": "3f8a2c91-..."
 }
 ```
 
+```powershell
+# RIGHT PANE — watch the chain fire
+docker logs ai-native-data-platform-api-1 --follow
 ```
-# RIGHT PANE — worker logs
-worker  | event=ingestion_started      doc=3f8a2c91 chunks=1
-worker  | event=chunk_embedded         idx=0 version=v1 ms=41
-worker  | event=chunk_inserted         rows=1 conflict=0
-worker  | event=opensearch_dual_write  indexed=1 errors=0
-worker  | event=ingestion_complete     latency_ms=94
+
+```
+{"name":"ingest_enqueued",       "document_id":"3f8a2c91-...", "workspace_id":"demo"}
+{"name":"opensearch_connected",  "version":"2.12.0",           "cluster":"docker-cluster"}
+{"name":"opensearch_bulk_upsert","indexed":1,"errors":0,       "latency_ms":94}
 ```
 
 **V.O.:** *"Chunked, embedded, written to pgvector — then dual-synced to OpenSearch in a single bulk call, after the Postgres transaction commits. Re-ingest the same document and you get one row, one OpenSearch doc. The dedup key is deterministic: `document_id:chunk_index:embedding_version`. No duplicates, ever."*
@@ -71,64 +76,57 @@ worker  | event=ingestion_complete     latency_ms=94
 
 Fresh terminal. Ask the platform about the just-ingested document.
 
-```bash
-$ curl -s -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -H "X-Workspace-Id: demo" \
-  -H "X-API-Key: demo" \
-  -d '{"workspace_id":"demo","query":"How long to get a refund?"}' | jq
+```powershell
+curl.exe -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d '{"workspace_id":"demo","query":"How long to get a refund?"}' | python -m json.tool
+```
 
+```json
 {
-  "answer":    "You have 30 days from the date of purchase to request a full refund.",
-  "citations": [{ "chunk_id": "3f8a2c91:0:v1", "snippet": "full refund within 30 days" }],
-  "unknown":   false,
-  "latency_ms": 312
+  "answer": "Customers may request a full refund within 30 days of purchase.",
+  "citations": [{ "chunk_id": "aeb53653-...", "snippet": "full refund within 30 days of purchase" }],
+  "unknown": false
 }
 ```
 
 **PAUSE ON** `"unknown": false` — the anti-hallucination contract. Hold 2s.
 
-**V.O.:** *"Query embeds. Redis cache miss. pgvector ANN + BM25 lexical fire in parallel, fused via RRF, reranked with MMR. LLM generates. The citation verifier confirms the snippet exists in the retrieved chunk, word-for-word. Groundedness passes 0.70. If it doesn't — `unknown: true`. The platform degrades safely. It never hallucinates."*
+**V.O.:** *"Query embeds. Redis cache miss. OpenSearch BM25 retrieves. LLM generates. The citation verifier confirms the snippet exists in the retrieved chunk, word-for-word. Groundedness passes. If it doesn't — `unknown: true`. The platform degrades safely. It never hallucinates."*
 
 ---
 
 ## S04 — INT. TERMINAL — SWITCH RETRIEVAL BACKEND LIVE `1:35 – 1:55`
 
-Same request body. One env var. Different engine. Result is identical.
+Same request body. One header. Different engine. Result is identical.
 
-```bash
-# Same request — now routed to OpenSearch BM25 + kNN + RRF
-$ RETRIEVAL_MODE=opensearch_hybrid \
-  curl -s -X POST http://localhost:8000/ask \
-  -H "X-Workspace-Id: demo" -H "X-API-Key: demo" \
-  -d '{"workspace_id":"demo","query":"How long to get a refund?"}' \
-  | jq '.answer,.unknown,.latency_ms'
-
-"You have 30 days from the date of purchase to request a full refund."
-false
-298
+```powershell
+curl.exe -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -d '{"workspace_id":"demo","query":"How long to get a refund?"}' | python -m json.tool
 ```
 
-**V.O.:** *"One env var. Eight retrieval modes — pgvector dense, lexical, hybrid, multimodal; or OpenSearch BM25, vector, or hybrid with RRF in Python. No code change. Same API contract."*
+```json
+{
+  "answer": "Customers may request a full refund within 30 days of purchase.",
+  "citations": [...],
+  "unknown": false
+}
+```
+
+**V.O.:** *"One header. Eight retrieval modes — pgvector dense, lexical, hybrid, multimodal; or OpenSearch BM25, vector, or hybrid with RRF in Python. No code change. Same API contract."*
 
 ---
 
 ## S05 — INT. TERMINAL — DSPy NL→SQL `1:55 – 2:25`
 
-Plain English → workspace-scoped parameterized SQL. Generated SQL visible in response.
+Plain English → workspace-scoped parameterized SQL.
 
-```bash
-$ curl -s -X POST http://localhost:8000/query/natural-language \
-  -H "X-Workspace-Id: demo" -H "X-API-Key: demo" \
-  -d '{"workspace_id":"demo","query":"Show the 5 slowest traces"}' | jq
+```powershell
+curl.exe -s -X POST http://localhost:8000/query/natural-language -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d '{"workspace_id":"demo","query":"Show the 5 slowest traces"}' | python -m json.tool
+```
 
+```json
 {
-  "sql": "SELECT id, trace_type, workspace_id, latency_ms, created_at
-          FROM trace_log
-          WHERE workspace_id = :_workspace_id
-          ORDER BY latency_ms DESC LIMIT 5",
-  "row_count": 5,
-  "results": [...]
+  "sql": "SELECT id, trace_type, workspace_id, latency_ms, created_at FROM trace_log WHERE workspace_id = :_workspace_id ORDER BY latency_ms DESC LIMIT 5",
+  "results": [],
+  "row_count": 0
 }
 ```
 
@@ -140,24 +138,27 @@ $ curl -s -X POST http://localhost:8000/query/natural-language \
 
 ## S06 — INT. BROWSER — GRAFANA OBSERVABILITY `2:25 – 2:55`
 
-Browser → **http://localhost:3000** → Dashboards → Platform Overview. Navigate slowly.
+Browser → **http://localhost:3000** (admin / admin) → Dashboards → Platform Overview. Navigate slowly.
 
 - **Panel 1:** RPS counter + p50/p95/p99 latency histogram. Hover a bar.
-- **Panel 2:** Rolling SLO window — error rate, unknown rate, p95 with threshold markers (800 ms / 25% / 35%).
+- **Panel 2:** Rolling SLO window — error rate, unknown rate, p95 with threshold markers.
 - **Panel 3:** EWMA anomaly scores — latency z-score and error z-score. Point at the 6.0 threshold line.
-- **Panel 4:** Ingestion job counts by status + OpenSearch latency histograms (BM25 / vector / hybrid separate).
+- **Panel 4:** Ingestion job counts by status + OpenSearch latency histograms.
 
-```bash
+```powershell
 # Check metrics directly
-$ curl -s http://localhost:8000/metrics | grep "anomaly_score\|slo_rolling"
-
-anomaly_score{detector="latency"}    0.82
-anomaly_score{detector="error_rate"} 0.14
-slo_rolling_p95_latency_ms           312.0
-slo_rolling_error_rate               0.0
+curl.exe -s http://localhost:8000/metrics | Select-String "slo_rolling|anomaly_score"
 ```
 
-**V.O.:** *"Prometheus scrapes every 10 seconds. Fifteen panels. Rolling SLO window holds the last 2,000 requests — p95, error rate, unknown rate on every observation. EWMA detectors surface anomalies before they trip a threshold. When a z-score exceeds 6.0, an event fires. If it sustains — the remediation controller activates."*
+```
+slo_rolling_p95_latency_ms 312.0
+slo_rolling_error_rate 0.0
+slo_rolling_unknown_rate 0.0
+platform_anomaly_score{signal="latency"} 0.82
+platform_anomaly_score{signal="error_rate"} 0.14
+```
+
+**V.O.:** *"Prometheus scrapes every 10 seconds. Rolling SLO window holds the last 2,000 requests — p95, error rate, unknown rate on every observation. EWMA detectors surface anomalies before they trip a threshold. When a z-score exceeds 6.0, an event fires. If it sustains — the remediation controller activates."*
 
 ---
 
@@ -170,19 +171,20 @@ Open **`app/core/reliability/remediation_controller.py`**. Walk lines 51–86.
 - **L83:** `violated = violated + 1 if bad else max(0, violated - 1)` — hysteresis, not a toggle
 - **L85:** `if violated >= 3: _write_override(force_experiment)` — forces all traffic to control
 
-```bash
-# After 3 consecutive SLO violations:
-$ cat .runtime/ab_override.json
-{
-  "force_all": "control",
-  "ts": 1720600000.0
-}
-
-# Restore normal routing — no deployment needed:
-$ rm .runtime/ab_override.json
+```powershell
+# After 3 consecutive SLO violations the file appears:
+Get-Content .runtime/ab_override.json
+```
+```json
+{ "force_all": "control", "ts": 1720600000.0 }
 ```
 
-**V.O.:** *"Leader-elected via Postgres advisory lock — in a multi-replica deployment, only one instance runs remediation. Three consecutive SLO violations write a JSON override, forcing all workspace traffic to the safe control experiment. Reversible: delete the file. Audited: every activation emits an event. Closed-loop ops in 100 lines of Python."*
+```powershell
+# Restore normal routing — no deployment needed:
+Remove-Item .runtime/ab_override.json
+```
+
+**V.O.:** *"Leader-elected via Postgres advisory lock — in a multi-replica deployment, only one instance runs remediation. Three consecutive SLO violations write a JSON override, forcing all workspace traffic to the safe control experiment. Reversible: delete the file. Closed-loop ops in 100 lines of Python."*
 
 ---
 
@@ -190,9 +192,11 @@ $ rm .runtime/ab_override.json
 
 New terminal. Run the full suite. No commentary until the summary line.
 
-```bash
-$ pytest tests/ -q
+```powershell
+pytest tests/ -q
+```
 
+```
 ................................ [ 16%]
 ................................ [ 33%]
 ................................ [ 50%]
@@ -201,18 +205,18 @@ $ pytest tests/ -q
 .......................ss        [ 99%]
 .                               [100%]
 
-190 passed, 2 skipped in 4.3s
+190 passed, 2 skipped in 14.7s
 ```
 
 **PAUSE ON** "190 passed" — hold 2 seconds before cutting.
 
-**V.O.:** *"190 tests. No live database or OpenSearch required — mocks injected at import time. Coverage: OpenSearch idempotency and availability re-probe, prompt injection in five taxonomies, PII redaction, DSPy normalization edge cases, SQL builder for every filter operator, reliability contracts, rolling SLO, token bucket, and chaos degradation when providers fail."*
+**V.O.:** *"190 tests. No live database or OpenSearch required — mocks injected at import time. Coverage: OpenSearch idempotency, prompt injection in five taxonomies, PII redaction, DSPy normalization edge cases, SQL builder for every filter operator, reliability contracts, rolling SLO, token bucket, and chaos degradation when providers fail."*
 
 ---
 
 ## S09 — INT. BROWSER — KNOWLEDGE GRAPH `3:45 – 4:00`
 
-Open **`graphify-out/graph.html`**. Zoom out to show the full graph, then hover god nodes.
+Open **`graphify-out/graph.html`** in a browser. Zoom out to show the full graph, then hover god nodes.
 
 - **HOVER** RetrievedChunk (61 edges) — schema type every retrieval path returns
 - **HOVER** QueryIntent (51 edges) — NL→SQL central abstraction

@@ -54,6 +54,11 @@ services:
       DATABASE_URL: postgresql+psycopg2://app:app@db:5432/app
       REDIS_URL: redis://redis:6379/0
       OPENSEARCH_URL: http://opensearch:9200
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      NL_QUERY_PROVIDER: ${NL_QUERY_PROVIDER:-dspy}
+      EMBED_PROVIDER: ${EMBED_PROVIDER:-mock}
+      RETRIEVAL_MODE: ${RETRIEVAL_MODE:-opensearch_bm25}
     ports:
       - "8000:8000"
     depends_on:

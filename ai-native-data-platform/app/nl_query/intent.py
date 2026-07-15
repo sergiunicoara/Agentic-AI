@@ -81,9 +81,12 @@ class QueryIntent(BaseModel):
 # Extraction — switches between real LLM and deterministic mock
 # ---------------------------------------------------------------------------
 
-PROVIDER = os.getenv("LLM_PROVIDER", "mock").lower()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+# NL_QUERY_PROVIDER overrides LLM_PROVIDER so generation and NL→SQL can use
+# different backends (e.g. LLM_PROVIDER=openai for generation, NL_QUERY_PROVIDER=dspy).
+_llm = os.getenv("LLM_PROVIDER", "mock").lower()
+PROVIDER = os.getenv("NL_QUERY_PROVIDER", _llm).lower()
 
 
 def extract_intent(nl_query: str) -> QueryIntent:
