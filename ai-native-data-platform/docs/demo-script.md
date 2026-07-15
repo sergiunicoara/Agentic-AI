@@ -2,7 +2,7 @@
 
 **Runtime:** ~4 min | **Stack:** FastAPI · pgvector · OpenSearch · Grafana · DSPy | **Tests:** 190 passing
 
-> **Terminal:** Use PowerShell. All commands are single-line — no `\` continuations.
+> **Terminal:** PowerShell 5.1 (default Windows terminal). The `--%%` token after `curl.exe` tells PowerShell to stop processing arguments — copy commands exactly as written.
 
 ---
 
@@ -10,9 +10,7 @@
 
 Screen dark. Cursor blinks. No title card. One command.
 
-**SHOT:** Full-screen PowerShell. Compose output animates in line by line.
-
-```powershell
+```
 docker compose up -d
 ```
 
@@ -31,7 +29,7 @@ docker compose up -d
 **V.O.:** *"A production-grade RAG platform. Eight services. One command. Let's see what it does."*
 
 > ↳ Init schema (first run only):
-> ```powershell
+> ```
 > Get-Content scripts/init_db.sql | docker exec -i ai-native-data-platform-db-1 psql -U app -d app
 > ```
 
@@ -41,11 +39,10 @@ docker compose up -d
 
 Split screen: curl request left pane, API logs right pane.
 
-> Note: `_jobs` is an in-process queue — ingestion threads run inside the API process, so logs appear in the API container, not the worker container.
+> Note: ingestion threads run inside the API process — logs appear in the API container, not the worker container.
 
-```powershell
-# LEFT PANE — ingest a document
-curl.exe -s -X POST http://localhost:8000/ingest/transcript -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d '{"workspace_id":"demo","title":"Refund Policy","text":"Customers may request a full refund within 30 days of purchase."}' | python -m json.tool
+```
+curl.exe --% -s -X POST http://localhost:8000/ingest/transcript -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"title\":\"Refund Policy\",\"text\":\"Customers may request a full refund within 30 days of purchase.\"}"
 ```
 
 ```json
@@ -55,15 +52,14 @@ curl.exe -s -X POST http://localhost:8000/ingest/transcript -H "Content-Type: ap
 }
 ```
 
-```powershell
-# RIGHT PANE — watch the chain fire
+```
 docker logs ai-native-data-platform-api-1 --follow
 ```
 
 ```
-{"name":"ingest_enqueued",       "document_id":"3f8a2c91-...", "workspace_id":"demo"}
-{"name":"opensearch_connected",  "version":"2.12.0",           "cluster":"docker-cluster"}
-{"name":"opensearch_bulk_upsert","indexed":1,"errors":0,       "latency_ms":94}
+{"name":"ingest_enqueued",        "document_id":"3f8a2c91-...", "workspace_id":"demo"}
+{"name":"opensearch_connected",   "version":"2.12.0",           "cluster":"docker-cluster"}
+{"name":"opensearch_bulk_upsert", "indexed":1, "errors":0,      "latency_ms":94}
 ```
 
 **V.O.:** *"Chunked, embedded, written to pgvector — then dual-synced to OpenSearch in a single bulk call, after the Postgres transaction commits. Re-ingest the same document and you get one row, one OpenSearch doc. The dedup key is deterministic: `document_id:chunk_index:embedding_version`. No duplicates, ever."*
@@ -76,14 +72,14 @@ docker logs ai-native-data-platform-api-1 --follow
 
 Fresh terminal. Ask the platform about the just-ingested document.
 
-```powershell
-curl.exe -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d '{"workspace_id":"demo","query":"How long to get a refund?"}' | python -m json.tool
+```
+curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
 ```
 
 ```json
 {
-  "answer": "Customers may request a full refund within 30 days of purchase.",
-  "citations": [{ "chunk_id": "aeb53653-...", "snippet": "full refund within 30 days of purchase" }],
+  "answer": "Customers have 30 days to request a refund.",
+  "citations": [{ "chunk_id": "aeb53653-...", "snippet": "Customers may request a full refund within 30 days of purchase." }],
   "unknown": false
 }
 ```
@@ -96,10 +92,10 @@ curl.exe -s -X POST http://localhost:8000/ask -H "Content-Type: application/json
 
 ## S04 — INT. TERMINAL — SWITCH RETRIEVAL BACKEND LIVE `1:35 – 1:55`
 
-Same request body. One header. Different engine. Result is identical.
+Same request body. One extra header. Different engine. Result is identical.
 
-```powershell
-curl.exe -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -d '{"workspace_id":"demo","query":"How long to get a refund?"}' | python -m json.tool
+```
+curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
 ```
 
 ```json
@@ -118,8 +114,8 @@ curl.exe -s -X POST http://localhost:8000/ask -H "Content-Type: application/json
 
 Plain English → workspace-scoped parameterized SQL.
 
-```powershell
-curl.exe -s -X POST http://localhost:8000/query/natural-language -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d '{"workspace_id":"demo","query":"Show the 5 slowest traces"}' | python -m json.tool
+```
+curl.exe --% -s -X POST http://localhost:8000/query/natural-language -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"query\":\"Show the 5 slowest traces\"}"
 ```
 
 ```json
@@ -145,8 +141,7 @@ Browser → **http://localhost:3000** (admin / admin) → Dashboards → Platfor
 - **Panel 3:** EWMA anomaly scores — latency z-score and error z-score. Point at the 6.0 threshold line.
 - **Panel 4:** Ingestion job counts by status + OpenSearch latency histograms.
 
-```powershell
-# Check metrics directly
+```
 curl.exe -s http://localhost:8000/metrics | Select-String "slo_rolling|anomaly_score"
 ```
 
@@ -171,16 +166,14 @@ Open **`app/core/reliability/remediation_controller.py`**. Walk lines 51–86.
 - **L83:** `violated = violated + 1 if bad else max(0, violated - 1)` — hysteresis, not a toggle
 - **L85:** `if violated >= 3: _write_override(force_experiment)` — forces all traffic to control
 
-```powershell
-# After 3 consecutive SLO violations the file appears:
+```
 Get-Content .runtime/ab_override.json
 ```
 ```json
 { "force_all": "control", "ts": 1720600000.0 }
 ```
 
-```powershell
-# Restore normal routing — no deployment needed:
+```
 Remove-Item .runtime/ab_override.json
 ```
 
@@ -190,9 +183,7 @@ Remove-Item .runtime/ab_override.json
 
 ## S08 — INT. TERMINAL — TEST SUITE `3:25 – 3:45`
 
-New terminal. Run the full suite. No commentary until the summary line.
-
-```powershell
+```
 pytest tests/ -q
 ```
 
