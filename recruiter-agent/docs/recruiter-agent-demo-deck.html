@@ -1054,26 +1054,28 @@
     </section>
 
     <!-- S05 -->
-    <section class="slide" data-title="S05 — Latency is measured" data-vo="That half-second voice response you saw? Here's the receipt. This benchmark runs against the live deployment: 428 milliseconds median to first audio, measured — the only estimated figure is the speech-to-text leg, and it's labeled as an estimate on purpose.">
+    <section class="slide" data-title="S05 — Latency is measured" data-vo="That sub-quarter-second voice response you saw? Here's the receipt. This benchmark runs against the live deployment: 241 milliseconds median to first audio, measured — the only estimated figure is the speech-to-text leg, and it's labeled as an estimate on purpose.">
       <div class="slide-inner">
         <p class="act-eyebrow">Act II — <b>The proof</b></p>
         <div class="scene-head"><span class="scene-tag">S05</span><h2>The latency is measured, not promised</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span><span class="mono">benchmark_voice.py</span> against the live target — the receipt for the half-second voice reply from S03.</p>
+        <p class="shot"><span class="shot-label">Shot</span><span class="mono">benchmark_voice.py</span> against the live target — the receipt for the voice reply from S03.</p>
         <div class="stage">
           <div class="term">
             <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — live Cloud Run</span></div>
             <pre class="term-body"><span class="prompt">python benchmark_voice.py https://recruiter-agent-969006882005.europe-west1.run.app</span>
 <span class="out-dim">Stage 2: Agent turn (POST /chat)
-  Agent  : p50=321ms  p95=589ms  min=318ms  max=589ms
+  Agent  : p50=390ms  p95=390ms  min=371ms  max=397ms
 
 Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
-  msg 1: first_audio=428ms  total=444ms  audio=51200b
-  E2E (agent+TTS): p50=428ms  p95=474ms  min=236ms  max=474ms</span>
-<span class="out-amber">  Full E2E estimate (incl. ~200ms Deepgram streaming): 628ms</span></pre>
+  msg 1: first_audio=211ms  total=241ms  audio=172416b
+  msg 2: first_audio=232ms  total=262ms  audio=169152b
+  msg 3: first_audio=141ms  total=208ms  audio=70080b
+  E2E (agent+TTS): p50=241ms  p95=241ms  min=208ms  max=262ms</span>
+<span class="out-amber">  Full E2E estimate (incl. ~200ms Deepgram streaming): 441ms</span></pre>
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">That half-second voice response you saw in act one? Here's the receipt. This benchmark runs against the live deployment: <b class="mono" style="color:var(--accent)">428ms</b> median to first audio, measured — the only estimated figure is the speech-to-text leg, and it's labeled as an estimate on purpose. Every latency claim in this repo has a script behind it you can re-run.</blockquote>
+            <blockquote class="vo">That sub-quarter-second voice response you saw in act one? Here's the receipt. This benchmark runs against the live deployment: <b class="mono" style="color:var(--accent)">241ms</b> median to first audio on the WebSocket path — the only estimated figure is the speech-to-text leg, and it's labeled as an estimate on purpose. Every latency claim in this repo has a script behind it you can re-run.</blockquote>
           </div>
         </div>
       </div>
@@ -1119,14 +1121,19 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
             <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
             <pre class="term-body"><span class="prompt">curl -s .../session/demo-01/summary</span>
 <span class="out-dim">{
+  "role_fit_score": 3,
+  "strengths": [
+    "Direct experience with 'voice_ai' from recruiter-agent:voice-pipeline.",
+    "Showed interest in ai-native-data-platform (observability/production RAG)."
+  ],
+  "concerns": [
+    "production_rag, observability, low_latency not explicitly confirmed.",
+    "Limited session data for full assessment."
+  ],
+  "recommendation": "Maybe",
+  "summary": "Project views suggest strong voice AI alignment. Further discussion needed on production RAG, observability, and low-latency. Sergiu is based in Timisoara, Romania.",
   "session_id": "demo-01",
-  "role": "Lead AI Engineer",
-  "trajectory": { "steps": [
-    {"kind": "tool", "message": "role_extraction"},
-    {"kind": "tool", "message": "criteria_parsing"},
-    {"kind": "tool", "message": "llm_judge_evaluation",
-     "meta": {"score": 5, "faithfulness": 1.0}}
-  ]}
+  "generated": true
 }</span></pre>
           </div>
           <div class="vo-wrap">
@@ -1205,9 +1212,9 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
           <table class="stats">
             <thead><tr><th>Metric</th><th>Value</th><th>Source</th></tr></thead>
             <tbody>
-              <tr><td class="metric">Agent turn latency (p50)</td><td class="value">321ms</td><td class="source">benchmark_voice.py Stage 2, live Cloud Run</td></tr>
-              <tr><td class="metric">First-audio latency (p50)</td><td class="value">428ms</td><td class="source">benchmark_voice.py Stage 4, live Cloud Run</td></tr>
-              <tr><td class="metric">Full E2E voice turn (est.)</td><td class="value">~628ms</td><td class="source">Stage 4 p50 + 200ms Deepgram streaming estimate</td></tr>
+              <tr><td class="metric">Agent turn latency (p50)</td><td class="value">390ms</td><td class="source">benchmark_voice.py Stage 2, live Cloud Run</td></tr>
+              <tr><td class="metric">First-audio latency (p50)</td><td class="value">241ms</td><td class="source">benchmark_voice.py Stage 4 WebSocket, live Cloud Run</td></tr>
+              <tr><td class="metric">Full E2E voice turn (est.)</td><td class="value">~441ms</td><td class="source">Stage 4 p50 + 200ms Deepgram streaming estimate</td></tr>
               <tr><td class="metric">Golden eval pass rate</td><td class="value">100% (15/15)</td><td class="source">run_eval.py / eval_results.json</td></tr>
               <tr><td class="metric">Golden eval avg score</td><td class="value">5.0 / 5.0</td><td class="source">run_eval.py / eval_results.json</td></tr>
               <tr><td class="metric">Eval pass threshold</td><td class="value">≥ 3.5 / 5.0</td><td class="source">app/critic_agent.py</td></tr>

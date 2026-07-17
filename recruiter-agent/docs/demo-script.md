@@ -150,19 +150,21 @@ deployment — the one scene where raw numbers beat a clean take.
 **Expected output (abridged — Stages 2 and 4 are the ones that matter):**
 ```
 Stage 2: Agent turn (POST /chat)
-  Agent  : p50=321ms  p95=589ms  min=318ms  max=589ms
+  Agent  : p50=390ms  p95=390ms  min=371ms  max=397ms
 
 Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
-  msg 1: first_audio=428ms  total=444ms  audio=51200b
-  E2E (agent+TTS): p50=428ms  p95=474ms  min=236ms  max=474ms
-  Full E2E estimate (incl. ~200ms Deepgram streaming): 628ms
+  msg 1: first_audio=211ms  total=241ms  audio=172416b
+  msg 2: first_audio=232ms  total=262ms  audio=169152b
+  msg 3: first_audio=141ms  total=208ms  audio=70080b
+  E2E (agent+TTS): p50=241ms  p95=241ms  min=208ms  max=262ms
+  Full E2E estimate (incl. ~200ms Deepgram streaming): 441ms
 ```
 
-**V.O.:** "That half-second voice response you saw in act one? Here's the
-receipt. This benchmark runs against the live deployment: 428 milliseconds
-median to first audio, measured — the only estimated figure is the
-speech-to-text leg, and it's labeled as an estimate on purpose. Every
-latency claim in this repo has a script behind it you can re-run."
+**V.O.:** "That sub-quarter-second voice response you saw in act one? Here's
+the receipt. This benchmark runs against the live deployment: 241 milliseconds
+median to first audio on the WebSocket path — the only estimated figure is the
+speech-to-text leg, and it's labeled as an estimate on purpose. Every latency
+claim in this repo has a script behind it you can re-run."
 
 ---
 
@@ -212,14 +214,19 @@ curl -s https://recruiter-agent-969006882005.europe-west1.run.app/session/demo-0
 **Expected output (abridged):**
 ```json
 {
+    "role_fit_score": 3,
+    "strengths": [
+        "Direct experience inferred with 'voice_ai' from 'recruiter-agent:voice-pipeline' project.",
+        "Showed interest in 'ai-native-data-platform' which could relate to observability/production RAG."
+    ],
+    "concerns": [
+        "Specific expertise in 'production_rag', 'observability', and 'low_latency' was not explicitly confirmed.",
+        "Limited data from session for detailed assessment."
+    ],
+    "recommendation": "Maybe",
+    "summary": "The candidate's project views suggest experience with voice AI pipelines, directly addressing one key criterion. However, further discussion is needed to confirm specific expertise in production RAG, observability, and low-latency systems relevant for a Lead AI Engineer role. Sergiu is based in Timisoara, Romania.",
     "session_id": "demo-01",
-    "role": "Lead AI Engineer",
-    "trajectory": { "steps": [
-        {"kind": "tool", "message": "role_extraction"},
-        {"kind": "tool", "message": "criteria_parsing"},
-        {"kind": "tool", "message": "llm_judge_evaluation",
-         "meta": {"score": 5, "faithfulness": 1.0}}
-    ]}
+    "generated": true
 }
 ```
 
