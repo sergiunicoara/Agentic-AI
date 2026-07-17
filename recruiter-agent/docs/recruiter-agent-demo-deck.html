@@ -1041,30 +1041,28 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
     </section>
 
     <!-- S08 -->
-    <section class="slide" data-title="S08 — Test suite" data-vo="Two stories here. The seven passing tests are new — they cover the barge-in path in the voice pipeline, which had zero coverage until it got refactored into one shared, testable core. One of them actually caught a real race where an already-synthesized sentence could get dropped on interruption. And the two failures? Those are honest too — test underscore api still hits slash healthz and slash api slash v1 slash match, endpoints that don't exist anymore. A real gap, left visible rather than papered over.">
+    <section class="slide" data-title="S08 — Test suite" data-vo="Twelve for twelve — but the interesting part is how it got there. Seven of these tests cover voice interruption; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. And two tests here used to fail — chasing those failures exposed an actual routing bug where every GET endpoint, including the health check, silently returned the web page instead of JSON. The failing tests weren't noise; they were the map to the bug.">
       <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S08</span><h2>Test suite</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Terminal. Let the mixed pass/fail output run — the honest beat: real coverage where it was just added, a stale file still visibly broken.</p>
+        <div class="scene-head"><span class="scene-tag">S08</span><h2>The tests that caught real bugs</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Terminal. A fully green suite — the V.O. tells the story of how it <i>got</i> green, which builds more trust than the checkmarks.</p>
         <div class="stage">
           <div class="term">
             <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
             <pre class="term-body"><span class="prompt">python -m pytest tests/ -q</span>
-<span class="out-pass">tests/test_tts_streaming.py .......                        [ 77%]</span>
-<span class="out-fail">FAILED tests/test_api.py::test_health - JSONDecodeError
-FAILED tests/test_api.py::test_match_basic - assert 405 == 200</span>
-<span class="out-dim">2 failed, 7 passed, 4 warnings in 51s</span></pre>
+<span class="out-pass">............                                               [100%]
+12 passed, 8 warnings in 49s</span></pre>
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Two stories here. The seven passing tests are new — they cover the barge-in path in the voice pipeline, which had zero coverage until it got refactored into one shared, testable core. One of them actually caught a real race where an already-synthesized sentence could get dropped on interruption.</blockquote>
-            <div class="note-amber"><span class="mark">note</span><span>And the two failures? Those are honest too — <span class="mono">test_api.py</span> still hits <span class="mono">/healthz</span> and <span class="mono">/api/v1/match</span>, endpoints that don't exist anymore. A real gap, left visible rather than papered over.</span></div>
+            <blockquote class="vo">Twelve for twelve — but the interesting part is how it got there. Seven tests cover barge-in; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. And two tests used to <i>fail</i> — chasing them exposed a routing bug where every GET endpoint, health check included, silently returned the web page instead of JSON.</blockquote>
+            <div class="note-amber"><span class="mark">note</span><span>The old failing tests weren't deleted to make the suite green — they were chased to the real bug (a route-ordering issue in <span class="mono">server.py</span>), fixed, and replaced with regression tests that guard against it coming back.</span></div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- S09 -->
-    <section class="slide" data-title="S09 — Close" data-vo="That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with new coverage on the barge-in path and the stale tests left visible instead of hidden. Repo's public, link's in the description.">
+    <section class="slide" data-title="S09 — Close" data-vo="That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with a test suite whose failures get chased down to real bugs, not deleted. Repo's public, link's in the description.">
       <div class="slide-inner">
         <div class="scene-head"><span class="scene-tag">S09</span><h2>Close</h2></div>
         <p class="shot"><span class="shot-label">Shot</span>Terminal, clean prompt. Kill the background server before cutting.</p>
@@ -1077,7 +1075,7 @@ FAILED tests/test_api.py::test_match_basic - assert 405 == 200</span>
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with new coverage on the barge-in path and the stale tests left visible instead of hidden. Repo's public, link's in the description.</blockquote>
+            <blockquote class="vo">That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with a test suite whose failures get chased down to real bugs, not deleted. Repo's public, link's in the description.</blockquote>
           </div>
         </div>
       </div>
@@ -1103,7 +1101,7 @@ FAILED tests/test_api.py::test_match_basic - assert 405 == 200</span>
               <tr><td class="metric">Session store, no REDIS_URL</td><td class="value">SQLite fallback</td><td class="source">app/session_store.py</td></tr>
               <tr><td class="metric">Session store, with REDIS_URL</td><td class="value">Redis, 24h TTL</td><td class="source">app/session_store.py</td></tr>
               <tr><td class="metric">API routes exposed</td><td class="value">24</td><td class="source">app/server.py</td></tr>
-              <tr><td class="metric">Test suite result</td><td class="value">7 passed / 2 failed</td><td class="source">pytest tests/ -q — 7 new barge-in tests pass; 2 stale API tests fail</td></tr>
+              <tr><td class="metric">Test suite result</td><td class="value">12 passed / 0 failed</td><td class="source">pytest tests/ -q — 7 barge-in tests + 5 API tests (incl. route-shadowing regressions)</td></tr>
               <tr><td class="metric">Total runtime</td><td class="value">~4:00</td><td class="source">S01–S09</td></tr>
             </tbody>
           </table>

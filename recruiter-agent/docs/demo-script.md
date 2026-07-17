@@ -217,10 +217,10 @@ walk backward from any score to the exact turn that earned it."
 
 ---
 
-## S08 — The parts that don't work (on purpose)
+## S08 — The tests that caught real bugs
 
-**Shot:** Terminal, local repo. Let the pass/fail mix play out fully — this
-scene builds more trust than any green checkmark.
+**Shot:** Terminal, local repo. A fully green suite — but the V.O. tells the
+story of how it *got* green, which builds more trust than the checkmarks.
 
 ```bash
 /c/Users/Sergiu/AppData/Local/Programs/Python/Python311/python -m pytest tests/ -q
@@ -228,19 +228,18 @@ scene builds more trust than any green checkmark.
 
 **Expected output:**
 ```
-tests/test_tts_streaming.py .......                                      [ 77%]
-FAILED tests/test_api.py::test_health - json.decoder.JSONDecodeError: Expecting value...
-FAILED tests/test_api.py::test_match_basic - assert 405 == 200
-2 failed, 7 passed, 4 warnings in 51s
+............                                                             [100%]
+12 passed, 8 warnings in 49s
 ```
 
-**V.O.:** "Full disclosure, on camera: two tests fail. They're stale — they
-hit endpoints that don't exist anymore, and they're left visible instead of
-deleted, because that's the standard this repo holds itself to. The seven
-that pass are new — they cover voice interruption, the exact feature you saw
-in scene three. One of them caught a real race condition where an
-already-synthesized sentence could get dropped mid-interrupt. The honest
-version of a demo includes the bugs."
+**V.O.:** "Twelve for twelve — but the interesting part is how it got there.
+Seven of these tests cover voice interruption, the feature you saw in scene
+three; writing them caught a real race where an already-synthesized sentence
+could get dropped mid-interrupt. And two tests here used to *fail* — chasing
+those failures exposed an actual routing bug where every GET endpoint,
+including the health check, silently returned the web page instead of JSON.
+The failing tests weren't noise; they were the map to the bug. Fixed, and
+now there's a regression test standing guard so it can't come back."
 
 ---
 
@@ -256,8 +255,8 @@ echo "recruiter-agent — live at https://recruiter-agent-969006882005.europe-we
 **V.O.:** "So: a candidate you can interview before you interview him.
 Paste a JD, talk to it, walk away with an ATS summary and an intro email —
 and under the hood, measured latency, a judge on every reply, and a test
-suite that admits what's broken. It's live right now — link's below. Ask it
-something hard."
+suite whose failures get chased down to real bugs, not deleted. It's live
+right now — link's below. Ask it something hard."
 
 ---
 
@@ -274,7 +273,7 @@ something hard."
 | Session store (no `REDIS_URL`) | SQLite fallback | `app/session_store.py` |
 | Session store (with `REDIS_URL`) | Redis, 24h TTL | `app/session_store.py` |
 | API routes exposed | 24 | `app/server.py` (`grep -c "@app\."`) |
-| Test suite result | 7 passed / 2 failed (9 total) | `pytest tests/ -q` — 7 new barge-in tests; 2 stale API tests |
+| Test suite result | 12 passed / 0 failed | `pytest tests/ -q` — 7 barge-in tests + 5 API tests (incl. route-shadowing regressions) |
 | Total runtime | ~4:30 | Act I (S01–S04) + Act II (S05–S09) |
 
 ---
