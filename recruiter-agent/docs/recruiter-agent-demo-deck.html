@@ -1,0 +1,1254 @@
+<title>recruiter-agent — Demo Walkthrough</title>
+<style>
+  :root {
+    --bg: #0a0d12;
+    --panel: #11151c;
+    --panel-raised: #161b24;
+    --ink: #e8ebf1;
+    --ink-dim: #8b93a7;
+    --ink-faint: #545d70;
+    --line: #212836;
+    --accent: #5eead4;
+    --accent-soft: rgba(94, 234, 212, 0.1);
+    --amber: #f5b942;
+    --amber-soft: rgba(245, 185, 66, 0.1);
+    --red: #ff7a7a;
+    --green: #7ee787;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    overflow: hidden;
+  }
+
+  body {
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---------- Deck shell ---------- */
+
+  .deck {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .rail {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+
+  .slide {
+    flex: 0 0 100vw;
+    height: 100%;
+    scroll-snap-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 8vw;
+    overflow-y: auto;
+  }
+
+  .slide-inner {
+    width: 100%;
+    max-width: 980px;
+  }
+
+  /* ---------- Cover ---------- */
+
+  .cover {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .cover-eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .cover h1 {
+    font-size: clamp(40px, 6vw, 68px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+    max-width: 13ch;
+  }
+
+  .cover-sub {
+    color: var(--ink-dim);
+    font-size: 19px;
+    max-width: 52ch;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .cover-meta {
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 36px;
+    margin-top: 12px;
+  }
+
+  .cover-meta dt {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 5px;
+  }
+
+  .cover-meta dd {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 550;
+  }
+
+  .cover-note {
+    margin-top: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--panel);
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    line-height: 1.65;
+    max-width: 62ch;
+  }
+
+  .cover-note b { color: var(--ink); font-weight: 600; }
+
+  .cover-cta {
+    margin-top: 8px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+  .cover-cta kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    background: var(--panel-raised);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 12px;
+  }
+
+  /* ---------- Scene slide ---------- */
+
+  .scene-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 6px;
+  }
+
+  .scene-tag {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    flex: 0 0 auto;
+  }
+
+  .scene-head h2 {
+    font-size: clamp(22px, 3vw, 30px);
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .shot {
+    font-size: 13.5px;
+    color: var(--ink-faint);
+    font-style: italic;
+    margin: 0 0 22px;
+    max-width: 68ch;
+    line-height: 1.5;
+  }
+
+  .shot-label {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-style: normal;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-right: 8px;
+  }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 26px;
+    align-items: start;
+  }
+
+  @media (max-width: 860px) {
+    .stage { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- Terminal panel ---------- */
+
+  .term {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+
+  .term-bar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-raised);
+  }
+
+  .term-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--line);
+  }
+
+  .term-title {
+    margin-left: 6px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
+  .term-body {
+    margin: 0;
+    padding: 16px 18px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12.8px;
+    line-height: 1.68;
+    color: var(--ink-dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 46vh;
+    overflow-y: auto;
+  }
+
+  .prompt { color: var(--accent); }
+  .prompt::before { content: "$ "; color: var(--ink-faint); }
+  .out-ok { color: var(--ink); }
+  .out-dim { color: var(--ink-faint); }
+  .out-fail { color: var(--red); }
+  .out-pass { color: var(--green); }
+  .out-amber { color: var(--amber); }
+  .comment { color: var(--ink-faint); }
+
+  /* ---------- V.O. panel ---------- */
+
+  .vo-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .vo-label {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  blockquote.vo {
+    margin: 0;
+    padding: 0 0 0 16px;
+    border-left: 2px solid var(--accent);
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  .note-amber {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    padding: 11px 13px;
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    background: var(--amber-soft);
+    border-radius: 4px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+
+  .note-amber .mark {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    color: var(--amber);
+    font-weight: 700;
+    flex: 0 0 auto;
+  }
+
+  /* ---------- Summary slide ---------- */
+
+  .summary-head {
+    margin-bottom: 24px;
+  }
+
+  .summary-head .scene-tag { color: var(--accent); }
+
+  .summary-head h2 {
+    font-size: clamp(24px, 3vw, 32px);
+    margin: 6px 0 0;
+    letter-spacing: -0.01em;
+  }
+
+  .table-scroll { overflow-x: auto; }
+
+  table.stats {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 640px;
+  }
+
+  table.stats th {
+    text-align: left;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 500;
+    padding: 0 14px 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  table.stats td {
+    padding: 11px 14px 11px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    color: var(--ink-dim);
+  }
+
+  table.stats tr:last-child td { border-bottom: none; }
+
+  table.stats td.metric { color: var(--ink); font-weight: 550; }
+
+  table.stats td.value {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  table.stats td.source {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  .close-links {
+    margin-top: 28px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .close-links a {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .close-links a:hover { border-bottom-color: var(--accent); }
+
+  /* ---------- Nav chrome ---------- */
+
+  .dots {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 9px;
+    z-index: 10;
+    background: rgba(10, 13, 18, 0.6);
+    backdrop-filter: blur(6px);
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .dot:hover { background: var(--ink-dim); }
+  .dot.active {
+    background: var(--accent);
+    transform: scale(1.3);
+  }
+
+  .arrow-btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: rgba(17, 21, 28, 0.7);
+    backdrop-filter: blur(6px);
+    color: var(--ink-dim);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .arrow-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .arrow-prev { left: 20px; }
+  .arrow-next { right: 20px; }
+
+  .progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: var(--accent);
+    z-index: 11;
+    transition: width 0.25s ease;
+  }
+
+  .scene-counter {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  .scene-counter b { color: var(--ink); }
+
+  .hud {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 10;
+  }
+
+  .vo-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .vo-btn {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink-dim);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+
+  .vo-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+  .vo-btn[aria-pressed="true"] {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    background: var(--accent-soft);
+  }
+
+  .vo-btn.replay { padding: 5px 8px; }
+
+  .vo-speaking-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+    margin-left: 6px;
+    opacity: 0;
+    animation: none;
+  }
+
+  .vo-speaking-dot.live {
+    opacity: 1;
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  /* ---------- UI mockup slide (recreates the real frontend) ---------- */
+
+  .ui-frame {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #020617;
+  }
+
+  .ui-frame-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #0f172a;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .ui-url {
+    flex: 1;
+    margin-left: 4px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 10.5px;
+    color: #64748b;
+    background: #1e293b;
+    border-radius: 5px;
+    padding: 3px 10px;
+  }
+
+  .ui-mock {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 14px;
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (max-width: 760px) {
+    .ui-mock { grid-template-columns: 1fr; }
+  }
+
+  .ui-badge {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-bottom: 8px;
+  }
+
+  .ui-mock h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f1f5f9;
+    line-height: 1.35;
+    margin: 0 0 6px;
+  }
+  .ui-mock h3 span { color: #38bdf8; }
+
+  .ui-mock p {
+    font-size: 10.5px;
+    color: #cbd5e1;
+    line-height: 1.5;
+    margin: 0 0 10px;
+  }
+
+  .ui-prompts {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .ui-prompt-btn {
+    font-size: 10px;
+    text-align: left;
+    color: #e2e8f0;
+    background: transparent;
+    border: 1px solid #334155;
+    border-radius: 7px;
+    padding: 6px 8px;
+  }
+  .ui-prompt-btn.featured { border-color: rgba(16, 185, 129, 0.5); }
+
+  .ui-chat-panel {
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    background: #020617;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .ui-chat-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .ui-chat-head .title { font-size: 11px; font-weight: 600; color: #f1f5f9; }
+  .ui-chat-head .eyebrow { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
+
+  .ui-ready {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9.5px;
+    color: #94a3b8;
+  }
+  .ui-ready .dot { width: 6px; height: 6px; border-radius: 50%; background: #34d399; }
+
+  .ui-chat-msgs {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 130px;
+  }
+
+  .ui-bubble {
+    font-size: 10.5px;
+    line-height: 1.45;
+    padding: 7px 10px;
+    border-radius: 10px;
+    max-width: 88%;
+  }
+  .ui-bubble.user {
+    align-self: flex-end;
+    background: #0369a1;
+    color: #f0f9ff;
+    border-bottom-right-radius: 3px;
+  }
+  .ui-bubble.agent {
+    align-self: flex-start;
+    background: #1e293b;
+    color: #e2e8f0;
+    border-bottom-left-radius: 3px;
+  }
+
+  .ui-chat-input {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid #1e293b;
+  }
+
+  .ui-textarea-fake {
+    flex: 1;
+    font-size: 10px;
+    color: #64748b;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 7px 9px;
+  }
+
+  .ui-mic-btn, .ui-send-btn {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 9.5px;
+    font-weight: 600;
+  }
+  .ui-mic-btn {
+    width: 30px;
+    color: #94a3b8;
+    border: 1px solid #334155;
+  }
+  .ui-send-btn {
+    padding: 0 12px;
+    background: #0ea5e9;
+    color: #020617;
+  }
+
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .flow-step {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+
+  .flow-step .fnum {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    flex: 0 0 18px;
+  }
+
+  .flow-step .flabel {
+    font-size: 13.5px;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+  .flow-step .flabel b { color: var(--accent); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    .arrow-btn { display: none; }
+    .slide { padding: 32px 6vw 96px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; }
+    .rail { scroll-behavior: auto !important; }
+  }
+</style>
+
+<div class="deck">
+  <div class="progress" id="progress"></div>
+  <div class="hud">
+    <div class="vo-controls">
+      <button class="vo-btn" id="voToggle" aria-pressed="false">V.O. off</button>
+      <button class="vo-btn replay" id="voReplay" aria-label="Replay narration for this scene">↺</button>
+      <span class="vo-speaking-dot" id="voDot"></span>
+    </div>
+    <div class="scene-counter"><b id="counterNow">1</b> / 12</div>
+  </div>
+
+  <div class="rail" id="rail">
+
+    <!-- Cover -->
+    <section class="slide" data-title="Cover" data-vo="recruiter-agent, scene by scene. A four minute screen-recording script for a voice and chat agent that represents a candidate to recruiters — nine scenes, each one a real command against a real deployment.">
+      <div class="slide-inner cover">
+        <div class="cover-eyebrow"><span class="live-dot"></span>demo walkthrough</div>
+        <h1>recruiter-agent, scene by scene.</h1>
+        <p class="cover-sub">A 4-minute screen-recording script for a voice and chat agent that represents a candidate to recruiters — nine scenes, each one a real command against a real deployment.</p>
+        <dl class="cover-meta">
+          <div><dt>Scenes</dt><dd>S01 – S09 + UI</dd></div>
+          <div><dt>Runtime</dt><dd>~4:00</dd></div>
+          <div><dt>Target</dt><dd>Cloud Run</dd></div>
+        </dl>
+        <div class="cover-note">
+          <b>Terminal target:</b> Git Bash (POSIX sh) on Windows, run from the repo root. S01–S06 &amp; S08 run against a local server on <code class="mono">localhost:9191</code>; S05–S07 reference the live Cloud Run deployment.
+        </div>
+        <div class="cover-cta"><kbd>→</kbd> or click to begin</div>
+      </div>
+    </section>
+
+    <!-- S01 -->
+    <section class="slide" data-title="S01 — Cold start" data-vo="This is recruiter-agent — a voice and chat AI that represents a candidate to recruiters instead of a static CV. One required setting: GOOGLE_API_KEY, because the judge and the RAG layer both run on Gemini.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S01</span><h2>Cold start</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Full terminal, clean prompt. Cut in on an empty pane, no editor open yet.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
+            <pre class="term-body"><span class="prompt">cd recruiter-agent</span>
+<span class="prompt">cat app/config.py</span>
+<span class="out-dim">from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    environment: str = "local"
+    service_name: str = "recruiter-agent"
+    log_level: str = "INFO"
+
+    <span class="comment"># ✔ Use GOOGLE_API_KEY, NOT OPENAI_API_KEY</span>
+    GOOGLE_API_KEY: str
+
+    host: str = "0.0.0.0"
+    port: int = 9191
+
+def get_settings() -> Settings:
+    return Settings()</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">This is recruiter-agent — a voice and chat AI that represents a candidate to recruiters instead of a static CV. One required setting: <span class="mono">GOOGLE_API_KEY</span>, because the judge and the RAG layer both run on Gemini.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S02 -->
+    <section class="slide" data-title="S02 — Boot the server" data-vo="Startup wires OpenTelemetry tracing, structured logging, and Langfuse — all before the first request. Slash health doubles as a config readout: right now it's telling us session state is running on the SQLite fallback, not Redis. That's honest — no REDIS_URL is set in this shell.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S02</span><h2>Boot the server</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Same pane. Let the startup log scroll naturally — don't cut it short.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
+            <pre class="term-body"><span class="prompt">GOOGLE_API_KEY=$GOOGLE_API_KEY python -m app.server &amp;</span>
+<span class="prompt">sleep 2 &amp;&amp; curl -s localhost:9191/health</span>
+<span class="out-ok">{"status":"ok","service":"recruiter-agent","session_store":{"backend":"sqlite","path":"/tmp/sessions.db","redis_url_set":false}}</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Startup wires OpenTelemetry tracing, structured logging, and Langfuse — all before the first request. <span class="mono">/health</span> doubles as a config readout: right now it's telling us session state is running on the SQLite fallback, not Redis. That's honest — no <span class="mono">REDIS_URL</span> is set in this shell.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S03 -->
+    <section class="slide" data-title="S03 — Main data flow" data-vo="One chat endpoint, one session ID, multi-turn state. Role extraction, then criteria parsing, then — on the next turn — project ranking against the actual portfolio. Every reply that comes back has already been scored by a critic agent before it's shown; we'll see that trail in the observability scene.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S03</span><h2>Main data flow: a recruiter turn</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Split terminal or picture-in-picture. Keep the JSON reply on screen long enough to read the <span class="mono">reply</span> field.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
+            <pre class="term-body"><span class="prompt">curl -s -X POST localhost:9191/chat -d '{"session_id":"demo-01","message":"Senior ML Engineer"}'</span>
+<span class="out-dim">{
+  "reply": "Got it — Senior Ml Engineer. What matters most for this role?
+             (e.g. ownership, production RAG, leadership)",
+  "state": { "role": "Senior Ml Engineer", "criteria": [] }
+}</span>
+
+<span class="prompt">curl -s -X POST localhost:9191/chat -d '{"session_id":"demo-01","message":"ownership, production RAG"}'</span>
+<span class="out-ok">{
+  "reply": "Perfect — I'll evaluate Sergiu's fit for Senior Ml Engineer
+             based on: Production Rag, Ownership. From here you can:
+             1) project deep dive (1, another)
+             2) ATS summary + recruiter email (2, ats)",
+  "state": { "role": "Senior Ml Engineer",
+             "criteria": ["production_rag", "ownership"] }
+}</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">One <span class="mono">/chat</span> endpoint, one session ID, multi-turn state. Role extraction, then criteria parsing, then — on the next turn — project ranking against the actual portfolio. Every reply that comes back has already been scored by a critic agent before it's shown.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- UI — the actual interface, for anyone who isn't reading curl output -->
+    <section class="slide" data-title="Interface — what a recruiter actually sees" data-vo="Same /chat call as the last scene, but this is what it looks like for a human: paste a job description or click a quick prompt, the agent replies with role and criteria confirmed, then the mic button switches the exact same backend turn into a live voice conversation, with barge-in to interrupt mid-sentence.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">UI</span><h2>The interface: what a recruiter actually sees</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Screen recording of <span class="mono">frontend/index.html</span> live — same <span class="mono">/chat</span> call as S03, now driven by clicks instead of curl.</p>
+        <div class="stage">
+          <div class="ui-frame">
+            <div class="ui-frame-bar">
+              <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+              <span class="ui-url">recruiter-agent-969006882005.europe-west1.run.app</span>
+            </div>
+            <div class="ui-mock">
+              <div>
+                <span class="ui-badge">Live voice AI · Deepgram STT · Cloud Run</span>
+                <h3>An AI recruiter — with a <span>live voice pipeline</span> — that explains how Sergiu fits your role.</h3>
+                <p>Paste a JD or speak your requirements. The agent extracts criteria, selects best-fit projects, and produces recruiter-ready summaries.</p>
+                <div class="ui-prompts">
+                  <button class="ui-prompt-btn featured">🎙️ Lead AI Engineer · voice pipeline · RAG · observability</button>
+                  <button class="ui-prompt-btn">🔍 Senior ML Engineer · RAG · ownership · communication</button>
+                  <button class="ui-prompt-btn">📝 ATS summary + recruiter email · voice AI</button>
+                </div>
+              </div>
+              <div class="ui-chat-panel">
+                <div class="ui-chat-head">
+                  <div><div class="eyebrow">Live demo</div><div class="title">Recruiter Agent Chat</div></div>
+                  <div class="ui-ready"><span class="dot"></span>Ready</div>
+                </div>
+                <div class="ui-chat-msgs">
+                  <div class="ui-bubble user">Lead AI Engineer — voice pipeline, RAG, observability</div>
+                  <div class="ui-bubble agent">Got it — Lead AI Engineer. What matters most: ownership, production RAG, leadership?</div>
+                  <div class="ui-bubble user">ownership, production RAG</div>
+                  <div class="ui-bubble agent">Perfect — evaluating Sergiu's fit. From here: project deep dive, or an ATS summary + recruiter email.</div>
+                </div>
+                <div class="ui-chat-input">
+                  <div class="ui-textarea-fake">Paste a job description or ask about fit, impact, CV…</div>
+                  <div class="ui-mic-btn">🎙</div>
+                  <div class="ui-send-btn">Send</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Same <span class="mono">/chat</span> call as the last scene, but this is what it looks like for a human. The <b style="color:var(--accent)">quick-prompt buttons</b> paste a real JD in one click; the <b style="color:var(--accent)">mic button</b> switches the exact same backend turn into a live voice conversation — same role extraction, same criteria parsing, same critic score, just a different transport.</blockquote>
+            <div class="flow-steps">
+              <div class="flow-step"><span class="fnum">1</span><span class="flabel">Click a <b>quick prompt</b> or paste a JD into the textarea</span></div>
+              <div class="flow-step"><span class="fnum">2</span><span class="flabel">Agent replies confirming <b>role + criteria</b>, chat-only — no voice yet</span></div>
+              <div class="flow-step"><span class="fnum">3</span><span class="flabel">Click the <b>mic icon</b> — same turn, now streamed as TTS with auto-speak</span></div>
+              <div class="flow-step"><span class="fnum">4</span><span class="flabel">Speak over it mid-reply — <b>barge-in</b> cuts audio instantly (S05's pipeline)</span></div>
+            </div>
+            <div class="note-amber"><span class="mark">note</span><span>The live <span class="mono">frontend/index.html</span> copy still reads "~600ms TTFA · 35ms deterministic routing" — the same unverified figures already corrected in the README and the agent's own project summary. This mockup uses the corrected wording; the deployed page doesn't yet.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S04 -->
+    <section class="slide" data-title="S04 — Live config switch" data-vo="Same binary, same code path — set REDIS_URL and session state moves to Redis with a 24-hour TTL. Drop the env var, or let the Redis connection fail, and it falls back to SQLite silently, logged at WARNING. No restart-time branch, no feature flag — it's a runtime probe in session_store.py.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S04</span><h2>Live config switch: Redis → SQLite fallback</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Terminal only — the "how does it not break in prod" beat. Let the before/after <span class="mono">/health</span> calls sit for a beat each.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
+            <pre class="term-body"><span class="prompt">curl -s localhost:9191/health</span>
+<span class="out-dim">{"session_store": {"backend": "sqlite", "redis_url_set": false}}</span>
+
+<span class="prompt">kill %1; REDIS_URL=redis://localhost:6379/0 python -m app.server &amp;</span>
+<span class="prompt">sleep 2 &amp;&amp; curl -s localhost:9191/health</span>
+<span class="out-ok">{"session_store": {"backend": "redis", "redis_url_set": true}}</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Same binary, same code path — set <span class="mono">REDIS_URL</span> and session state moves to Redis with a 24-hour TTL. Drop the env var, or let the connection fail, and it falls back to SQLite silently, logged at WARNING. No restart-time branch, no feature flag — it's a runtime probe in <span class="mono">session_store.py</span>.</blockquote>
+            <div class="note-amber"><span class="mark">note</span><span>If no local Redis is running for the recording, skip the second half and narrate the fallback from the code instead — don't fake a connection succeeding.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S05 -->
+    <section class="slide" data-title="S05 — Voice pipeline" data-vo="Deepgram nova-2 streams the transcript in over WebSocket, the agent replies, Google Neural2-D streams TTS back sentence by sentence so playback starts before synthesis finishes. Measured first-audio p50 on Cloud Run: 428 milliseconds. The full-turn number with STT included is labeled as an estimate on purpose — it's the one figure in this repo that isn't a direct measurement, and the README says so.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S05</span><h2>Voice pipeline (STT → agent → TTS)</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span><span class="mono">benchmark_voice.py</span> against a live target — the one scene where real numbers matter more than a clean take.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — live Cloud Run</span></div>
+            <pre class="term-body"><span class="prompt">python benchmark_voice.py https://recruiter-agent-969006882005.europe-west1.run.app</span>
+<span class="out-dim">Stage 2: Agent turn (POST /chat)
+  msg 1: 321ms  reply='I'll evaluate Sergiu's fit for...'
+  Agent  : p50=321ms  p95=589ms  min=318ms  max=589ms
+
+Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
+  msg 1: first_audio=428ms  total=444ms  audio=51200b
+  E2E (agent+TTS): p50=428ms  p95=474ms  min=236ms  max=474ms</span>
+<span class="out-amber">  Full E2E estimate (incl. ~200ms Deepgram streaming): 628ms</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Deepgram nova-2 streams the transcript in over WebSocket, the agent replies, Google Neural2-D streams TTS back sentence-by-sentence so playback starts before synthesis finishes. Measured first-audio p50 on Cloud Run: <b class="mono" style="color:var(--accent)">428ms</b>.</blockquote>
+            <div class="note-amber"><span class="mark">note</span><span>The full-turn number with STT included is labeled as an estimate on purpose — it's the one figure in this repo that isn't a direct measurement, and the README says so.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S06 -->
+    <section class="slide" data-title="S06 — Evaluation" data-vo="Fifteen golden recruiter conversations, replayed against the live agent every run. Gemini 2.5 Flash judges each reply on faithfulness, relevancy, and factuality, with a rubric that knows the agent's correct behaviors — sharing CV facts isn't a privacy violation here, it's the job. Pass threshold is 3.5 out of 5. This run: 15 for 15, 5.0 average. Any regression against this file blocks deploy in CI.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S06</span><h2>Evaluation: LLM-as-a-Judge + golden set</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Terminal. Cut to <span class="mono">eval_results.json</span> in an editor for 2–3s if the read is easier there.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — live Cloud Run</span></div>
+            <pre class="term-body"><span class="prompt">python run_eval.py https://recruiter-agent-969006882005.europe-west1.run.app</span>
+<span class="out-dim">Loaded 15 golden cases
+
+{
+  "aggregate": {</span>
+<span class="out-pass">    "n_cases": 15.0,
+    "pass_rate": 1.0,
+    "avg_score": 5.0,
+    "avg_faithfulness": 1.0,
+    "avg_relevancy": 1.0,
+    "avg_factuality": 1.0</span>
+<span class="out-dim">  }
+}</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Fifteen golden recruiter conversations, replayed against the live agent every run. Gemini 2.5 Flash judges each reply on faithfulness, relevancy, and factuality, with a rubric that knows the agent's <i>correct</i> behaviors — sharing CV facts isn't a privacy violation here, it's the job. Pass threshold is 3.5 out of 5. Any regression against this file blocks deploy in CI.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S07 -->
+    <section class="slide" data-title="S07 — Observability" data-vo="Every turn emits an OTel span and a trajectory step — role extraction, criteria parsing, the judge call, all attributed to the session. That's what makes the eval numbers auditable instead of anecdotal: you can walk backward from a score to the exact turn that produced it.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S07</span><h2>Observability: tracing a single turn</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Browser — Langfuse or OTel collector UI showing one trace expanded to its spans. No dashboard reachable? Substitute the raw trajectory JSON below, don't skip the scene.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
+            <pre class="term-body"><span class="prompt">curl -s localhost:9191/session/demo-01/summary</span>
+<span class="out-dim">{
+  "session_id": "demo-01",
+  "role": "Senior Ml Engineer",
+  "criteria": ["production_rag", "ownership"],
+  "trajectory": { "steps": [
+    {"kind": "tool", "message": "role_extraction"},
+    {"kind": "tool", "message": "criteria_parsing"},
+    {"kind": "tool", "message": "llm_judge_evaluation",
+     "meta": {"score": 5, "faithfulness": 1.0}}
+  ]}
+}</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Every turn emits an OTel span and a trajectory step — role extraction, criteria parsing, the judge call, all attributed to the session. That's what makes the eval numbers auditable instead of anecdotal: you can walk backward from a score to the exact turn that produced it.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S08 -->
+    <section class="slide" data-title="S08 — Test suite" data-vo="Two stories here. The seven passing tests are new — they cover the barge-in path in the voice pipeline, which had zero coverage until it got refactored into one shared, testable core. One of them actually caught a real race where an already-synthesized sentence could get dropped on interruption. And the two failures? Those are honest too — test underscore api still hits slash healthz and slash api slash v1 slash match, endpoints that don't exist anymore. A real gap, left visible rather than papered over.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S08</span><h2>Test suite</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Terminal. Let the mixed pass/fail output run — the honest beat: real coverage where it was just added, a stale file still visibly broken.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
+            <pre class="term-body"><span class="prompt">python -m pytest tests/ -q</span>
+<span class="out-pass">tests/test_tts_streaming.py .......                        [ 77%]</span>
+<span class="out-fail">FAILED tests/test_api.py::test_health - JSONDecodeError
+FAILED tests/test_api.py::test_match_basic - assert 405 == 200</span>
+<span class="out-dim">2 failed, 7 passed, 4 warnings in 51s</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Two stories here. The seven passing tests are new — they cover the barge-in path in the voice pipeline, which had zero coverage until it got refactored into one shared, testable core. One of them actually caught a real race where an already-synthesized sentence could get dropped on interruption.</blockquote>
+            <div class="note-amber"><span class="mark">note</span><span>And the two failures? Those are honest too — <span class="mono">test_api.py</span> still hits <span class="mono">/healthz</span> and <span class="mono">/api/v1/match</span>, endpoints that don't exist anymore. A real gap, left visible rather than papered over.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S09 -->
+    <section class="slide" data-title="S09 — Close" data-vo="That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with new coverage on the barge-in path and the stale tests left visible instead of hidden. Repo's public, link's in the description.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S09</span><h2>Close</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Terminal, clean prompt. Kill the background server before cutting.</p>
+        <div class="stage">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
+            <pre class="term-body"><span class="prompt">kill %1 2&gt;/dev/null</span>
+<span class="prompt">echo "recruiter-agent — live at https://recruiter-agent-969006882005.europe-west1.run.app"</span>
+<span class="out-ok">recruiter-agent — live at https://recruiter-agent-969006882005.europe-west1.run.app</span></pre>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with new coverage on the barge-in path and the stale tests left visible instead of hidden. Repo's public, link's in the description.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Summary -->
+    <section class="slide" data-title="Summary stats">
+      <div class="slide-inner">
+        <div class="summary-head">
+          <span class="scene-tag mono">Summary</span>
+          <h2>Every number in this deck, with its source</h2>
+        </div>
+        <div class="table-scroll">
+          <table class="stats">
+            <thead><tr><th>Metric</th><th>Value</th><th>Source</th></tr></thead>
+            <tbody>
+              <tr><td class="metric">Agent turn latency (p50)</td><td class="value">321ms</td><td class="source">benchmark_voice.py Stage 2, live Cloud Run</td></tr>
+              <tr><td class="metric">First-audio latency (p50)</td><td class="value">428ms</td><td class="source">benchmark_voice.py Stage 4, live Cloud Run</td></tr>
+              <tr><td class="metric">Full E2E voice turn (est.)</td><td class="value">~628ms</td><td class="source">Stage 4 p50 + 200ms Deepgram streaming estimate</td></tr>
+              <tr><td class="metric">Golden eval pass rate</td><td class="value">100% (15/15)</td><td class="source">run_eval.py / eval_results.json</td></tr>
+              <tr><td class="metric">Golden eval avg score</td><td class="value">5.0 / 5.0</td><td class="source">run_eval.py / eval_results.json</td></tr>
+              <tr><td class="metric">Eval pass threshold</td><td class="value">≥ 3.5 / 5.0</td><td class="source">app/critic_agent.py</td></tr>
+              <tr><td class="metric">Session store, no REDIS_URL</td><td class="value">SQLite fallback</td><td class="source">app/session_store.py</td></tr>
+              <tr><td class="metric">Session store, with REDIS_URL</td><td class="value">Redis, 24h TTL</td><td class="source">app/session_store.py</td></tr>
+              <tr><td class="metric">API routes exposed</td><td class="value">24</td><td class="source">app/server.py</td></tr>
+              <tr><td class="metric">Test suite result</td><td class="value">7 passed / 2 failed</td><td class="source">pytest tests/ -q — 7 new barge-in tests pass; 2 stale API tests fail</td></tr>
+              <tr><td class="metric">Total runtime</td><td class="value">~4:00</td><td class="source">S01–S09</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="close-links">
+          <a href="https://github.com/sergiunicoara/Agentic-AI/tree/main/recruiter-agent">github ↗</a>
+          <span class="mono" style="color:var(--ink-faint); font-size:13px;">recruiter-agent · sergiu nicoară</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <button class="arrow-btn arrow-prev" id="prevBtn" aria-label="Previous scene">‹</button>
+  <button class="arrow-btn arrow-next" id="nextBtn" aria-label="Next scene">›</button>
+  <nav class="dots" id="dots" aria-label="Scene navigation"></nav>
+</div>
+
+<script>
+(function () {
+  var rail = document.getElementById('rail');
+  var slides = Array.prototype.slice.call(rail.children);
+  var dotsWrap = document.getElementById('dots');
+  var progress = document.getElementById('progress');
+  var counterNow = document.getElementById('counterNow');
+  var prevBtn = document.getElementById('prevBtn');
+  var nextBtn = document.getElementById('nextBtn');
+  var voToggle = document.getElementById('voToggle');
+  var voReplay = document.getElementById('voReplay');
+  var voDot = document.getElementById('voDot');
+  var current = 0;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Voice-over (browser Speech Synthesis — no network calls) ----------
+  var synth = window.speechSynthesis || null;
+  var voEnabled = false;
+  var chosenVoice = null;
+
+  function pickVoice() {
+    if (!synth) return;
+    var voices = synth.getVoices();
+    if (!voices.length) return;
+    chosenVoice =
+      voices.find(function (v) { return /en[-_]US/i.test(v.lang) && /Google|Natural|Neural/i.test(v.name); }) ||
+      voices.find(function (v) { return /en[-_]US/i.test(v.lang); }) ||
+      voices.find(function (v) { return /^en/i.test(v.lang); }) ||
+      voices[0];
+  }
+  if (synth) {
+    pickVoice();
+    synth.addEventListener('voiceschanged', pickVoice);
+  }
+
+  function speak(text) {
+    if (!synth || !voEnabled || !text) return;
+    synth.cancel();
+    var utter = new SpeechSynthesisUtterance(text);
+    if (chosenVoice) utter.voice = chosenVoice;
+    utter.rate = 0.98;
+    utter.pitch = 1;
+    utter.onstart = function () { voDot.classList.add('live'); };
+    utter.onend = function () { voDot.classList.remove('live'); };
+    utter.onerror = function () { voDot.classList.remove('live'); };
+    synth.speak(utter);
+  }
+
+  function speakCurrent() {
+    speak(slides[current].getAttribute('data-vo'));
+  }
+
+  function setVoEnabled(on) {
+    voEnabled = on;
+    voToggle.textContent = on ? 'V.O. on' : 'V.O. off';
+    voToggle.setAttribute('aria-pressed', String(on));
+    if (!on && synth) {
+      synth.cancel();
+      voDot.classList.remove('live');
+    } else if (on) {
+      speakCurrent();
+    }
+  }
+
+  if (synth) {
+    voToggle.addEventListener('click', function () { setVoEnabled(!voEnabled); });
+    voReplay.addEventListener('click', function () {
+      if (!voEnabled) setVoEnabled(true);
+      else speakCurrent();
+    });
+  } else {
+    voToggle.disabled = true;
+    voReplay.disabled = true;
+    voToggle.textContent = 'V.O. unsupported';
+  }
+
+  slides.forEach(function (s, i) {
+    var d = document.createElement('button');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.setAttribute('aria-label', s.getAttribute('data-title') || ('Scene ' + (i + 1)));
+    d.addEventListener('click', function () { goTo(i); });
+    dotsWrap.appendChild(d);
+  });
+  var dots = Array.prototype.slice.call(dotsWrap.children);
+
+  function updateChrome(i) {
+    dots.forEach(function (d, di) { d.classList.toggle('active', di === i); });
+    progress.style.width = ((i + 1) / slides.length * 100) + '%';
+    counterNow.textContent = String(i + 1);
+    prevBtn.style.visibility = i === 0 ? 'hidden' : 'visible';
+    nextBtn.style.visibility = i === slides.length - 1 ? 'hidden' : 'visible';
+  }
+
+  function goTo(i) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    current = i;
+    slides[i].scrollIntoView({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      inline: 'start',
+      block: 'nearest',
+    });
+    updateChrome(i);
+    if (voEnabled) speakCurrent();
+  }
+
+  prevBtn.addEventListener('click', function () { goTo(current - 1); });
+  nextBtn.addEventListener('click', function () { goTo(current + 1); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goTo(current + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(current - 1); }
+  });
+
+  var scrollTimer = null;
+  rail.addEventListener('scroll', function () {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function () {
+      var idx = Math.round(rail.scrollLeft / rail.clientWidth);
+      idx = Math.max(0, Math.min(slides.length - 1, idx));
+      if (idx !== current) {
+        current = idx;
+        updateChrome(idx);
+        if (voEnabled) speakCurrent();
+      }
+    }, 80);
+  });
+
+  updateChrome(0);
+})();
+</script>

@@ -57,8 +57,9 @@ from opentelemetry import trace
 from .agent import agent_turn
 from .models.state import State
 from .session_store import load_session, save_session
+from .tts_streaming import stream_tts_sentences
 from .turn_state import TurnStateMachine
-from .voice import _clean_reply, _split_sentences
+from .voice import _clean_reply
 
 logger = logging.getLogger(__name__)
 
@@ -115,62 +116,26 @@ async def _tts_stream_phone(
     Returns True if the stream completed normally, False if cancelled (barge-in).
     Sends a Twilio 'clear' event on cancellation to flush their audio buffer.
     """
-    sentences = _split_sentences(text)
-    if not sentences:
-        return True
 
-    # Kick off all synthesis tasks in parallel (same pattern as browser TTS)
-    tasks = [asyncio.create_task(_tts_bytes_phone(s)) for s in sentences]
-    cancelled = False
-
-    for task in tasks:
-        if cancel and cancel.is_set():
-            for t in tasks:
-                if not t.done():
-                    t.cancel()
-            cancelled = True
-            break
-
-        if cancel:
-            cancel_waiter = asyncio.ensure_future(cancel.wait())
-            try:
-                done, _ = await asyncio.wait(
-                    {task, cancel_waiter},
-                    return_when=asyncio.FIRST_COMPLETED,
+    async def _send_chunked(audio: bytes) -> None:
+        # Send in ~400 ms chunks so Twilio doesn't buffer the whole response
+        for i in range(0, len(audio), _TWILIO_CHUNK_BYTES):
+            chunk = audio[i : i + _TWILIO_CHUNK_BYTES]
+            await ws.send_text(
+                json.dumps(
+                    {
+                        "event": "media",
+                        "streamSid": stream_sid,
+                        "media": {"payload": base64.b64encode(chunk).decode()},
+                    }
                 )
-            finally:
-                if not cancel_waiter.done():
-                    cancel_waiter.cancel()
+            )
 
-            if cancel.is_set():
-                for t in tasks:
-                    if not t.done():
-                        t.cancel()
-                cancelled = True
-                break
+    completed = await stream_tts_sentences(
+        text, synth=_tts_bytes_phone, send=_send_chunked, cancel=cancel
+    )
 
-            try:
-                audio = task.result()
-            except Exception:
-                audio = None
-        else:
-            audio = await task
-
-        if audio:
-            # Send in ~400 ms chunks so Twilio doesn't buffer the whole response
-            for i in range(0, len(audio), _TWILIO_CHUNK_BYTES):
-                chunk = audio[i : i + _TWILIO_CHUNK_BYTES]
-                await ws.send_text(
-                    json.dumps(
-                        {
-                            "event": "media",
-                            "streamSid": stream_sid,
-                            "media": {"payload": base64.b64encode(chunk).decode()},
-                        }
-                    )
-                )
-
-    if cancelled:
+    if not completed:
         # Flush Twilio's audio buffer so the user doesn't hear the tail end
         try:
             await ws.send_text(json.dumps({"event": "clear", "streamSid": stream_sid}))

@@ -202,54 +202,30 @@ async def _process_audio_track(track: "MediaStreamTrack", session: WebRTCSession
 async def _tts_to_datachannel(text: str, session: WebRTCSession) -> bool:
     """
     Synthesise *text* via Google Neural2-D and send MP3 chunks over the data channel.
-    Returns True if completed normally, False if cancelled (barge-in).
+    Returns True if completed normally, False if cancelled (barge-in) or a
+    data-channel send failed partway through.
     """
-    from .voice import _split_sentences, _tts_bytes
+    from .tts_streaming import stream_tts_sentences
+    from .voice import _tts_bytes
 
-    sentences = _split_sentences(text)
-    if not sentences:
-        return True
+    send_failed = False
 
-    tasks = [asyncio.create_task(_tts_bytes(s)) for s in sentences]
-    cancelled = False
+    async def _send_chunk(audio: bytes) -> None:
+        nonlocal send_failed
+        if not session.channel:
+            return
+        chunk_size = 4096
+        for i in range(0, len(audio), chunk_size):
+            try:
+                session.channel.send(audio[i : i + chunk_size])
+            except Exception:
+                send_failed = True
+                break
 
-    for task in tasks:
-        if session.tts_cancel.is_set():
-            for t in tasks:
-                if not t.done():
-                    t.cancel()
-            cancelled = True
-            break
-
-        cancel_waiter = asyncio.ensure_future(session.tts_cancel.wait())
-        try:
-            await asyncio.wait({task, cancel_waiter}, return_when=asyncio.FIRST_COMPLETED)
-        finally:
-            if not cancel_waiter.done():
-                cancel_waiter.cancel()
-
-        if session.tts_cancel.is_set():
-            for t in tasks:
-                if not t.done():
-                    t.cancel()
-            cancelled = True
-            break
-
-        try:
-            audio = task.result()
-        except Exception:
-            audio = None
-
-        if audio and session.channel:
-            chunk_size = 4096
-            for i in range(0, len(audio), chunk_size):
-                try:
-                    session.channel.send(audio[i : i + chunk_size])
-                except Exception:
-                    cancelled = True
-                    break
-
-    return not cancelled
+    completed = await stream_tts_sentences(
+        text, synth=_tts_bytes, send=_send_chunk, cancel=session.tts_cancel
+    )
+    return completed and not send_failed
 
 
 # ---------------------------------------------------------------------------

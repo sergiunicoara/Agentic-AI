@@ -1,0 +1,612 @@
+<title>Recruiter Agent — Production Voice AI Pipeline</title>
+<style>
+  :root {
+    --bg: #0b0e13;
+    --bg-raised: #10141b;
+    --ink: #e7eaf0;
+    --ink-dim: #9aa3b5;
+    --ink-faint: #5c6479;
+    --line: #232a38;
+    --accent: #5eead4;
+    --accent-dim: #2d5f57;
+    --measured: #f5a623;
+    --measured-dim: #4a3a1a;
+    --danger: #ff6b6b;
+    --radius: 3px;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f6f7f9;
+    --bg-raised: #ffffff;
+    --ink: #171a21;
+    --ink-dim: #565f74;
+    --ink-faint: #8991a3;
+    --line: #dde1e8;
+    --accent: #0e9c88;
+    --accent-dim: #d3f3ee;
+    --measured: #a5670a;
+    --measured-dim: #fbeed7;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f6f7f9;
+      --bg-raised: #ffffff;
+      --ink: #171a21;
+      --ink-dim: #565f74;
+      --ink-faint: #8991a3;
+      --line: #dde1e8;
+      --accent: #0e9c88;
+      --accent-dim: #d3f3ee;
+      --measured: #a5670a;
+      --measured-dim: #fbeed7;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ---------- Hero ---------- */
+
+  .hero {
+    padding: 72px 24px 48px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hero-inner {
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+
+  h1 {
+    font-size: clamp(32px, 5vw, 46px);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+    max-width: 15ch;
+  }
+
+  .hero-sub {
+    color: var(--ink-dim);
+    font-size: 18px;
+    max-width: 56ch;
+    margin: 0 0 32px;
+  }
+
+  #waveform {
+    display: block;
+    width: 100%;
+    height: 84px;
+    border-radius: var(--radius);
+  }
+
+  .hero-caption {
+    display: flex;
+    justify-content: space-between;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 8px;
+  }
+
+  /* ---------- Section shell ---------- */
+
+  section.block {
+    padding: 56px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  section.block:last-of-type { border-bottom: none; }
+
+  .kicker {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 8px;
+  }
+
+  h2 {
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    margin: 0 0 28px;
+    text-wrap: balance;
+  }
+
+  p.lede {
+    color: var(--ink-dim);
+    max-width: 62ch;
+    margin: -14px 0 28px;
+  }
+
+  /* ---------- Pipeline flow ---------- */
+
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .flow-step {
+    flex: 1 1 0;
+    min-width: 150px;
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 14px;
+  }
+
+  .flow-step .num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .flow-step .name {
+    font-weight: 600;
+    font-size: 14.5px;
+    margin-bottom: 4px;
+  }
+
+  .flow-step .detail {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    line-height: 1.45;
+  }
+
+  .flow-arrow {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--ink-faint);
+    font-size: 18px;
+  }
+
+  /* ---------- Stack grid ---------- */
+
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .stack-item {
+    background: var(--bg-raised);
+    padding: 16px 16px 18px;
+  }
+
+  .stack-item .role {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+  }
+
+  .stack-item .tool {
+    font-weight: 600;
+    font-size: 14.5px;
+  }
+
+  /* ---------- Metrics table ---------- */
+
+  .metric-note {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--measured-dim);
+    border: 1px solid color-mix(in srgb, var(--measured) 35%, transparent);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 13.5px;
+    color: var(--ink);
+    margin-bottom: 24px;
+  }
+
+  .metric-note .mark {
+    color: var(--measured);
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-weight: 700;
+    flex: 0 0 auto;
+  }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    min-width: 560px;
+  }
+
+  th {
+    text-align: left;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 500;
+    padding: 0 12px 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  td {
+    padding: 12px 12px 12px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td.num, th.num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-left: 8px;
+    vertical-align: 1px;
+  }
+
+  .badge.measured {
+    color: var(--measured);
+    background: var(--measured-dim);
+  }
+
+  .badge.estimate {
+    color: var(--ink-faint);
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+  }
+
+  /* ---------- Eval strip ---------- */
+
+  .eval-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .eval-stat {
+    background: var(--bg-raised);
+    padding: 18px 16px;
+  }
+
+  .eval-stat .val {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 26px;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .eval-stat .label {
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  ul.checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+  }
+
+  ul.checklist li {
+    display: flex;
+    gap: 10px;
+    font-size: 14.5px;
+    color: var(--ink-dim);
+  }
+
+  ul.checklist li::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    margin-top: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  ul.checklist b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Close ---------- */
+
+  .close {
+    padding-top: 56px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .close .links {
+    display: flex;
+    gap: 20px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 13.5px;
+  }
+
+  .close .sig {
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+
+  @media (max-width: 600px) {
+    .hero { padding: 48px 20px 36px; }
+    .eval-strip { grid-template-columns: repeat(2, 1fr); }
+    .flow { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); padding: 4px 0; align-self: center; }
+    .close { flex-direction: column; align-items: flex-start; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow"><span class="status-dot"></span>live on cloud run</div>
+    <h1>A voice agent that represents the candidate, not the company.</h1>
+    <p class="hero-sub">Recruiters call it, talk to it, and get answers grounded in a real CV and project history — with every reply scored for accuracy before it's shown.</p>
+    <canvas id="waveform" width="1600" height="168" role="img" aria-label="Audio waveform visualizing the voice pipeline"></canvas>
+    <div class="hero-caption">
+      <span>speech in → deepgram → agent → google tts → speech out</span>
+      <span>~430ms measured p50</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="block">
+    <p class="kicker">01 — Pipeline</p>
+    <h2>What happens on a single voice turn</h2>
+    <p class="lede">Every leg of this is instrumented — the numbers below come from a benchmark script run against the live deployment, not from estimates.</p>
+    <div class="flow">
+      <div class="flow-step">
+        <span class="num">STT</span>
+        <div class="name">Deepgram nova-2</div>
+        <div class="detail">Streaming WebSocket transcription, punctuated + endpointed</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="num">ORCHESTRATE</span>
+        <div class="name">Agent turn</div>
+        <div class="detail">Role extraction → criteria parsing → RAG project ranking</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="num">TTS</span>
+        <div class="name">Google Neural2-D</div>
+        <div class="detail">Sentence-level streaming, playback starts before synthesis ends</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="num">JUDGE</span>
+        <div class="name">Critic agent</div>
+        <div class="detail">Faithfulness · relevancy · factuality scored before delivery</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="kicker">02 — Stack</p>
+    <h2>What it's built on</h2>
+    <div class="stack-grid">
+      <div class="stack-item"><div class="role">Runtime</div><div class="tool">FastAPI · Cloud Run</div></div>
+      <div class="stack-item"><div class="role">STT</div><div class="tool">Deepgram nova-2</div></div>
+      <div class="stack-item"><div class="role">TTS</div><div class="tool">Google Neural2-D</div></div>
+      <div class="stack-item"><div class="role">Telephony</div><div class="tool">Twilio PSTN/SIP</div></div>
+      <div class="stack-item"><div class="role">Browser voice</div><div class="tool">WebRTC · aiortc</div></div>
+      <div class="stack-item"><div class="role">Session state</div><div class="tool">Redis (SQLite fallback)</div></div>
+      <div class="stack-item"><div class="role">Judge model</div><div class="tool">Gemini 2.5 Flash</div></div>
+      <div class="stack-item"><div class="role">Tracing</div><div class="tool">OpenTelemetry · Langfuse</div></div>
+      <div class="stack-item"><div class="role">Agent interop</div><div class="tool">MCP · A2A validation</div></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="kicker">03 — Latency</p>
+    <h2>Measured, not modeled</h2>
+    <div class="metric-note">
+      <span class="mark">note</span>
+      <span>The one place this project got audited hardest: a stale README once claimed "~600ms TTFA" that turned out to be a hardcoded guess. Every number below was re-run against the live deployment before publishing.</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th class="num">p50</th>
+            <th class="num">range</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Agent turn (<span class="mono">/chat</span>)</td>
+            <td class="num">321ms</td>
+            <td class="num">318–589ms</td>
+            <td><span class="badge measured">measured</span></td>
+          </tr>
+          <tr>
+            <td>First audio byte</td>
+            <td class="num">428ms</td>
+            <td class="num">236–474ms</td>
+            <td><span class="badge measured">measured</span></td>
+          </tr>
+          <tr>
+            <td>Full agent+TTS turn</td>
+            <td class="num">444ms</td>
+            <td class="num">327–479ms</td>
+            <td><span class="badge measured">measured</span></td>
+          </tr>
+          <tr>
+            <td>Full voice turn incl. STT endpointing</td>
+            <td class="num">~644ms</td>
+            <td class="num">—</td>
+            <td><span class="badge estimate">+200ms est.</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="block">
+    <p class="kicker">04 — Evaluation</p>
+    <h2>Every reply is graded before it ships</h2>
+    <div class="eval-strip">
+      <div class="eval-stat"><div class="val">100%</div><div class="label">golden set pass rate</div></div>
+      <div class="eval-stat"><div class="val">5.0/5</div><div class="label">avg judge score</div></div>
+      <div class="eval-stat"><div class="val">3.5</div><div class="label">pass threshold</div></div>
+      <div class="eval-stat"><div class="val">3</div><div class="label">scored dimensions</div></div>
+    </div>
+    <ul class="checklist">
+      <li><b>LLM-as-a-Judge</b> — Gemini scores faithfulness, relevancy, and factuality on every turn, anchored to a rubric that knows the agent's correct behaviors (e.g. sharing CV facts is expected, not a privacy violation).</li>
+      <li><b>Critic agent (A2A)</b> — routes replies through an MCP tool interface for structured PASS/FAIL verdicts and concrete recommended actions, not just a number.</li>
+      <li><b>CI gate</b> — new versions run the same golden conversations; a regression in pass rate or avg score blocks deploy.</li>
+      <li><b>WER harness</b> — a separate TTS→STT round trip catches voice-quality regressions the text judge can't see.</li>
+    </ul>
+  </section>
+
+  <div class="close">
+    <div class="links">
+      <a href="https://github.com/sergiunicoara/Agentic-AI/tree/main/recruiter-agent">github ↗</a>
+    </div>
+    <div class="sig mono">recruiter-agent · sergiu nicoară</div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var canvas = document.getElementById('waveform');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function accentColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#5eead4';
+  }
+  function faintColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--ink-faint').trim() || '#5c6479';
+  }
+
+  var bars = 96;
+  var seeds = [];
+  for (var i = 0; i < bars; i++) {
+    seeds.push(0.15 + Math.random() * 0.85);
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, W, H);
+    var barW = W / bars;
+    var gap = barW * 0.35;
+    var accent = accentColor();
+    var faint = faintColor();
+
+    for (var i = 0; i < bars; i++) {
+      var phase = reduceMotion ? 0 : t / 900 + i * 0.35;
+      var amp = seeds[i] * (0.55 + 0.45 * Math.sin(phase));
+      var h = Math.max(4, amp * H * 0.82);
+      var x = i * barW + gap / 2;
+      var y = (H - h) / 2;
+      var w = barW - gap;
+
+      var mid = bars / 2;
+      var dist = Math.abs(i - mid) / mid;
+      ctx.fillStyle = dist < 0.35 ? accent : faint;
+      ctx.globalAlpha = dist < 0.35 ? 1 : 0.5;
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  if (reduceMotion) {
+    draw(0);
+  } else {
+    function loop(t) {
+      draw(t);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', function () {});
+})();
+</script>

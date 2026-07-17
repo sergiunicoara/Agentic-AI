@@ -278,8 +278,8 @@ def _match_criteria_to_project(
                 )
             elif c_low == "low_latency":
                 reasons.append(
-                    "- **Low Latency**: ~600ms TTFA on Cloud Run (~35ms deterministic agent, "
-                    "~400ms Google Neural2-D TTS); sentence-level parallel synthesis and async WebSocket."
+                    "- **Low Latency**: ~428ms measured agent+TTS time-to-first-audio on Cloud Run; "
+                    "sentence-level parallel synthesis and async WebSocket streaming."
                 )
             continue
 

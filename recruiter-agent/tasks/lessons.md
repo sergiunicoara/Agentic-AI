@@ -36,6 +36,26 @@ Patterns from corrections in past sessions. Review at session start.
    text.** First CV bullet attempt was +31/+33 chars over target. Run
    `python -c "print(len(...))"` on every artifact before showing it.
 
+4a. **A stale number lives in more than the docs — grep the whole repo,
+    including code that generates live output.** The "~600ms TTFA / 35ms
+    routing" figure from lesson 3a turned out to be duplicated in four
+    separate places: `README.md`, `app/tools.py` (STATIC_PROJECTS, recited
+    to recruiters in project deep-dives), `frontend/index.html` (the actual
+    UI copy), and — worst — `app/agent.py`'s `low_latency` criteria-match
+    branch, which builds text sent live through `/chat` whenever a recruiter
+    mentions "low latency" as a criterion. That last one isn't documentation
+    at all; it's a runtime f-string a real user reads. Same session also
+    found `frontend/index.html` citing `RAGAS context_precision=1.0` — a
+    metric that belongs to a *different* STATIC_PROJECTS entry
+    (`graphrag:ragas-pipeline`), not this project's actual eval (Gemini
+    LLM-as-Judge, pass_rate/avg_score). Fix: after finding one stale number,
+    `grep -rn "<the number>" --include="*.py" --include="*.html" --include="*.md" .`
+    across the whole repo before considering the fix done — don't stop at
+    the first file that had the bug, and don't assume docs are the only
+    place a claim can be wrong. Prompt-generation code (agent.py, tools.py)
+    is a live surface, not a doc, and is easy to skip because it doesn't
+    "look like" copy.
+
 ## Stale docs
 
 5. **Update README in the same change that ships the feature.** The entire

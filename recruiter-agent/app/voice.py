@@ -14,13 +14,13 @@ from opentelemetry import trace
 from .agent import agent_turn, agent_turn_stream
 from .models.state import State
 from .session_store import load_session, save_session
+from .tts_streaming import _split_sentences, _strip_markdown, stream_tts_sentences
 from .turn_state import TurnStateMachine
 
 logger = logging.getLogger(__name__)
 
 _tts_client = texttospeech.TextToSpeechClient()
 
-_MD_STRIP = re.compile(r"\*{1,2}([^*]+)\*{1,2}|`([^`]+)`|#{1,6}\s*")
 _EMOJI_RE = re.compile(
     "[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF"
     "\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF"
@@ -36,33 +36,10 @@ _TTS_AUDIO_CFG = texttospeech.AudioConfig(
 )
 
 
-def _strip_markdown(text: str) -> str:
-    text = _MD_STRIP.sub(lambda m: m.group(1) or m.group(2) or "", text)
-    return text.strip()
-
-
 def _clean_reply(text: str) -> str:
     """Remove emojis from agent reply before sending to UI / TTS."""
     text = _EMOJI_RE.sub("", text)
     return text.strip()
-
-
-def _split_sentences(text: str) -> list[str]:
-    """Split reply into TTS-sized chunks at sentence/line boundaries."""
-    parts = re.split(r"(?<=[.!?])\s+|\n+", text)
-    chunks: list[str] = []
-    buf = ""
-    for part in parts:
-        clean = _strip_markdown(part).strip()
-        if not clean:
-            continue
-        buf += (" " if buf else "") + clean
-        if re.search(r"[.!?]$", buf) or len(buf) > 120:
-            chunks.append(buf)
-            buf = ""
-    if buf:
-        chunks.append(buf)
-    return chunks
 
 
 def _get_deepgram_key() -> str:
@@ -194,56 +171,13 @@ async def _tts_stream(
     Client only calls playAudioChunks() on "audio_end", so stale bytes
     from an interrupted stream are never played.
     """
-    sentences = _split_sentences(text)
-    if not sentences:
+    completed = await stream_tts_sentences(
+        text, synth=_tts_bytes, send=ws.send_bytes, cancel=cancel
+    )
+    if completed:
         await ws.send_text(json.dumps({"type": "audio_end"}))
-        return
-
-    # Kick off all synthesis tasks in parallel upfront
-    tasks = [asyncio.create_task(_tts_bytes(s)) for s in sentences]
-    cancelled = False
-
-    for task in tasks:
-        if cancel and cancel.is_set():
-            for t in tasks:
-                if not t.done():
-                    t.cancel()
-            cancelled = True
-            break
-
-        if cancel:
-            # Wait for this sentence OR a barge-in — whichever comes first
-            cancel_waiter = asyncio.ensure_future(cancel.wait())
-            try:
-                done, _ = await asyncio.wait(
-                    {task, cancel_waiter},
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-            finally:
-                if not cancel_waiter.done():
-                    cancel_waiter.cancel()
-
-            if cancel.is_set():
-                for t in tasks:
-                    if not t.done():
-                        t.cancel()
-                cancelled = True
-                break
-
-            try:
-                audio = task.result()
-            except Exception:
-                audio = None
-        else:
-            audio = await task
-
-        if audio:
-            await ws.send_bytes(audio)
-
-    if cancelled:
-        await ws.send_text(json.dumps({"type": "audio_cancelled"}))
     else:
-        await ws.send_text(json.dumps({"type": "audio_end"}))
+        await ws.send_text(json.dumps({"type": "audio_cancelled"}))
 
 
 async def voice_handler(ws: WebSocket, session_id: str, sample_rate: int = 48000) -> None:
