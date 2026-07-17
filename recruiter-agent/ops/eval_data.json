@@ -18,7 +18,7 @@
     "description": "Detect Data Scientist role from NLP-focused message",
     "user_message": "We're hiring a data scientist to build NLP pipelines for document classification.",
     "expected_role": "Data Scientist",
-    "expected_criteria": ["production_rag"]
+    "expected_criteria": []
   },
   {
     "id": "role_llm_engineer_startup",
@@ -36,35 +36,48 @@
   },
   {
     "id": "criteria_production_ownership",
-    "description": "Parse two canonical criteria from comma-separated input",
+    "description": "Parse two canonical criteria from comma-separated input after role is already set",
+    "setup_messages": [
+      "I need a Machine Learning Engineer"
+    ],
     "user_message": "production RAG, ownership",
     "expected_role": "Machine Learning Engineer",
     "expected_criteria": ["production_rag", "ownership"]
   },
   {
     "id": "criteria_leadership_communication",
-    "description": "Parse leadership and communication criteria",
+    "description": "Parse role + criteria from a single message with em-dash separator",
     "user_message": "AI Engineer — leadership, communication",
     "expected_role": "AI Engineer",
     "expected_criteria": ["leadership", "communication"]
   },
   {
     "id": "deep_dive_numeric",
-    "description": "Trigger project deep dive with numeric shortcut",
+    "description": "Trigger project deep dive with numeric shortcut after role+criteria set",
+    "setup_messages": [
+      "I'm looking for a Senior ML Engineer with production RAG experience and strong ownership."
+    ],
     "user_message": "1",
     "expected_role": "Senior ML Engineer",
     "expected_criteria": ["production_rag", "ownership"]
   },
   {
     "id": "deep_dive_keyword",
-    "description": "Trigger project deep dive with 'another' keyword",
+    "description": "Trigger project deep dive with 'another' keyword after first deep dive",
+    "setup_messages": [
+      "Looking for an ML Engineer with production RAG experience.",
+      "1"
+    ],
     "user_message": "another",
     "expected_role": "ML Engineer",
     "expected_criteria": ["production_rag"]
   },
   {
     "id": "ats_summary_keyword",
-    "description": "Request ATS summary using keyword shortcut",
+    "description": "Request ATS summary using keyword shortcut after role+criteria set",
+    "setup_messages": [
+      "I need an ML Engineer with production RAG and leadership skills."
+    ],
     "user_message": "ats",
     "expected_role": "ML Engineer",
     "expected_criteria": ["production_rag", "leadership"]

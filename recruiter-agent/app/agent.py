@@ -73,6 +73,17 @@ VALID_ROLES = [
 ROLE_ENDINGS = ["engineer", "scientist", "developer", "researcher"]
 
 
+_ACRONYMS = {"ai", "ml", "llm", "nlp", "rag", "cv", "api", "sdk"}
+
+
+def _title_preserve_acronyms(s: str) -> str:
+    """Like str.title() but keeps known acronyms uppercase."""
+    return " ".join(
+        w.upper() if w.lower() in _ACRONYMS else w.capitalize()
+        for w in s.split()
+    )
+
+
 def extract_role(text: str) -> Optional[str]:
     """
     Simple heuristic role extraction from free text / job description.
@@ -83,7 +94,7 @@ def extract_role(text: str) -> Optional[str]:
     # direct matches first
     for r in VALID_ROLES:
         if r in t:
-            return r.title()
+            return _title_preserve_acronyms(r)
 
     # generic "<something> engineer|scientist|developer|researcher"
     match = re.search(
@@ -91,7 +102,7 @@ def extract_role(text: str) -> Optional[str]:
         t,
     )
     if match:
-        return match.group(1).strip().title()
+        return _title_preserve_acronyms(match.group(1).strip())
 
     return None
 

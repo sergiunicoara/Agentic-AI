@@ -21,6 +21,7 @@ class EvalCase:
     expected_role: Optional[str] = None
     expected_criteria: Optional[List[str]] = None
     description: str = ""
+    setup_messages: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -55,6 +56,7 @@ def load_eval_cases(path: Path = EVAL_DATA_PATH) -> List[EvalCase]:
             expected_role=item.get("expected_role"),
             expected_criteria=item.get("expected_criteria"),
             description=item.get("description", ""),
+            setup_messages=item.get("setup_messages", []),
         )
         for item in data
     ]
@@ -98,10 +100,22 @@ def run_eval_suite(
     results: List[EvalResult] = []
 
     for case in cases:
+        # Each case gets its own isolated session so state never bleeds between cases
+        case_session_id = f"{session_id}-{case.id}"
+
+        # --- Step 0: send any setup messages to prime session context ---
+        for setup_msg in case.setup_messages:
+            requests.post(
+                f"{base_url.rstrip('/')}/chat",
+                json={"session_id": case_session_id, "message": setup_msg},
+                timeout=60,
+            )
+            time.sleep(1)
+
         # --- Step 1: call the agent ---
         chat_resp = requests.post(
             f"{base_url.rstrip('/')}/chat",
-            json={"session_id": session_id, "message": case.user_message},
+            json={"session_id": case_session_id, "message": case.user_message},
             timeout=60,
         )
         chat_resp.raise_for_status()
