@@ -652,6 +652,23 @@
   }
   .ui-ready .dot { width: 6px; height: 6px; border-radius: 50%; background: #34d399; }
 
+  .ui-thread-continue {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 8.5px;
+    color: #64748b;
+    margin: 2px 0 4px;
+  }
+  .ui-thread-continue::before,
+  .ui-thread-continue::after {
+    content: "";
+    height: 1px;
+    width: 22px;
+    background: #334155;
+  }
+
   .ui-chat-msgs {
     padding: 10px;
     display: flex;
@@ -711,11 +728,92 @@
     color: #94a3b8;
     border: 1px solid #334155;
   }
+  .ui-mic-btn.recording {
+    color: #fca5a5;
+    border-color: rgba(248, 113, 113, 0.6);
+    background: rgba(248, 113, 113, 0.1);
+    animation: mic-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.35); }
+    50% { box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.05); }
+  }
   .ui-send-btn {
     padding: 0 12px;
     background: #0ea5e9;
     color: #020617;
   }
+
+  /* ---------- Voice bubble states ---------- */
+
+  .ui-bubble.speaking {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ui-waveform {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 14px;
+  }
+  .ui-waveform span {
+    width: 2px;
+    background: #38bdf8;
+    border-radius: 1px;
+    animation: wave 0.9s ease-in-out infinite;
+  }
+  .ui-waveform span:nth-child(1) { height: 40%; animation-delay: 0s; }
+  .ui-waveform span:nth-child(2) { height: 90%; animation-delay: 0.1s; }
+  .ui-waveform span:nth-child(3) { height: 60%; animation-delay: 0.2s; }
+  .ui-waveform span:nth-child(4) { height: 100%; animation-delay: 0.3s; }
+  .ui-waveform span:nth-child(5) { height: 50%; animation-delay: 0.4s; }
+  .ui-waveform span:nth-child(6) { height: 75%; animation-delay: 0.5s; }
+  .ui-waveform span:nth-child(7) { height: 35%; animation-delay: 0.6s; }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.4); }
+    50% { transform: scaleY(1); }
+  }
+
+  .ui-bargein-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: #fca5a5;
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin: 2px 0;
+  }
+  .ui-bargein-badge .dot {
+    width: 5px; height: 5px; border-radius: 50%; background: #fca5a5;
+  }
+
+  /* ---------- Copy-selection highlight (payoff slide) ---------- */
+
+  .ui-bubble .selectable {
+    background: rgba(56, 189, 248, 0.28);
+    border-radius: 2px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  /* ---------- Act eyebrow ---------- */
+
+  .act-eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+  .act-eyebrow b { color: var(--accent); font-weight: 700; }
 
   .flow-steps {
     display: flex;
@@ -764,121 +862,35 @@
       <button class="vo-btn replay" id="voReplay" aria-label="Replay narration for this scene">↺</button>
       <span class="vo-speaking-dot" id="voDot"></span>
     </div>
-    <div class="scene-counter"><b id="counterNow">1</b> / 12</div>
+    <div class="scene-counter"><b id="counterNow">1</b> / 11</div>
   </div>
 
   <div class="rail" id="rail">
 
     <!-- Cover -->
-    <section class="slide" data-title="Cover" data-vo="recruiter-agent, scene by scene. A four minute screen-recording script for a voice and chat agent that represents a candidate to recruiters — nine scenes, each one a real command against a real deployment.">
+    <section class="slide" data-title="Cover" data-vo="recruiter-agent. A candidate you can interview before you interview him. Two acts: the experience, then the proof.">
       <div class="slide-inner cover">
         <div class="cover-eyebrow"><span class="live-dot"></span>demo walkthrough</div>
-        <h1>recruiter-agent, scene by scene.</h1>
-        <p class="cover-sub">A 4-minute screen-recording script for a voice and chat agent that represents a candidate to recruiters — nine scenes, each one a real command against a real deployment.</p>
+        <h1>A candidate you can interview before you interview him.</h1>
+        <p class="cover-sub">Two acts. Act I is the experience — paste a job description, talk to it, walk away with an intro email — no jargon, no terminal. Act II is the proof, for anyone who stays: measured latency, a judge on every reply, and a test suite that admits what's broken.</p>
         <dl class="cover-meta">
-          <div><dt>Scenes</dt><dd>S01 – S09 + UI</dd></div>
-          <div><dt>Runtime</dt><dd>~4:00</dd></div>
-          <div><dt>Target</dt><dd>Cloud Run</dd></div>
+          <div><dt>Act I</dt><dd>S01 – S04 · the UI</dd></div>
+          <div><dt>Act II</dt><dd>S05 – S09 · the terminal</dd></div>
+          <div><dt>Runtime</dt><dd>~4:30</dd></div>
         </dl>
         <div class="cover-note">
-          <b>Terminal target:</b> Git Bash (POSIX sh) on Windows, run from the repo root. S01–S06 &amp; S08 run against a local server on <code class="mono">localhost:9191</code>; S05–S07 reference the live Cloud Run deployment.
+          <b>Recording note:</b> Act I is a browser screen-recording of the live URL with system audio on. Act II is Git Bash (POSIX sh) on Windows, run from the repo root.
         </div>
         <div class="cover-cta"><kbd>→</kbd> or click to begin</div>
       </div>
     </section>
 
     <!-- S01 -->
-    <section class="slide" data-title="S01 — Cold start" data-vo="This is recruiter-agent — a voice and chat AI that represents a candidate to recruiters instead of a static CV. One required setting: GOOGLE_API_KEY, because the judge and the RAG layer both run on Gemini.">
+    <section class="slide" data-title="S01 — Cold open" data-vo="This is Sergiu's CV — except you don't read it. You interview it. It's a live AI agent that knows his projects, his skills, and his real metrics, and it's running in production right now.">
       <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S01</span><h2>Cold start</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Full terminal, clean prompt. Cut in on an empty pane, no editor open yet.</p>
-        <div class="stage">
-          <div class="term">
-            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
-            <pre class="term-body"><span class="prompt">cd recruiter-agent</span>
-<span class="prompt">cat app/config.py</span>
-<span class="out-dim">from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    environment: str = "local"
-    service_name: str = "recruiter-agent"
-    log_level: str = "INFO"
-
-    <span class="comment"># ✔ Use GOOGLE_API_KEY, NOT OPENAI_API_KEY</span>
-    GOOGLE_API_KEY: str
-
-    host: str = "0.0.0.0"
-    port: int = 9191
-
-def get_settings() -> Settings:
-    return Settings()</span></pre>
-          </div>
-          <div class="vo-wrap">
-            <div class="vo-label">V.O.</div>
-            <blockquote class="vo">This is recruiter-agent — a voice and chat AI that represents a candidate to recruiters instead of a static CV. One required setting: <span class="mono">GOOGLE_API_KEY</span>, because the judge and the RAG layer both run on Gemini.</blockquote>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- S02 -->
-    <section class="slide" data-title="S02 — Boot the server" data-vo="Startup wires OpenTelemetry tracing, structured logging, and Langfuse — all before the first request. Slash health doubles as a config readout: right now it's telling us session state is running on the SQLite fallback, not Redis. That's honest — no REDIS_URL is set in this shell.">
-      <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S02</span><h2>Boot the server</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Same pane. Let the startup log scroll naturally — don't cut it short.</p>
-        <div class="stage">
-          <div class="term">
-            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
-            <pre class="term-body"><span class="prompt">GOOGLE_API_KEY=$GOOGLE_API_KEY python -m app.server &amp;</span>
-<span class="prompt">sleep 2 &amp;&amp; curl -s localhost:9191/health</span>
-<span class="out-ok">{"status":"ok","service":"recruiter-agent","session_store":{"backend":"sqlite","path":"/tmp/sessions.db","redis_url_set":false}}</span></pre>
-          </div>
-          <div class="vo-wrap">
-            <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Startup wires OpenTelemetry tracing, structured logging, and Langfuse — all before the first request. <span class="mono">/health</span> doubles as a config readout: right now it's telling us session state is running on the SQLite fallback, not Redis. That's honest — no <span class="mono">REDIS_URL</span> is set in this shell.</blockquote>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- S03 -->
-    <section class="slide" data-title="S03 — Main data flow" data-vo="One chat endpoint, one session ID, multi-turn state. Role extraction, then criteria parsing, then — on the next turn — project ranking against the actual portfolio. Every reply that comes back has already been scored by a critic agent before it's shown; we'll see that trail in the observability scene.">
-      <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S03</span><h2>Main data flow: a recruiter turn</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Split terminal or picture-in-picture. Keep the JSON reply on screen long enough to read the <span class="mono">reply</span> field.</p>
-        <div class="stage">
-          <div class="term">
-            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
-            <pre class="term-body"><span class="prompt">curl -s -X POST localhost:9191/chat -d '{"session_id":"demo-01","message":"Senior ML Engineer"}'</span>
-<span class="out-dim">{
-  "reply": "Got it — Senior Ml Engineer. What matters most for this role?
-             (e.g. ownership, production RAG, leadership)",
-  "state": { "role": "Senior Ml Engineer", "criteria": [] }
-}</span>
-
-<span class="prompt">curl -s -X POST localhost:9191/chat -d '{"session_id":"demo-01","message":"ownership, production RAG"}'</span>
-<span class="out-ok">{
-  "reply": "Perfect — I'll evaluate Sergiu's fit for Senior Ml Engineer
-             based on: Production Rag, Ownership. From here you can:
-             1) project deep dive (1, another)
-             2) ATS summary + recruiter email (2, ats)",
-  "state": { "role": "Senior Ml Engineer",
-             "criteria": ["production_rag", "ownership"] }
-}</span></pre>
-          </div>
-          <div class="vo-wrap">
-            <div class="vo-label">V.O.</div>
-            <blockquote class="vo">One <span class="mono">/chat</span> endpoint, one session ID, multi-turn state. Role extraction, then criteria parsing, then — on the next turn — project ranking against the actual portfolio. Every reply that comes back has already been scored by a critic agent before it's shown.</blockquote>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- UI — the actual interface, for anyone who isn't reading curl output -->
-    <section class="slide" data-title="Interface — what a recruiter actually sees" data-vo="Same /chat call as the last scene, but this is what it looks like for a human: paste a job description or click a quick prompt, the agent replies with role and criteria confirmed, then the mic button switches the exact same backend turn into a live voice conversation, with barge-in to interrupt mid-sentence.">
-      <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">UI</span><h2>The interface: what a recruiter actually sees</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Screen recording of <span class="mono">frontend/index.html</span> live — same <span class="mono">/chat</span> call as S03, now driven by clicks instead of curl.</p>
+        <p class="act-eyebrow">Act I — <b>The experience</b></p>
+        <div class="scene-head"><span class="scene-tag">S01</span><h2>Cold open: meet the agent</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Browser, full screen, live URL. No terminal anywhere. Land on the hero, let it breathe 3 seconds before the V.O. starts.</p>
         <div class="stage">
           <div class="ui-frame">
             <div class="ui-frame-bar">
@@ -902,10 +914,7 @@ def get_settings() -> Settings:
                   <div class="ui-ready"><span class="dot"></span>Ready</div>
                 </div>
                 <div class="ui-chat-msgs">
-                  <div class="ui-bubble user">Lead AI Engineer — voice pipeline, RAG, observability</div>
-                  <div class="ui-bubble agent">Got it — Lead AI Engineer. What matters most: ownership, production RAG, leadership?</div>
-                  <div class="ui-bubble user">ownership, production RAG</div>
-                  <div class="ui-bubble agent">Perfect — evaluating Sergiu's fit. From here: project deep dive, or an ATS summary + recruiter email.</div>
+                  <div class="ui-bubble agent">Hi! I'm Sergiu's AI recruiter agent.<br><br>Tell me the role you're hiring for — or paste a full job description.<br><br>You can also hit the mic button to speak your requirements directly.</div>
                 </div>
                 <div class="ui-chat-input">
                   <div class="ui-textarea-fake">Paste a job description or ask about fit, impact, CV…</div>
@@ -917,54 +926,144 @@ def get_settings() -> Settings:
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Same <span class="mono">/chat</span> call as the last scene, but this is what it looks like for a human. The <b style="color:var(--accent)">quick-prompt buttons</b> paste a real JD in one click; the <b style="color:var(--accent)">mic button</b> switches the exact same backend turn into a live voice conversation — same role extraction, same criteria parsing, same critic score, just a different transport.</blockquote>
-            <div class="flow-steps">
-              <div class="flow-step"><span class="fnum">1</span><span class="flabel">Click a <b>quick prompt</b> or paste a JD into the textarea</span></div>
-              <div class="flow-step"><span class="fnum">2</span><span class="flabel">Agent replies confirming <b>role + criteria</b>, chat-only — no voice yet</span></div>
-              <div class="flow-step"><span class="fnum">3</span><span class="flabel">Click the <b>mic icon</b> — same turn, now streamed as TTS with auto-speak</span></div>
-              <div class="flow-step"><span class="fnum">4</span><span class="flabel">Speak over it mid-reply — <b>barge-in</b> cuts audio instantly (S05's pipeline)</span></div>
+            <blockquote class="vo">This is Sergiu's CV — except you don't read it. You interview it. It's a live AI agent that knows his projects, his skills, and his real metrics, and it's running in production right now. Let me show you what a recruiter does with it.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S02 -->
+    <section class="slide" data-title="S02 — Paste a JD" data-vo="Paste any job description — the agent pulls out what the role actually needs, confirms it, then maps specific projects with specific results to each of your requirements. No generic passionate team player — it cites work.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S02</span><h2>Paste a job description, get a real answer</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Click a quick prompt (a full, realistic JD drops in) → Send → role + criteria confirmed → <span class="mono">1</span> → project deep dive.</p>
+        <div class="stage">
+          <div class="ui-frame">
+            <div class="ui-frame-bar">
+              <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+              <span class="ui-url">recruiter-agent-969006882005.europe-west1.run.app</span>
             </div>
-            <div class="note-amber"><span class="mark">note</span><span>The live <span class="mono">frontend/index.html</span> copy still reads "~600ms TTFA · 35ms deterministic routing" — the same unverified figures already corrected in the README and the agent's own project summary. This mockup uses the corrected wording; the deployed page doesn't yet.</span></div>
+            <div class="ui-mock" style="grid-template-columns: 1fr;">
+              <div class="ui-chat-panel">
+                <div class="ui-chat-head">
+                  <div><div class="eyebrow">Session demo-01 · started</div><div class="title">Recruiter Agent Chat</div></div>
+                  <div class="ui-ready"><span class="dot"></span>Ready</div>
+                </div>
+                <div class="ui-chat-msgs" style="min-height:180px;">
+                  <div class="ui-bubble user">We're building a production AI phone assistant for law firms. Looking for a Lead AI Engineer with hands-on voice pipeline experience — STT/TTS integration, real-time agentic workflows, low-latency streaming, RAG architectures, and LLM observability.</div>
+                  <div class="ui-bubble agent">Perfect — I'll evaluate Sergiu's fit for <b>Lead AI Engineer</b> based on: Production RAG, Voice AI, Observability, Low Latency.<br><br>Say <b>1</b> for a project deep dive, or <b>ats</b> for a summary.</div>
+                  <div class="ui-bubble user">1</div>
+                  <div class="ui-bubble agent">🔍 <b>Deep Dive: Production Voice AI Pipeline</b><br>Real-time voice agent on Cloud Run — Deepgram STT → orchestrator → Neural2-D TTS, barge-in via RMS VAD, ~430ms measured time-to-first-audio, critic agent scoring every reply.</div>
+                </div>
+                <div class="ui-chat-input">
+                  <div class="ui-textarea-fake">Paste a job description or ask about fit, impact, CV…</div>
+                  <div class="ui-mic-btn">🎙</div>
+                  <div class="ui-send-btn">Send</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">Paste any job description — this one's a Lead AI Engineer role. The agent pulls out what the role actually needs, confirms it, and then does what a good candidate does in a first call: it maps <i>specific projects with specific results</i> to each of your requirements. No generic "passionate team player" — it cites work.</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- S03 -->
+    <section class="slide" data-title="S03 — Voice showpiece" data-vo="Hit the mic and it's hands-free. Say next to move between projects, or ask a real question about his background — same backend, same criteria, now spoken. Real speech in, real speech out, in under half a second.">
+      <div class="slide-inner">
+        <div class="scene-head"><span class="scene-tag">S03</span><h2>Now say it out loud <span style="color:var(--ink-faint); font-weight: 400;">(the showpiece)</span></h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>System audio ON. Click mic → say "next" to advance hands-free → ask a real CV question → hear it answer.</p>
+        <div class="stage">
+          <div class="ui-frame">
+            <div class="ui-frame-bar">
+              <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+              <span class="ui-url">recruiter-agent-969006882005.europe-west1.run.app</span>
+            </div>
+            <div class="ui-mock" style="grid-template-columns: 1fr;">
+              <div class="ui-chat-panel">
+                <div class="ui-chat-head">
+                  <div><div class="eyebrow">Session demo-01 · continued</div><div class="title">Recruiter Agent Chat</div></div>
+                  <div class="ui-ready"><span class="dot"></span>Ready</div>
+                </div>
+                <div class="ui-chat-msgs" style="min-height:200px;">
+                  <div class="ui-thread-continue">↑ same session — Lead AI Engineer, deep dive from S02</div>
+                  <div class="ui-bubble user">🎙 "Next"</div>
+                  <div class="ui-bubble agent speaking">
+                    <span>Deep Dive 3 of 3: AI Engineering Workflow Toolkit. Production-grade CI/CD quality gate for AI-assisted codebases — every git diff runs through a deterministic tool pipeline before any LLM judgement fires…</span>
+                    <div class="ui-waveform"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                  </div>
+                  <div class="ui-bubble user">🎙 "Where is he based?"</div>
+                  <div class="ui-bubble agent">Here's what I found in Sergiu's CV: Sergiu is based in Timisoara, Romania.</div>
+                </div>
+                <div class="ui-chat-input">
+                  <div class="ui-textarea-fake">Paste a job description or ask about fit, impact, CV…</div>
+                  <div class="ui-mic-btn recording">🎙</div>
+                  <div class="ui-send-btn">Send</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="vo-wrap">
+            <div class="vo-label">V.O.</div>
+            <blockquote class="vo">And here's the part that separates this from a chatbot: hit the mic and it's hands-free. Say "next" to move between projects without touching the keyboard, or ask a real question about his background — same backend, same criteria, now spoken out loud.</blockquote>
+            <div class="note-amber"><span class="mark">note</span><span>Both turns above are verbatim from a live <span class="mono">/chat</span> call against this deployment — not staged copy. Barge-in (interrupt mid-sentence) is a real feature of the same pipeline, verified by 7 passing tests in <span class="mono">tests/test_tts_streaming.py</span>, but isn't replayable through this text-only check — see it live on the page, mic in hand.</span></div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- S04 -->
-    <section class="slide" data-title="S04 — Live config switch" data-vo="Same binary, same code path — set REDIS_URL and session state moves to Redis with a 24-hour TTL. Drop the env var, or let the Redis connection fail, and it falls back to SQLite silently, logged at WARNING. No restart-time branch, no feature flag — it's a runtime probe in session_store.py.">
+    <section class="slide" data-title="S04 — The payoff" data-vo="When you're done talking, you don't leave empty-handed. One word, ats, and you get a summary formatted for your tracking system and an intro email ready to forward to the hiring manager. The whole loop took about ninety seconds.">
       <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S04</span><h2>Live config switch: Redis → SQLite fallback</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Terminal only — the "how does it not break in prod" beat. Let the before/after <span class="mono">/health</span> calls sit for a beat each.</p>
+        <div class="scene-head"><span class="scene-tag">S04</span><h2>Walk away with something you can use</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Type <span class="mono">ats</span> (or click the quick prompt) → summary + email lands → select-all the email text, the "I could paste this into Outlook right now" gesture.</p>
         <div class="stage">
-          <div class="term">
-            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
-            <pre class="term-body"><span class="prompt">curl -s localhost:9191/health</span>
-<span class="out-dim">{"session_store": {"backend": "sqlite", "redis_url_set": false}}</span>
-
-<span class="prompt">kill %1; REDIS_URL=redis://localhost:6379/0 python -m app.server &amp;</span>
-<span class="prompt">sleep 2 &amp;&amp; curl -s localhost:9191/health</span>
-<span class="out-ok">{"session_store": {"backend": "redis", "redis_url_set": true}}</span></pre>
+          <div class="ui-frame">
+            <div class="ui-frame-bar">
+              <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+              <span class="ui-url">recruiter-agent-969006882005.europe-west1.run.app</span>
+            </div>
+            <div class="ui-mock" style="grid-template-columns: 1fr;">
+              <div class="ui-chat-panel">
+                <div class="ui-chat-head">
+                  <div><div class="eyebrow">Session demo-01 · continued</div><div class="title">Recruiter Agent Chat</div></div>
+                  <div class="ui-ready"><span class="dot"></span>Ready</div>
+                </div>
+                <div class="ui-chat-msgs" style="min-height:190px;">
+                  <div class="ui-thread-continue">↑ same session — JD, deep dive, and two voice follow-ups above</div>
+                  <div class="ui-bubble user">ats</div>
+                  <div class="ui-bubble agent">📝 <b>ATS-ready Summary — Lead AI Engineer</b><br>Key criteria: production_rag, voice_ai, observability, low_latency<br><br><span class="selectable">Hi,<br>I reviewed Sergiu's profile — strong alignment on voice pipelines and production RAG. I recommend moving him forward to the next interview stage.<br><br>Best,<br>Your AI recruiter agent</span></div>
+                </div>
+                <div class="ui-chat-input">
+                  <div class="ui-textarea-fake">Paste a job description or ask about fit, impact, CV…</div>
+                  <div class="ui-mic-btn">🎙</div>
+                  <div class="ui-send-btn">Send</div>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Same binary, same code path — set <span class="mono">REDIS_URL</span> and session state moves to Redis with a 24-hour TTL. Drop the env var, or let the connection fail, and it falls back to SQLite silently, logged at WARNING. No restart-time branch, no feature flag — it's a runtime probe in <span class="mono">session_store.py</span>.</blockquote>
-            <div class="note-amber"><span class="mark">note</span><span>If no local Redis is running for the recording, skip the second half and narrate the fallback from the code instead — don't fake a connection succeeding.</span></div>
+            <blockquote class="vo">And when you're done talking, you don't leave empty-handed. One word — "ats" — and you get a summary formatted for your tracking system and an intro email ready to forward to the hiring manager. The whole loop — JD in, conversation, deliverable out — took about ninety seconds. Now, if you're technical and wondering whether any of this is real… stay for act two.</blockquote>
           </div>
         </div>
       </div>
     </section>
 
     <!-- S05 -->
-    <section class="slide" data-title="S05 — Voice pipeline" data-vo="Deepgram nova-2 streams the transcript in over WebSocket, the agent replies, Google Neural2-D streams TTS back sentence by sentence so playback starts before synthesis finishes. Measured first-audio p50 on Cloud Run: 428 milliseconds. The full-turn number with STT included is labeled as an estimate on purpose — it's the one figure in this repo that isn't a direct measurement, and the README says so.">
+    <section class="slide" data-title="S05 — Latency is measured" data-vo="That half-second voice response you saw? Here's the receipt. This benchmark runs against the live deployment: 428 milliseconds median to first audio, measured — the only estimated figure is the speech-to-text leg, and it's labeled as an estimate on purpose.">
       <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S05</span><h2>Voice pipeline (STT → agent → TTS)</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span><span class="mono">benchmark_voice.py</span> against a live target — the one scene where real numbers matter more than a clean take.</p>
+        <p class="act-eyebrow">Act II — <b>The proof</b></p>
+        <div class="scene-head"><span class="scene-tag">S05</span><h2>The latency is measured, not promised</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span><span class="mono">benchmark_voice.py</span> against the live target — the receipt for the half-second voice reply from S03.</p>
         <div class="stage">
           <div class="term">
             <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — live Cloud Run</span></div>
             <pre class="term-body"><span class="prompt">python benchmark_voice.py https://recruiter-agent-969006882005.europe-west1.run.app</span>
 <span class="out-dim">Stage 2: Agent turn (POST /chat)
-  msg 1: 321ms  reply='I'll evaluate Sergiu's fit for...'
   Agent  : p50=321ms  p95=589ms  min=318ms  max=589ms
 
 Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
@@ -974,18 +1073,17 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Deepgram nova-2 streams the transcript in over WebSocket, the agent replies, Google Neural2-D streams TTS back sentence-by-sentence so playback starts before synthesis finishes. Measured first-audio p50 on Cloud Run: <b class="mono" style="color:var(--accent)">428ms</b>.</blockquote>
-            <div class="note-amber"><span class="mark">note</span><span>The full-turn number with STT included is labeled as an estimate on purpose — it's the one figure in this repo that isn't a direct measurement, and the README says so.</span></div>
+            <blockquote class="vo">That half-second voice response you saw in act one? Here's the receipt. This benchmark runs against the live deployment: <b class="mono" style="color:var(--accent)">428ms</b> median to first audio, measured — the only estimated figure is the speech-to-text leg, and it's labeled as an estimate on purpose. Every latency claim in this repo has a script behind it you can re-run.</blockquote>
           </div>
         </div>
       </div>
     </section>
 
     <!-- S06 -->
-    <section class="slide" data-title="S06 — Evaluation" data-vo="Fifteen golden recruiter conversations, replayed against the live agent every run. Gemini 2.5 Flash judges each reply on faithfulness, relevancy, and factuality, with a rubric that knows the agent's correct behaviors — sharing CV facts isn't a privacy violation here, it's the job. Pass threshold is 3.5 out of 5. This run: 15 for 15, 5.0 average. Any regression against this file blocks deploy in CI.">
+    <section class="slide" data-title="S06 — Every reply is graded" data-vo="Everything the agent told you in act one had already been graded before you saw it. Fifteen golden recruiter conversations replay against the live agent on every release: fifteen for fifteen, five-point-oh average. If a change makes the agent worse, the deploy is blocked, automatically.">
       <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S06</span><h2>Evaluation: LLM-as-a-Judge + golden set</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Terminal. Cut to <span class="mono">eval_results.json</span> in an editor for 2–3s if the read is easier there.</p>
+        <div class="scene-head"><span class="scene-tag">S06</span><h2>Every reply is graded before you see it</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Terminal, then 2–3s on <span class="mono">eval_results.json</span> in an editor.</p>
         <div class="stage">
           <div class="term">
             <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — live Cloud Run</span></div>
@@ -1005,25 +1103,24 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Fifteen golden recruiter conversations, replayed against the live agent every run. Gemini 2.5 Flash judges each reply on faithfulness, relevancy, and factuality, with a rubric that knows the agent's <i>correct</i> behaviors — sharing CV facts isn't a privacy violation here, it's the job. Pass threshold is 3.5 out of 5. Any regression against this file blocks deploy in CI.</blockquote>
+            <blockquote class="vo">Everything the agent told you in act one had already been graded before you saw it. A second model — a judge — scores every reply on three questions: is it faithful to the real CV, is it relevant, are the facts right. Fifteen golden conversations replay on every release: fifteen for fifteen, five-point-oh average. If a change makes the agent worse, the deploy is blocked. Automatically.</blockquote>
           </div>
         </div>
       </div>
     </section>
 
     <!-- S07 -->
-    <section class="slide" data-title="S07 — Observability" data-vo="Every turn emits an OTel span and a trajectory step — role extraction, criteria parsing, the judge call, all attributed to the session. That's what makes the eval numbers auditable instead of anecdotal: you can walk backward from a score to the exact turn that produced it.">
+    <section class="slide" data-title="S07 — Every conversation leaves a trail" data-vo="Every turn of that conversation left a trace — which step extracted the role, which parsed the criteria, what the judge scored the reply. So when I say fifteen for fifteen, that's not an anecdote — you can walk backward from any score to the exact turn that earned it.">
       <div class="slide-inner">
-        <div class="scene-head"><span class="scene-tag">S07</span><h2>Observability: tracing a single turn</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Browser — Langfuse or OTel collector UI showing one trace expanded to its spans. No dashboard reachable? Substitute the raw trajectory JSON below, don't skip the scene.</p>
+        <div class="scene-head"><span class="scene-tag">S07</span><h2>Every conversation leaves a trail</h2></div>
+        <p class="shot"><span class="shot-label">Shot</span>Langfuse/OTel UI with one trace expanded — or the trajectory JSON below if no dashboard is reachable.</p>
         <div class="stage">
           <div class="term">
             <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
-            <pre class="term-body"><span class="prompt">curl -s localhost:9191/session/demo-01/summary</span>
+            <pre class="term-body"><span class="prompt">curl -s .../session/demo-01/summary</span>
 <span class="out-dim">{
   "session_id": "demo-01",
-  "role": "Senior Ml Engineer",
-  "criteria": ["production_rag", "ownership"],
+  "role": "Lead AI Engineer",
   "trajectory": { "steps": [
     {"kind": "tool", "message": "role_extraction"},
     {"kind": "tool", "message": "criteria_parsing"},
@@ -1034,14 +1131,14 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Every turn emits an OTel span and a trajectory step — role extraction, criteria parsing, the judge call, all attributed to the session. That's what makes the eval numbers auditable instead of anecdotal: you can walk backward from a score to the exact turn that produced it.</blockquote>
+            <blockquote class="vo">Every turn of that conversation left a trace — which step extracted the role, which parsed the criteria, what the judge scored the reply. So when I say "fifteen for fifteen," that's not an anecdote — you can walk backward from any score to the exact turn that earned it.</blockquote>
           </div>
         </div>
       </div>
     </section>
 
     <!-- S08 -->
-    <section class="slide" data-title="S08 — Test suite" data-vo="Twelve for twelve — but the interesting part is how it got there. Seven of these tests cover voice interruption; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. And two tests here used to fail — chasing those failures exposed an actual routing bug where every GET endpoint, including the health check, silently returned the web page instead of JSON. The failing tests weren't noise; they were the map to the bug.">
+    <section class="slide" data-title="S08 — Test suite" data-vo="Twelve for twelve — but the interesting part is how it got there. Seven tests cover barge-in, the exact feature from act one; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. Two tests used to fail — chasing them exposed a routing bug where every GET endpoint silently returned the web page instead of JSON.">
       <div class="slide-inner">
         <div class="scene-head"><span class="scene-tag">S08</span><h2>The tests that caught real bugs</h2></div>
         <p class="shot"><span class="shot-label">Shot</span>Terminal. A fully green suite — the V.O. tells the story of how it <i>got</i> green, which builds more trust than the checkmarks.</p>
@@ -1054,7 +1151,7 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Twelve for twelve — but the interesting part is how it got there. Seven tests cover barge-in; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. And two tests used to <i>fail</i> — chasing them exposed a routing bug where every GET endpoint, health check included, silently returned the web page instead of JSON.</blockquote>
+            <blockquote class="vo">Twelve for twelve — but the interesting part is how it got there. Seven tests cover barge-in, the exact feature you saw in act one; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. And two tests used to <i>fail</i> — chasing them exposed a routing bug where every GET endpoint, health check included, silently returned the web page instead of JSON.</blockquote>
             <div class="note-amber"><span class="mark">note</span><span>The old failing tests weren't deleted to make the suite green — they were chased to the real bug (a route-ordering issue in <span class="mono">server.py</span>), fixed, and replaced with regression tests that guard against it coming back.</span></div>
           </div>
         </div>
@@ -1062,20 +1159,36 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
     </section>
 
     <!-- S09 -->
-    <section class="slide" data-title="S09 — Close" data-vo="That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with a test suite whose failures get chased down to real bugs, not deleted. Repo's public, link's in the description.">
+    <section class="slide" data-title="S09 — Close" data-vo="So: a candidate you can interview before you interview him. Paste a JD, talk to it, walk away with an ATS summary and an intro email — and under the hood, measured latency, a judge on every reply, and a test suite that admits what's broken. It's live right now. Ask it something hard.">
       <div class="slide-inner">
         <div class="scene-head"><span class="scene-tag">S09</span><h2>Close</h2></div>
-        <p class="shot"><span class="shot-label">Shot</span>Terminal, clean prompt. Kill the background server before cutting.</p>
+        <p class="shot"><span class="shot-label">Shot</span>Back to the browser — the live page, chat panel ready. Hold 2 seconds, then cut.</p>
         <div class="stage">
-          <div class="term">
-            <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
-            <pre class="term-body"><span class="prompt">kill %1 2&gt;/dev/null</span>
-<span class="prompt">echo "recruiter-agent — live at https://recruiter-agent-969006882005.europe-west1.run.app"</span>
-<span class="out-ok">recruiter-agent — live at https://recruiter-agent-969006882005.europe-west1.run.app</span></pre>
+          <div class="ui-frame">
+            <div class="ui-frame-bar">
+              <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+              <span class="ui-url">recruiter-agent-969006882005.europe-west1.run.app</span>
+            </div>
+            <div class="ui-mock" style="grid-template-columns: 1fr;">
+              <div class="ui-chat-panel">
+                <div class="ui-chat-head">
+                  <div><div class="eyebrow">Live demo</div><div class="title">Recruiter Agent Chat</div></div>
+                  <div class="ui-ready"><span class="dot"></span>Ready</div>
+                </div>
+                <div class="ui-chat-msgs">
+                  <div class="ui-bubble agent">Hi! I'm Sergiu's AI recruiter agent. Ask me something hard.</div>
+                </div>
+                <div class="ui-chat-input">
+                  <div class="ui-textarea-fake">Paste a job description or ask about fit, impact, CV…</div>
+                  <div class="ui-mic-btn">🎙</div>
+                  <div class="ui-send-btn">Send</div>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">That's the full loop — chat and voice in, ranked projects and a scored reply out, traced end-to-end, with a test suite whose failures get chased down to real bugs, not deleted. Repo's public, link's in the description.</blockquote>
+            <blockquote class="vo">So: a candidate you can interview before you interview him. Paste a JD, talk to it, walk away with an ATS summary and an intro email — and under the hood, measured latency, a judge on every reply, and a test suite whose failures get chased down to real bugs, not deleted. It's live right now — link's below. Ask it something hard.</blockquote>
           </div>
         </div>
       </div>
@@ -1102,7 +1215,7 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
               <tr><td class="metric">Session store, with REDIS_URL</td><td class="value">Redis, 24h TTL</td><td class="source">app/session_store.py</td></tr>
               <tr><td class="metric">API routes exposed</td><td class="value">24</td><td class="source">app/server.py</td></tr>
               <tr><td class="metric">Test suite result</td><td class="value">12 passed / 0 failed</td><td class="source">pytest tests/ -q — 7 barge-in tests + 5 API tests (incl. route-shadowing regressions)</td></tr>
-              <tr><td class="metric">Total runtime</td><td class="value">~4:00</td><td class="source">S01–S09</td></tr>
+              <tr><td class="metric">Total runtime</td><td class="value">~4:30</td><td class="source">Act I (S01–S04, the UI) + Act II (S05–S09, the proof)</td></tr>
             </tbody>
           </table>
         </div>

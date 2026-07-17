@@ -77,25 +77,38 @@ player' — it cites work."
 **Shot:** Same page. This is the scene to get right — re-record until the
 audio moment lands. System audio ON.
 
-**Action (record in order):**
-1. Click the **mic icon**. Speak, naturally: *"What's his experience with
-   voice pipelines?"*
-2. The transcript appears as your bubble, the reply comes back — **and the
-   page speaks it aloud**. Let 1–2 spoken sentences play uninterrupted.
-3. Then **interrupt it mid-sentence** — just start talking over it:
-   *"And what about observability?"* The voice cuts off instantly, your new
-   question goes through, a new spoken answer comes back.
+**Action (record in order) — verified against the live deployment, same
+session as S02:**
+1. Click the **mic icon**. Speak, naturally: *"Next."* The agent advances
+   hands-free to the next project deep dive (verified live output: *"Deep
+   Dive 3 of 3: AI Engineering Workflow Toolkit…"*).
+2. Speak a real CV question: *"Where is he based?"* Verified live reply:
+   *"Here's what I found in Sergiu's CV: Sergiu is based in Timisoara,
+   Romania."*
+3. **Optional, if time allows and it lands clean on the take:** interrupt a
+   spoken reply mid-sentence to demonstrate barge-in. This is a real,
+   tested feature (7 passing tests in `tests/test_tts_streaming.py`, one of
+   which caught a real race condition) — but it's a live audio behavior,
+   not something scriptable as guaranteed dialogue, so don't force a
+   specific line here. Let it happen naturally and keep whatever take works.
 
 **Expected:** first audio lands fast enough to feel like a phone call, not a
-loading screen (measured p50: ~430ms to first audio). The interruption is
-clean — no overlapping audio, no stutter.
+loading screen (measured p50: ~430ms to first audio).
 
 **V.O.:** "And here's the part that separates this from a chatbot: hit the
-mic and it's a conversation. Real speech in, real speech out, in under half
-a second — that's a measured number, not a marketing one. And watch this:
-interrupt it, like you would a person… it stops and listens. Recruiters
-don't type on the way to their next call. This works the way they actually
-work — it even answers a real phone number."
+mic and it's hands-free. Say 'next' to move between projects without
+touching the keyboard, or ask a real question about his background — same
+backend, same criteria, now spoken out loud."
+
+> **Accuracy note:** an earlier draft of this scene scripted the agent
+> giving contextual spoken answers to open-ended follow-up questions
+> ("has he shipped retrieval in production, not just a demo?"). Live
+> testing against the deployment showed the deterministic router doesn't
+> support that — free-form questions either get silently treated as "next"
+> or fall back to a generic menu reminder. Only scripted commands
+> (`next`/`another`/`ats`) and a narrow set of CV-fact patterns (phone,
+> certs, location, etc.) are reliably answered. Use those, not invented
+> Q&A, for any live recording.
 
 ---
 
