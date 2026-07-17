@@ -277,9 +277,13 @@ def _match_criteria_to_project(
                     "critic agent scoring every turn on faithfulness/relevancy/factuality."
                 )
             elif c_low == "low_latency":
+                # No hardcoded latency figure here on purpose — the measured
+                # number lives in one place (STATIC_PROJECTS in tools.py) so
+                # it can't drift out of sync with a second copy. See lesson 4a.
                 reasons.append(
-                    "- **Low Latency**: ~428ms measured agent+TTS time-to-first-audio on Cloud Run; "
-                    "sentence-level parallel synthesis and async WebSocket streaming."
+                    "- **Low Latency**: sentence-level parallel TTS synthesis and async "
+                    "WebSocket streaming keep response time low — see the project impact "
+                    "section above for the current measured benchmark."
                 )
             continue
 
