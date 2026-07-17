@@ -46,44 +46,34 @@ def _lf_score(name: str, value: float, comment: str = "") -> None:
         pass
 
 
-def _ensure_client_configured() -> None:
-    """Create Gemini client once per process.
+def _make_client() -> "genai.Client":
+    """Build and return a working Gemini client.
 
-    Tries AI Studio key first; falls back to Vertex AI ADC when
-    GOOGLE_CLOUD_PROJECT is set (e.g. Cloud Run with ADC).
+    Tries AI Studio key first; falls back to Vertex AI ADC when the key is
+    absent, looks like a service-account blob, or fails a quick smoke-test.
     """
+    api_key = (os.environ.get("GOOGLE_API_KEY") or "").lstrip("\ufeff").strip()
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT", "recruiter-sergiu-260213").strip()
+
+    # Try AI Studio key if it looks like a real API key (starts with "AIza")
+    if api_key and api_key.startswith("AIza"):
+        try:
+            client = genai.Client(api_key=api_key)
+            # Quick validation \u2014 list models is cheap and auth-gated
+            client.models.get(model="gemini-2.5-flash")
+            return client
+        except Exception:
+            pass  # fall through to Vertex ADC
+
+    # Vertex AI ADC \u2014 works on Cloud Run with the default Compute SA
+    return genai.Client(vertexai=True, project=project, location="us-central1")
+
+
+def _ensure_client_configured() -> None:
     global _client
     if _client is not None:
         return
-
-    api_key = (os.environ.get("GOOGLE_API_KEY") or "").lstrip("\ufeff").strip()
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT", "").strip()
-
-    if api_key:
-        try:
-            candidate = genai.Client(api_key=api_key)
-            # Smoke-test: if the key is a service-account JSON blob it will
-            # start with '{' and fail at the first API call. Fall through to
-            # Vertex ADC in that case.
-            if not api_key.startswith("{"):
-                _client = candidate
-                return
-        except Exception:
-            pass
-
-    # Fall back to Vertex AI ADC (works on Cloud Run without an explicit key)
-    if project:
-        _client = genai.Client(vertexai=True, project=project, location="us-central1")
-        return
-
-    # Last resort: try ADC without explicit project (picks up ambient credentials)
-    try:
-        _client = genai.Client(vertexai=True)
-        return
-    except Exception:
-        pass
-
-    raise RuntimeError("Could not initialise Gemini client: set GOOGLE_API_KEY or GOOGLE_CLOUD_PROJECT.")
+    _client = _make_client()
 
 
 @observe(as_type="generation", name="llm_judge")
