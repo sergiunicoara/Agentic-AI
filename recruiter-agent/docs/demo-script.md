@@ -268,10 +268,6 @@ now there's a regression test standing guard so it can't come back."
 **Shot:** Back to the browser — the live page, chat panel ready. Hold 2
 seconds, then cut.
 
-```bash
-echo "recruiter-agent — live at https://recruiter-agent-969006882005.europe-west1.run.app"
-```
-
 **V.O.:** "So: a candidate you can interview before you interview him.
 Paste a JD, talk to it, walk away with an ATS summary and an intro email —
 and under the hood, measured latency, a judge on every reply, and a test
