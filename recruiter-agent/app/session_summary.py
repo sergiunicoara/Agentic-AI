@@ -106,9 +106,19 @@ def _get_gemini_client():
             or os.environ.get("GEMINI_API_KEY")
             or ""
         ).lstrip("﻿").strip()
-        if not key:
-            return None
-        return genai.Client(api_key=key)
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT", "recruiter-sergiu-260213").strip()
+
+        # Try AI Studio key if it looks like a real API key
+        if key and key.startswith("AIza"):
+            try:
+                client = genai.Client(api_key=key)
+                client.models.get(model="gemini-2.5-flash")
+                return client
+            except Exception:
+                pass  # fall through to Vertex ADC
+
+        # Vertex AI ADC — works on Cloud Run with the default Compute SA
+        return genai.Client(vertexai=True, project=project, location="us-central1")
     except Exception as exc:
         logger.debug("Gemini client unavailable for session summary: %s", exc)
         return None
