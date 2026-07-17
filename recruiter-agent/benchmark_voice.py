@@ -52,7 +52,7 @@ def _read_secret(name: str) -> str:
 
 DEEPGRAM_KEY = os.environ.get("DEEPGRAM_API_KEY") or _read_secret("DEEPGRAM_API_KEY")
 ELEVENLABS_KEY = os.environ.get("ELEVENLABS_API_KEY") or _read_secret("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "pNInz6obpgDQGcFmaJgB")  # Adam — pre-made, free tier
 
 N_RUNS = 5  # repetitions per stage
 
