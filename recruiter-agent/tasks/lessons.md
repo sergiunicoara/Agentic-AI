@@ -56,6 +56,23 @@ Patterns from corrections in past sessions. Review at session start.
     is a live surface, not a doc, and is easy to skip because it doesn't
     "look like" copy.
 
+## Eval / testing
+
+12. **Running the demo script is not the same as running the eval suite.**
+    Verifying the scripted deck dialogue (S02→S04) confirmed the happy path
+    but left the eval suite unrun — which had 0% pass rate due to three
+    independent bugs: (a) judge client used a bad AI Studio key on Cloud Run
+    instead of falling back to Vertex AI ADC; (b) all 15 cases shared one
+    `session_id`, so state bled between them; (c) multi-turn cases (`deep_dive_*`,
+    `ats_*`) had no prior context and always failed. After any deploy, run
+    `python run_eval.py <url>` before declaring the deployment done.
+
+13. **`str.title()` destroys acronyms.** `"LLM Engineer".lower().title()` →
+    `"Llm Engineer"`. Replace with an acronym-aware helper that calls
+    `w.upper()` for known tokens (ai, ml, llm, nlp, rag, …) and `w.capitalize()`
+    for the rest. Check every place role names are formatted before trusting
+    the output.
+
 ## Stale docs
 
 5. **Update README in the same change that ships the feature.** The entire
