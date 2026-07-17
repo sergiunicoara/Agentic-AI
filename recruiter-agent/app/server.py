@@ -78,15 +78,11 @@ async def serve_frontend_root():
     return FileResponse(index_path)
 
 
-@app.get("/{path:path}", include_in_schema=False)
-async def serve_frontend_assets(path: str):
-    # Resolve fully and verify the result stays inside FRONTEND_DIR to prevent
-    # path-traversal requests such as /../app/cv.txt from escaping the frontend.
-    resolved_base = FRONTEND_DIR.resolve()
-    file_path = (FRONTEND_DIR / path).resolve()
-    if resolved_base in file_path.parents and file_path.is_file():
-        return FileResponse(file_path)
-    return FileResponse(FRONTEND_DIR / "index.html")
+# NOTE: the frontend catch-all GET route is registered at the BOTTOM of this
+# file — Starlette matches routes in registration order, so registering
+# /{path:path} here would shadow every GET API route defined below it
+# (/health, /mcp/tools, /session/{id}/summary, ...), silently returning
+# index.html instead of JSON.
 
 
 # ------------------------------------------------------------------
@@ -519,3 +515,19 @@ async def health_endpoint() -> Dict[str, Any]:
         "service": SERVICE_NAME,
         "session_store": session_store_info(),
     }
+
+
+# ------------------------------------------------------------------
+# Frontend catch-all — MUST stay the last registered route (it would
+# shadow every GET API route registered after it; see note at top).
+# ------------------------------------------------------------------
+
+@app.get("/{path:path}", include_in_schema=False)
+async def serve_frontend_assets(path: str):
+    # Resolve fully and verify the result stays inside FRONTEND_DIR to prevent
+    # path-traversal requests such as /../app/cv.txt from escaping the frontend.
+    resolved_base = FRONTEND_DIR.resolve()
+    file_path = (FRONTEND_DIR / path).resolve()
+    if resolved_base in file_path.parents and file_path.is_file():
+        return FileResponse(file_path)
+    return FileResponse(FRONTEND_DIR / "index.html")
