@@ -1,0 +1,53 @@
+# env
+.env
+.env.local
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+
+# docker
+*.pid
+
+# os
+.DS_Store
+Thumbs.db
+
+# evals — only evals/results/ (real demo-repo runs) is committed, per spec §6
+evals/results-ci/
+evals/results-hybrid/
+evals/results/latest.json
+submission.zip
+*.zip
+
+# misc
+*.log
+
+# graphify generated knowledge-graph outputs
+graphify-out/
+
+# generated presentation media
+DEMO_VIDEO.mp4
+DEMO_VIDEO_FINAL.mp4
+DEMO_VIDEO_CORE.mp4
+DEMO_VIDEO_NARRATION.txt
+video-work/
+backend/build/
+
+# local AI assistant configuration
+.claude/
+CLAUDE.md

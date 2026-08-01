@@ -1,0 +1,53 @@
+# Small golden set against backend/tests/fixtures/sample_repo — used ONLY by the CI
+# eval gate (fast, cheap: ~8 questions vs the full 30-question set against the real
+# demo repo in golden.yaml). Same schema as golden.yaml.
+
+- id: fx01
+  question: "Where is the User class defined?"
+  expected_files: ["pkg/models.py"]
+  expected_symbols: ["User"]
+  answer_must_mention: ["User"]
+
+- id: fx02
+  question: "What does the create_user function do?"
+  expected_files: ["pkg/models.py"]
+  expected_symbols: ["create_user"]
+  answer_must_mention: ["User"]
+
+- id: fx03
+  question: "What does the display_name method return?"
+  expected_files: ["pkg/models.py"]
+  expected_symbols: ["display_name"]
+  answer_must_mention: ["name", "email"]
+
+- id: fx04
+  question: "What is DEFAULT_TIMEOUT set to in pkg/models.py?"
+  expected_files: ["pkg/models.py"]
+  expected_symbols: ["pkg.models"]
+  answer_must_mention: ["30"]
+
+- id: fx05
+  question: "How do I install this project, per the README?"
+  expected_files: ["README.md"]
+  expected_symbols: []
+  answer_must_mention: ["install"]
+
+- id: fx06
+  question: "What does the long_running_pipeline function do?"
+  expected_files: ["pkg/utils.py"]
+  expected_symbols: ["long_running_pipeline"]
+  answer_must_mention: []
+
+- id: fx07
+  question: "What database does this project connect to?"
+  expected_files: []
+  expected_symbols: []
+  answer_must_mention: []
+  expects_refusal: true
+
+- id: fx08
+  question: "How is user authentication implemented in this codebase?"
+  expected_files: []
+  expected_symbols: []
+  answer_must_mention: []
+  expects_refusal: true

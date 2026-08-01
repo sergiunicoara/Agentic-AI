@@ -1,0 +1,187 @@
+# 30-question golden set against the real demo repo: fastapi/fastapi, `fastapi/`
+# package dir only (per spec). Hand-written, then verified against the actual clone
+# before the real eval run — file paths/symbols below are drafted from well-known
+# FastAPI structure and corrected against ground truth in DECISIONS.md if any drifted.
+
+- id: q01
+  question: "Where is the FastAPI application class defined?"
+  expected_files: ["fastapi/applications.py"]
+  expected_symbols: ["FastAPI"]
+  answer_must_mention: ["FastAPI"]
+
+- id: q02
+  question: "Where is APIRouter defined?"
+  expected_files: ["fastapi/routing.py"]
+  expected_symbols: ["APIRouter"]
+  answer_must_mention: ["APIRouter"]
+
+- id: q03
+  question: "What does the add_api_route method do?"
+  expected_files: ["fastapi/routing.py"]
+  expected_symbols: ["add_api_route"]
+  answer_must_mention: ["route"]
+
+- id: q04
+  question: "Where is dependency injection resolved for a request?"
+  expected_files: ["fastapi/dependencies/utils.py"]
+  expected_symbols: ["solve_dependencies"]
+  answer_must_mention: ["dependenc"]
+
+- id: q05
+  question: "What does the Depends function do?"
+  expected_files: ["fastapi/param_functions.py"]
+  expected_symbols: ["Depends"]
+  answer_must_mention: ["dependenc"]
+
+- id: q06
+  question: "Where is the Query parameter helper defined?"
+  expected_files: ["fastapi/param_functions.py"]
+  expected_symbols: ["Query"]
+  answer_must_mention: ["Query"]
+
+- id: q07
+  question: "What does jsonable_encoder do?"
+  expected_files: ["fastapi/encoders.py"]
+  expected_symbols: ["jsonable_encoder"]
+  answer_must_mention: ["JSON"]
+
+- id: q08
+  question: "Where is HTTPException defined?"
+  expected_files: ["fastapi/exceptions.py"]
+  expected_symbols: ["HTTPException"]
+  answer_must_mention: ["HTTPException"]
+
+- id: q09
+  question: "What does the include_router method do on APIRouter?"
+  expected_files: ["fastapi/routing.py"]
+  expected_symbols: ["include_router"]
+  answer_must_mention: ["router"]
+
+- id: q10
+  question: "Where is OAuth2PasswordBearer implemented?"
+  expected_files: ["fastapi/security/oauth2.py"]
+  expected_symbols: ["OAuth2PasswordBearer"]
+  answer_must_mention: ["OAuth2"]
+
+- id: q11
+  question: "What does BackgroundTasks do?"
+  expected_files: ["fastapi/background.py"]
+  expected_symbols: ["BackgroundTasks"]
+  answer_must_mention: ["background"]
+
+- id: q12
+  question: "Where is the OpenAPI schema generated?"
+  expected_files: ["fastapi/openapi/utils.py"]
+  expected_symbols: ["get_openapi"]
+  answer_must_mention: ["OpenAPI"]
+
+- id: q13
+  question: "What does get_swagger_ui_html do?"
+  expected_files: ["fastapi/openapi/docs.py"]
+  expected_symbols: ["get_swagger_ui_html"]
+  answer_must_mention: ["Swagger"]
+
+- id: q14
+  question: "Where is UploadFile defined?"
+  expected_files: ["fastapi/datastructures.py"]
+  expected_symbols: ["UploadFile"]
+  answer_must_mention: ["file"]
+
+- id: q15
+  question: "What does run_in_threadpool do?"
+  expected_files: ["fastapi/concurrency.py"]
+  expected_symbols: ["run_in_threadpool"]
+  answer_must_mention: ["thread"]
+
+- id: q16
+  question: "Where is WebSocket support implemented?"
+  expected_files: ["fastapi/websockets.py"]
+  expected_symbols: ["WebSocket"]
+  answer_must_mention: ["WebSocket"]
+
+- id: q17
+  question: "What does FastAPI's default HTTP exception handler do?"
+  expected_files: ["fastapi/exception_handlers.py"]
+  expected_symbols: ["http_exception_handler"]
+  answer_must_mention: ["exception"]
+
+- id: q18
+  question: "What does the Path function control, as opposed to Query?"
+  expected_files: ["fastapi/param_functions.py"]
+  expected_symbols: ["Path"]
+  answer_must_mention: ["path"]
+
+- id: q19
+  question: "Where is request validation error handling implemented?"
+  expected_files: ["fastapi/exception_handlers.py"]
+  expected_symbols: ["request_validation_exception_handler"]
+  answer_must_mention: ["validation"]
+
+- id: q20
+  question: "What does get_dependant do?"
+  expected_files: ["fastapi/dependencies/utils.py"]
+  expected_symbols: ["get_dependant"]
+  answer_must_mention: ["dependant"]
+
+- id: q21
+  question: "Which module defines the APIKeyHeader security scheme?"
+  expected_files: ["fastapi/security/api_key.py"]
+  expected_symbols: ["APIKeyHeader"]
+  answer_must_mention: ["API key"]
+
+- id: q22
+  question: "What does the FastAPI class's openapi() method do?"
+  expected_files: ["fastapi/applications.py"]
+  expected_symbols: ["openapi"]
+  answer_must_mention: ["OpenAPI"]
+
+- id: q23
+  question: "Where is CORS middleware configured or wrapped for FastAPI apps?"
+  expected_files: ["fastapi/middleware/cors.py"]
+  expected_symbols: ["CORSMiddleware"]
+  answer_must_mention: ["CORS"]
+
+- id: q25
+  question: "What does the Body function control about a request parameter?"
+  expected_files: ["fastapi/param_functions.py"]
+  expected_symbols: ["Body"]
+  answer_must_mention: ["body"]
+
+- id: q26
+  question: "Where is HTTPBasic authentication implemented?"
+  expected_files: ["fastapi/security/http.py"]
+  expected_symbols: ["HTTPBasic"]
+  answer_must_mention: ["Basic"]
+
+- id: q27
+  question: "What does TestClient provide for testing FastAPI applications?"
+  expected_files: ["fastapi/testclient.py"]
+  expected_symbols: ["TestClient"]
+  answer_must_mention: ["test"]
+
+- id: q28
+  question: "What HTTP method decorators does APIRouter provide for registering routes (e.g. GET, POST)?"
+  expected_files: ["fastapi/routing.py"]
+  expected_symbols: ["get", "post", "api_route"]
+  answer_must_mention: ["GET"]
+
+- id: q29
+  question: "What is FastAPI's built-in support for GraphQL subscriptions?"
+  expected_files: []
+  expected_symbols: []
+  answer_must_mention: []
+  expects_refusal: true
+
+- id: q30
+  question: "Which proprietary GPU scheduler does FastAPI use in production?"
+  expected_files: []
+  expected_symbols: []
+  answer_must_mention: []
+  expects_refusal: true
+
+- id: q31
+  question: "What is the pricing model for FastAPI's managed cloud hosting service?"
+  expected_files: []
+  expected_symbols: []
+  answer_must_mention: []
+  expects_refusal: true
