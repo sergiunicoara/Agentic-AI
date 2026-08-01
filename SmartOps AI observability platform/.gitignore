@@ -9,8 +9,6 @@ dist/
 # Data volumes (docker bind mounts)
 infra/docker/data/
 
-# Drizzle generated
-apps/api/drizzle/migrations/*.sql
 apps/api/mastra.db*
 
 # OS

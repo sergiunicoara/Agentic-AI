@@ -81,6 +81,7 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
             rcaSummary:     stepPayload.rca.summary,
             confidence:     Math.round(stepPayload.rca.confidence * 100),
             workflowRunId:  run.runId,
+            createdBy:      request.user.sub,
             status:         "pending_approval",
           });
         }
@@ -117,9 +118,12 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       const { runId } = request.params;
       const { approved } = request.body;
 
-      const [incident] = await db.select({ id: incidents.id, status: incidents.status })
+      const [incident] = await db.select({ id: incidents.id, status: incidents.status, createdBy: incidents.createdBy })
         .from(incidents).where(eq(incidents.workflowRunId, runId)).limit(1);
       if (!incident) return reply.code(404).send({ error: "Not Found", message: "Workflow incident not found" });
+      if (request.user.role === "operator" && incident.createdBy !== request.user.sub) {
+        return reply.code(403).send({ error: "Forbidden", message: "Only the incident owner or an admin may approve it" });
+      }
       if (incident.status !== "pending_approval") {
         return reply.code(409).send({ error: "Conflict", message: "Incident has already been decided" });
       }

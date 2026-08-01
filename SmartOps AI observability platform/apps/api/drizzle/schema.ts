@@ -127,10 +127,20 @@ export const incidents = pgTable("incidents", {
   rcaSummary:     text("rca_summary"),
   confidence:     integer("confidence"), // stored as 0-100 (percent)
   workflowRunId:  varchar("workflow_run_id", { length: 128 }).notNull().unique(),
+  createdBy:      uuid("created_by").references(() => users.id),
   status:         incidentStatusEnum("status").notNull().default("pending_approval"),
   snowTicketId:   varchar("snow_ticket_id", { length: 64 }),
   createdAt:      timestamp("created_at").notNull().defaultNow(),
   resolvedAt:     timestamp("resolved_at"),
+});
+
+export const refreshSessions = pgTable("refresh_sessions", {
+  id:        uuid("id").primaryKey().defaultRandom(),
+  userId:    uuid("user_id").notNull().references(() => users.id),
+  tokenHash: varchar("token_hash", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ── Relations ────────────────────────────────────────────────
@@ -141,4 +151,8 @@ export const assetsRelations = relations(assets, ({ one }) => ({
 export const alertRulesRelations = relations(alertRules, ({ one }) => ({
   region:    one(regions, { fields: [alertRules.regionId], references: [regions.id] }),
   createdBy: one(users,   { fields: [alertRules.createdBy], references: [users.id] }),
+}));
+
+export const refreshSessionsRelations = relations(refreshSessions, ({ one }) => ({
+  user: one(users, { fields: [refreshSessions.userId], references: [users.id] }),
 }));

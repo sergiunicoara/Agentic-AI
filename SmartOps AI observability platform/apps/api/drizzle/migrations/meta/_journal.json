@@ -8,6 +8,13 @@
       "when": 1783741208272,
       "tag": "0000_long_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785583232865,
+      "tag": "0001_grey_lucky_pierre",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ export interface JwtPayload {
   email: string;
   role: string;
   type: "access" | "refresh";
+  sid?: string;
 }
 
 declare module "@fastify/jwt" {

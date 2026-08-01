@@ -23,6 +23,18 @@ test.describe("Authentication", () => {
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
   });
 
+  test("session cookies are HttpOnly and never exposed to page scripts", async ({ page }) => {
+    await page.goto("/login");
+    await page.locator("button[type=submit]").click();
+    await page.waitForURL(/\/dashboard/);
+    const cookies = await page.context().cookies();
+    const access = cookies.find((cookie) => cookie.name === "smartops_token");
+    const refresh = cookies.find((cookie) => cookie.name === "smartops_refresh");
+    expect(access?.httpOnly).toBe(true);
+    expect(refresh?.httpOnly).toBe(true);
+    expect(await page.evaluate(() => document.cookie)).not.toContain("smartops_token");
+  });
+
   test("wrong password shows error message", async ({ page }) => {
     await page.goto("/login");
     await page.fill("input[type=password]", "wrong-password");

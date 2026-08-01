@@ -1,5 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import sensible from "@fastify/sensible";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -32,6 +34,19 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
     credentials: true,
   });
   await app.register(sensible);
+  await app.register(helmet, { contentSecurityPolicy: config.nodeEnv === "production" });
+  await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
+
+  const allowedOrigins = new Set([config.corsOrigin, "http://localhost:3000"]);
+  app.addHook("onRequest", async (request, reply) => {
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) return;
+    const hasCookieAuth = request.headers.cookie?.split(";").some((part) => part.trim().startsWith("smartops_token="));
+    if (!hasCookieAuth) return;
+    const origin = request.headers.origin;
+    if ((config.nodeEnv === "production" && !origin) || (origin && !allowedOrigins.has(origin))) {
+      return reply.code(403).send({ error: "Forbidden", message: "Invalid request origin" });
+    }
+  });
 
   // ── OpenAPI ─────────────────────────────────────────────────
   await app.register(swagger, {

@@ -22,6 +22,7 @@ api:
   env:
     NODE_ENV: production
     PORT: "3000"
+    CORS_ORIGIN: https://smartops.example.com
     VICTORIAMETRICS_URL: http://smartops-victoriametrics:8428
     ELASTICSEARCH_URL: http://smartops-elasticsearch:9200
     ELASTICSEARCH_USERNAME: elastic
