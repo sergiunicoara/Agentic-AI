@@ -1,6 +1,6 @@
-# Codex — Code Documentation Assistant
+# RepoLens — Grounded Code Intelligence
 
-Codex is a repo-agnostic code assistant for asking natural-language questions about a Python or Markdown codebase. It indexes source into Postgres + pgvector, retrieves AST-aware chunks, streams answers through Claude, and returns only server-validated citations as clickable source links.
+RepoLens is a repo-agnostic code assistant for asking natural-language questions about a Python or Markdown codebase. It indexes source into Postgres + pgvector, retrieves AST-aware chunks, streams answers through Claude, and returns only server-validated citations as clickable source links.
 
 The default demo corpus is `fastapi/fastapi`, indexed to the `fastapi/` package directory.
 
@@ -144,8 +144,8 @@ The application was browser-verified against the real FastAPI index:
 
 The complete recording plan is in [DEMO_VIDEO_SCRIPT.md](DEMO_VIDEO_SCRIPT.md). It covers
 ingestion, health checks, repository browsing, exact source ranges, streaming citations,
-conversation memory, refusal behavior, MCP, CI/evaluation, and observability. The video itself
-is not committed to the repository.
+conversation memory, refusal behavior, MCP, CI/evaluation, and observability. The committed
+[presentation video](DEMO_VIDEO_FINAL.mp4) shows the end-to-end workflow.
 
 A previous fresh Compose validation applied the then-current SQL migrations, passed 46 backend tests, and returned successful `/health` and `/health/db` responses. New verification results are recorded only after the current environment completes the checks below.
 
@@ -160,9 +160,33 @@ The running decision log is in [DECISIONS.md](DECISIONS.md), and measurements ar
 - Every vector query is filtered by `repo_id`; HNSW filtering can reduce approximate-search recall at larger scale, so I would benchmark partitioning or per-repository indexes before changing it.
 - Conversation memory is intentionally simple: the last 10 messages.
 
+### RAG, orchestration, and guardrails
+
+The application uses direct orchestration in the FastAPI retrieval service rather than
+LangChain or LlamaIndex. This keeps retrieval, context assembly, streaming, and citation
+validation explicit and easy to test. Claude Sonnet is the default answer model and
+`text-embedding-3-small` is the default embedding model. PostgreSQL with pgvector stores
+vectors alongside repository metadata and exact source content.
+
+Prompts use bounded, repository-scoped context assembled from retrieved chunks. The main
+guardrails are refusal when the repository cannot support an answer, repository-scoped history,
+bounded context, citation validation against supplied chunks, sanitized SSE errors, and a safe
+replacement for factual answers that finish without valid citations. Citation-shaped text that
+the backend did not validate remains ordinary text in the UI.
+
 ## Productionising and deployment
 
-For a production deployment, I would move Postgres and pgvector to a managed PostgreSQL service, store API keys in the cloud secret manager, and add authentication, authorization, tenant isolation, and rate limits before exposing ingestion or chat publicly. Repository ingestion would run in background workers behind a queue with size, time, network-egress, and repository-policy limits. Large source files and generated artifacts could use object storage with lifecycle retention, while the API would remain stateless and scale horizontally behind a load balancer. Managed OpenTelemetry/Langfuse-compatible observability, encrypted backups, point-in-time recovery, CI/CD promotion checks, dependency scanning, and private-source redaction/retention controls would complete the deployment baseline.
+For a production deployment on AWS, GCP, Azure, or Cloudflare, I would run the API and frontend as
+stateless containers and use managed PostgreSQL with pgvector (for example RDS, Cloud SQL, Azure
+Database, or an equivalent hosted service). API keys would live in Secrets Manager, Secret Manager,
+Key Vault, or the platform equivalent. I would add authentication, authorization, tenant isolation,
+and rate limits before exposing ingestion or chat publicly.
+
+Repository ingestion would run in background workers behind a queue with size, time, network-egress,
+and repository-policy limits. Large source files and generated artifacts could use object storage with
+lifecycle retention. Managed OpenTelemetry/Langfuse-compatible observability, encrypted backups,
+point-in-time recovery, CI/CD promotion checks, dependency scanning, and private-source
+redaction/retention controls would complete the deployment baseline.
 
 ## What I would do differently with more time
 
@@ -180,7 +204,10 @@ These omissions keep the submission focused on the core value: correct, clickabl
 
 ## AI-assisted development notes
 
-Development was checkpointed by phase with focused tests. Specific rework included:
+I used Codex and Claude Code for repository exploration, implementation suggestions, test generation,
+debugging, documentation, and review. I treated their output as assistance: I made the design choices,
+reviewed diffs, ran the tests, and verified security-sensitive changes myself. Development was
+checkpointed by phase with focused tests. Specific rework included:
 
 - A CRLF citation corruption bug was found by the line-range fidelity test and fixed by switching source reads to bytes.
 - Test fixtures were found to delete every repository's chunks; the deletes were scoped through the repository cascade.
@@ -189,4 +216,7 @@ Development was checkpointed by phase with focused tests. Specific rework includ
 
 ## Project status
 
-The implementation is pushed to `main`. The local Langfuse trace has been verified through the authenticated API, and the remaining handoff step is to submit the assignment through the Newpage submission link after confirming the GitHub Actions run.
+RepoLens is located at [`Agentic-AI/RepoLens`](https://github.com/sergiunicoara/Agentic-AI/tree/main/RepoLens)
+and is pushed to `main`. The local Langfuse trace has been verified through the authenticated API.
+The remaining handoff step is to submit the assignment through the Newpage submission link after
+confirming the GitHub Actions run.
