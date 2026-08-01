@@ -267,7 +267,7 @@ These are the design decisions I'd defend, the trade-offs I accepted knowingly, 
 
 ### 1. Deterministic detection before probabilistic reasoning
 
-The fast detection path — `detectAnomalies()` — is pure z-score math: no LLM, no network call to Anthropic, no latency beyond the VictoriaMetrics query. The LLM only runs when an anomaly is already confirmed. This keeps the happy path cheap: 6 parallel metric queries, each under 100 ms, and zero AI cost when everything is healthy.
+The fast detection path — `detectAnomalies()` — is pure z-score math: no LLM, no network call to Anthropic, no latency beyond the VictoriaMetrics query. The LLM only runs when an anomaly is already confirmed. This keeps the happy path cheap: 12 parallel metric-region scans (four metrics across three regions), and zero AI cost when everything is healthy.
 
 The z-score threshold (> 2 standard deviations, above the warning floor) is intentionally conservative. Chasing a lower false-negative rate by lowering the threshold would push work to the RCA agent on every minor fluctuation, which compounds cost and alert fatigue. The absolute backstop — always flag values ≥ 85% CPU regardless of history — handles the cold-start problem where there isn't enough baseline data for a meaningful z-score yet.
 
@@ -313,7 +313,7 @@ The one limitation: SSE is text-only. If the metrics payload grew to the point w
 
 **Instrument the agent calls with OpenTelemetry.** The OTel Collector is running and the trace pipeline routes to Elasticsearch. The simulator now generates infrastructure traces (service-level spans for api-gateway, db-service, etc.) that correlate with anomaly windows and feed the RCA confidence score. What's still missing: wrapping each `agent.generate()` call in an OTel span. That would produce traces showing LLM latency, tool call counts, and retry attempts — making the AI reasoning layer itself observable, not just the infrastructure it watches.
 
-**Replace in-process Mastra state with a Redis-backed workflow store.** SQLite is fine for a single-process local setup. For horizontal scaling — multiple API instances behind a load balancer — the workflow state needs to be shared so any instance can resume a suspended run. Mastra supports external storage backends; wiring up Redis or a Postgres-backed store would be the production path.
+**Workflow state is PostgreSQL-backed.** Mastra checkpoints are stored in the shared application database, so suspended runs survive restarts and can be resumed by any API replica.
 
 **Add a dead-letter topic for failed consumer messages.** Both Kafka consumers silently re-queue on ES/VM errors. A dead-letter topic (`smartops.metrics.dlq`) would capture failed messages for inspection and replay without blocking the main consumer group — standard production Kafka practice.
 

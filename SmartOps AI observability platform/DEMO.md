@@ -64,7 +64,7 @@ the Grafana dashboard (`localhost:3002`) — the CPU panel should spike within 1
 
 **ACTION:** Go to `localhost:3001` → **AI Insights** → click **Run AI Scan**.
 
-> "Six detection queries run in parallel — three regions, two metrics each. For each series
+> "Twelve detection queries run in parallel — four metrics across three regions. For each series
 > it computes a z-score against the last 10 minutes of baseline. CPU at 92%, baseline mean 35%,
 > z-score 3.8 — anomaly confirmed. Under a second, no model involved, purely deterministic math."
 
@@ -83,7 +83,7 @@ the Grafana dashboard (`localhost:3002`) — the CPU panel should spike within 1
 *On screen: approval modal with RCA summary, confidence score, correlated evidence,
 remediation actions.*
 
-> "The workflow suspended. It literally paused mid-execution, persisted state to SQLite, and
+> "The workflow suspended. It literally paused mid-execution, persisted state to PostgreSQL, and
 > is waiting for a human. This isn't a UI convention — Mastra's suspend-resume is the execution
 > model. The confidence score is `0.40 base + error logs × 0.02 + trace spans × 0.03` — honest
 > signal about how much evidence the agent found.
