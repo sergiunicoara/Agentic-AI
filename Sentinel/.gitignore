@@ -31,6 +31,10 @@ yarn-error.log*
 # Logs and debug info
 *.log
 logs/
+
+# Graphify output is regenerated locally, not source-controlled.
+graphify-out/
+**/graphify-out/
 CUsersSergiuAppDataRoaminggcloud/
 
 # Build and distribution files

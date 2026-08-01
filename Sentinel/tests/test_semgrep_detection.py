@@ -16,6 +16,11 @@ from sentinel.pipeline import run_sentinel
 T6_PATH = str(Path(__file__).parent.parent / "targets" / "t6_ssrf")
 
 
+def test_registry_pack_configuration_is_present():
+    """Production keeps the broader, best-effort registry packs enabled."""
+    assert evidence_server._REGISTRY_CONFIG_GROUP == ["p/python", "p/gitleaks"]
+
+
 def test_bandit_finds_nothing_relevant_on_t6():
     """
     Bandit must NOT catch the SSRF or the API-key-by-value-format issue —
@@ -45,7 +50,7 @@ def test_semgrep_catches_llm_key_by_value_format_on_t6():
     assert any("llm-api-key" in c.lower() for c in check_ids)
 
 
-def test_local_rules_survive_a_failed_registry_pack():
+def test_local_rules_survive_a_failed_registry_pack(monkeypatch):
     """
     The local-rules config group runs as its own semgrep invocation
     specifically so that a broken/unreachable registry pack group (no
@@ -53,6 +58,15 @@ def test_local_rules_survive_a_failed_registry_pack():
     local rules, which need no network at all. This is a regression test
     for that exact failure mode.
     """
+    real_run = evidence_server._run
+
+    def fail_fake_registry(command, **kwargs):
+        if "p/totally-fake-nonexistent-pack-xyz" in command:
+            return {"returncode": -1, "stdout": "", "stderr": "registry unavailable"}
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(evidence_server, "_run", fail_fake_registry)
+
     with patch.object(
         evidence_server, "SEMGREP_CONFIG_GROUPS",
         [[str(evidence_server._SEMGREP_RULES_DIR)], ["p/totally-fake-nonexistent-pack-xyz"]],
@@ -64,6 +78,35 @@ def test_local_rules_survive_a_failed_registry_pack():
         "Local project rules must still fire even when a registry pack "
         "fails to fetch"
     )
+
+
+def test_failed_registry_pack_is_not_retried_for_each_scan(monkeypatch):
+    """A registry outage must not add a 120-second timeout to every target."""
+    local_group = [str(evidence_server._SEMGREP_RULES_DIR)]
+    registry_group = ["p/python", "p/gitleaks"]
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        configs = [
+            command[index + 1]
+            for index, value in enumerate(command[:-1])
+            if value == "--config"
+        ]
+        calls.append(configs)
+        if configs == registry_group:
+            return {"returncode": -1, "stdout": "", "stderr": "registry unavailable"}
+        return {"returncode": 0, "stdout": '{"results": [], "errors": []}', "stderr": ""}
+
+    monkeypatch.setattr(evidence_server, "SEMGREP_CONFIG_GROUPS", [local_group, registry_group])
+    monkeypatch.setattr(evidence_server, "_REGISTRY_CONFIG_GROUP", registry_group)
+    monkeypatch.setattr(evidence_server, "_registry_packs_unavailable", False)
+    monkeypatch.setattr(evidence_server, "_run", fake_run)
+
+    semgrep_scan(T6_PATH)
+    semgrep_scan(T6_PATH)
+
+    assert calls.count(registry_group) == 1
+    assert calls.count(local_group) == 2
 
 
 def test_full_pipeline_catches_t6_via_semgrep_only():

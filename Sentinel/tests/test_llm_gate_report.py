@@ -8,7 +8,26 @@ the real numbers when run with live Vertex AI credentials.
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from sentinel.eval.llm_gate_report import run_llm_gate_report
+from sentinel.models.schemas import Evidence
+
+
+@pytest.fixture(autouse=True)
+def synthetic_evidence(monkeypatch):
+    """Report tests cover aggregation, not repeated external scanner runs."""
+    def collect(_target_path):
+        return [
+            Evidence(
+                evidence_id="ev_semgrep_report_test",
+                source="semgrep",
+                locator="fixture.py:1",
+                raw={"check_id": "sentinel-test-rule"},
+            )
+        ]
+
+    monkeypatch.setattr("sentinel.eval.llm_gate_report.collect_evidence", collect)
 
 
 def _mock_client(responses_by_call):

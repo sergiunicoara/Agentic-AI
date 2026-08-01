@@ -106,6 +106,10 @@ SEMGREP_CONFIG_GROUPS = [
 ]
 
 
+_REGISTRY_CONFIG_GROUP = ["p/python", "p/gitleaks"]
+_registry_packs_unavailable = False
+
+
 def lint_scan(target_path: str) -> dict:
     """
     Run ruff linter on target path.
@@ -189,11 +193,21 @@ def semgrep_scan(target_path: str) -> dict:
         return {"tool": "semgrep", "target": target_path, "returncode": -1,
                 "findings": [], "raw_stderr": str(e)}
 
+    global _registry_packs_unavailable
+
     all_findings = []
     stderr_parts = []
     any_succeeded = False
 
     for group in SEMGREP_CONFIG_GROUPS:
+        # A registry outage can otherwise add a 120-second timeout to every
+        # target in a batch. Local rules still run for every target.
+        if group == _REGISTRY_CONFIG_GROUP and _registry_packs_unavailable:
+            stderr_parts.append(
+                "[p/python,p/gitleaks] skipped after an earlier registry fetch failure"
+            )
+            continue
+
         cmd = ["semgrep"]
         for cfg in group:
             cmd += ["--config", cfg]
@@ -211,8 +225,11 @@ def semgrep_scan(target_path: str) -> dict:
         if parsed.get("results") is not None and not parsed.get("errors"):
             any_succeeded = True
             all_findings.extend(parsed["results"])
-        elif result["stderr"]:
-            stderr_parts.append(f"[{','.join(group)}] {result['stderr'][:200]}")
+        else:
+            if group == _REGISTRY_CONFIG_GROUP:
+                _registry_packs_unavailable = True
+            if result["stderr"]:
+                stderr_parts.append(f"[{','.join(group)}] {result['stderr'][:200]}")
 
     return {
         "tool": "semgrep",
