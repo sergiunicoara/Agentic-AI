@@ -8,6 +8,7 @@ Run after `docker compose up`:
 """
 
 import asyncio
+import os
 import random
 import time
 
@@ -54,7 +55,12 @@ async def run_agent(tracer: AgentTracer, task_id: str) -> None:
 
 
 async def main() -> None:
-    async with AgentTracer(server="localhost:50051", agent_name="weather-agent") as tracer:
+    api_key = os.environ.get("EMIT_API_KEY")
+    if not api_key:
+        raise RuntimeError("Set EMIT_API_KEY before running this example")
+    async with AgentTracer(
+        server="localhost:50051", agent_name="weather-agent", api_key=api_key
+    ) as tracer:
         tasks = [f"task-{i:04d}" for i in range(5)]
         for task_id in tasks:
             await run_agent(tracer, task_id)

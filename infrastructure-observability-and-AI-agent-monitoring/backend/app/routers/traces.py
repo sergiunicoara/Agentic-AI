@@ -63,14 +63,14 @@ async def list_traces(
     subject: dict = Depends(verified_payload),
 ):
     traces = await get_traces(db, agent_name=agent_name, limit=limit, offset=offset)
-    # DECISION: trace *metadata* (agent name, task id, outcome) is treated as
-    # 'public' so any authenticated user can browse the trace list. Span
-    # contents are where sensitivity lives — those are filtered per-span in
-    # get_trace() below. Revisit if trace metadata itself becomes sensitive.
+    # Only expose metadata for traces with at least one readable span. This
+    # prevents the list endpoint from becoming a side-channel for confidential
+    # agent names, task IDs, and outcomes.
     visible = []
     for t in traces:
-        resource = {"data_sensitivity": "public", "owner_email": "", "agent_name": t.agent_name}
-        if check_span_access(subject, resource, "read"):
+        if not t.spans or any(
+            check_span_access(subject, _span_resource(span), "read") for span in t.spans
+        ):
             visible.append(
                 TraceOut(
                     id=t.id,

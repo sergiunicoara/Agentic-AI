@@ -91,10 +91,19 @@ class AgentTracer:
         server: str = "localhost:50051",
         agent_name: str = "unnamed-agent",
         service_name: str = "agent-sdk",
-        api_key: str = "dev-emit-key",
+        api_key: str = "",
+        tls_ca_file: str = "",
+        client_cert_file: str = "",
+        client_key_file: str = "",
     ):
         self.agent_name = agent_name
-        self._emitter = AsyncGrpcEmitter(server, api_key=api_key)
+        self._emitter = AsyncGrpcEmitter(
+            server,
+            api_key=api_key,
+            tls_ca_file=tls_ca_file,
+            client_cert_file=client_cert_file,
+            client_key_file=client_key_file,
+        )
         self._otel = OtelBridge(service_name)
 
     @asynccontextmanager

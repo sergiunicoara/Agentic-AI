@@ -38,9 +38,9 @@ static_resources:
 
                       cors:
                         allow_origin_string_match:
-                          - prefix: "*"
+                          - exact: "http://localhost:5173"
                         allow_methods: GET, POST, PUT, DELETE, OPTIONS, PATCH
-                        allow_headers: authorization, content-type, x-grpc-web, x-user-agent
+                        allow_headers: authorization, content-type, x-grpc-web, x-user-agent, x-api-key
                         expose_headers: grpc-status, grpc-message
                         allow_credentials: true
 

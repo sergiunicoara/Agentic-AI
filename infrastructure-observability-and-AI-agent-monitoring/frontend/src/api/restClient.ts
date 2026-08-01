@@ -1,18 +1,15 @@
 import axios from "axios";
 
-const ENVOY_BASE = import.meta.env.VITE_ENVOY_URL ?? "http://localhost:8080";
+const ENVOY_BASE = import.meta.env.VITE_ENVOY_URL || window.location.origin;
 
 export const restClient = axios.create({
   baseURL: `${ENVOY_BASE}/api/v1`,
 });
 
-// Attach session token from localStorage to every request.
-// DECISION: localStorage is XSS-readable; httpOnly cookies would be safer but
-// the gRPC-Web stream needs the token in the request payload (cookies don't
-// flow through Envoy's gRPC-Web transcoding), so both paths share one store.
-// Mitigations: 60-min expiry, server-side revocation, no inline scripts.
+// Keep the session scoped to the current browser tab. gRPC-Web carries the
+// token in its request body, so an httpOnly cookie cannot be used here.
 restClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
+  const token = sessionStorage.getItem("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -60,13 +57,13 @@ export async function exchangeOIDCCode(code: string, state: string): Promise<str
     code_verifier: verifier,
   });
 
-  localStorage.setItem("access_token", data.access_token);
+  sessionStorage.setItem("access_token", data.access_token);
   return data.access_token;
 }
 
 export async function logout(): Promise<void> {
   await restClient.post("/auth/logout").catch(() => {});
-  localStorage.removeItem("access_token");
+  sessionStorage.removeItem("access_token");
 }
 
 // --- Traces ---

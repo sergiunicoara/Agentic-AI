@@ -2,13 +2,16 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import Field
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.models.eval_ import EvalResult, EvalRun
+from app.services.abac import check_span_access
 from app.services.auth_service import get_current_user, require_role
+from app.services.trace_service import get_trace_with_spans
 
 router = APIRouter(prefix="/evals", tags=["evals"])
 
@@ -21,7 +24,7 @@ class EvalRunCreate(BaseModel):
 
 class EvalResultCreate(BaseModel):
     metric: str
-    score: float
+    score: float = Field(ge=-1_000_000, le=1_000_000)
     details: dict = {}
 
 
@@ -42,7 +45,10 @@ async def list_runs(
     db: AsyncSession = Depends(get_db),
     _user: dict = Depends(get_current_user),
 ):
-    result = await db.execute(select(EvalRun).order_by(EvalRun.created_at.desc()).limit(100))
+    query = select(EvalRun).order_by(EvalRun.created_at.desc()).limit(100)
+    if _user.get("role") != "admin":
+        query = query.where(EvalRun.created_by == str(_user.get("sub")))
+    result = await db.execute(query)
     return list(result.scalars().all())
 
 
@@ -52,6 +58,23 @@ async def create_run(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(require_role("developer")),
 ):
+    if body.trace_id:
+        trace = await get_trace_with_spans(body.trace_id, db)
+        if not trace:
+            raise HTTPException(status_code=404, detail="Trace not found")
+        if not any(
+            check_span_access(
+                user,
+                {
+                    "data_sensitivity": (span.attributes or {}).get("data_sensitivity", "internal"),
+                    "owner_email": (span.attributes or {}).get("owner_email", ""),
+                },
+                "read",
+            )
+            for span in trace.spans
+        ):
+            raise HTTPException(status_code=403, detail="Insufficient clearance for trace")
+
     run = EvalRun(
         id=str(uuid.uuid4()),
         name=body.name,
@@ -70,8 +93,14 @@ async def add_result(
     run_id: str,
     body: EvalResultCreate,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_role("developer")),
+    user: dict = Depends(require_role("developer")),
 ):
+    run_result = await db.execute(select(EvalRun).where(EvalRun.id == run_id))
+    run = run_result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Eval run not found")
+    if user.get("role") != "admin" and run.created_by != str(user.get("sub")):
+        raise HTTPException(status_code=403, detail="Not the eval owner")
     result_row = EvalResult(
         id=str(uuid.uuid4()),
         run_id=run_id,
@@ -88,11 +117,13 @@ async def add_result(
 async def delete_run(
     run_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_role("developer")),
+    user: dict = Depends(require_role("developer")),
 ):
     result = await db.execute(select(EvalRun).where(EvalRun.id == run_id))
     run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail="Not found")
+    if user.get("role") != "admin" and run.created_by != str(user.get("sub")):
+        raise HTTPException(status_code=403, detail="Not the eval owner")
     await db.delete(run)
     await db.commit()

@@ -11,7 +11,7 @@
  * and forwards to the backend (:50051).
  */
 
-const ENVOY_URL = import.meta.env.VITE_ENVOY_URL ?? "http://localhost:8080";
+const ENVOY_URL = import.meta.env.VITE_ENVOY_URL || window.location.origin;
 
 export interface AgentEventJS {
   traceId: string;

@@ -24,7 +24,7 @@ function parseSessionToken(token: string): Omit<AuthState, "token"> {
 }
 
 function loadStored(): AuthState {
-  const token = localStorage.getItem("access_token");
+  const token = sessionStorage.getItem("access_token");
   if (!token) return { token: null, role: null, email: null, department: null, clearanceLevel: 0 };
   return { token, ...parseSessionToken(token) };
 }

@@ -35,13 +35,16 @@ docker compose up --build
 
 # 3. Apply DB migrations (first run only)
 docker compose exec backend sh -c "export PYTHONPATH=/app && cd /app && alembic stamp 0001 && alembic upgrade head"
-# If columns already exist (app created them via init_db): stamp directly
-# docker compose exec backend sh -c "export PYTHONPATH=/app && cd /app && alembic stamp 0002"
+# The backend container also runs `alembic upgrade head` before starting.
 
 # 4. Open the dashboard
 open http://localhost:5173
 # Click "Sign in with OIDC" → authenticates via your configured provider
 ```
+
+For production, terminate HTTPS and mTLS for externally deployed SDK agents
+at an infrastructure gateway. The Compose file deliberately exposes only the
+dashboard and loopback gRPC for local development.
 
 ## OIDC Configuration
 
@@ -52,7 +55,8 @@ OIDC_ISSUER_URL=https://accounts.google.com          # or Keycloak/Auth0 issuer
 OIDC_CLIENT_ID=your-client-id
 OIDC_CLIENT_SECRET=your-client-secret                # leave empty for public clients
 OIDC_REDIRECT_URI=http://localhost:5173/auth/callback
-EMIT_API_KEY=dev-emit-key                            # gRPC EmitEvent auth — change in prod
+EMIT_API_KEY=your-random-ingestion-key               # use per-agent keys in production
+EMIT_AGENT_KEYS={"my-agent":"32-character-minimum-agent-key"}
 FRONTEND_ORIGIN=http://localhost:5173                # exact CORS origin
 ```
 
@@ -67,11 +71,11 @@ Users are **JIT-provisioned** on first login (default role: `viewer`). Promote v
 | Service | URL | Purpose |
 |---|---|---|
 | Frontend | http://localhost:5173 | React dashboard |
-| Envoy | http://localhost:8080 | gRPC-Web + REST proxy |
-| Backend REST | http://localhost:8000/api/v1/docs | FastAPI Swagger |
-| gRPC | localhost:50051 | SDK event intake |
-| OTel Collector | localhost:4317 | Telemetry receiver |
-| Envoy Admin | http://localhost:9901 | Envoy metrics |
+| Envoy | internal only | gRPC-Web + REST proxy |
+| Backend REST | internal only | FastAPI Swagger |
+| gRPC | 127.0.0.1:50051 | Local SDK intake; use an mTLS gateway in production |
+| OTel Collector | internal only | Telemetry receiver |
+| Envoy Admin | internal only | Envoy metrics |
 
 ## Project Structure
 
@@ -106,16 +110,16 @@ agent-observability/
 
 **Current version:** `v1`
 
-Base URL: `http://localhost:8080/api/v1` (via Envoy) or `http://localhost:8000/api/v1` (direct)
+Base URL: `http://localhost:5173/api/v1` through the dashboard proxy. Backend REST is private to the Compose network.
 
-Swagger UI: `http://localhost:8000/api/v1/docs`
+Swagger UI: `http://localhost:5173/api/v1/docs`
 
 | Method | Path | Access | Description |
 |---|---|---|---|
 | GET | /auth/authorize | — | Initiate OIDC flow (rate-limited 10/min/IP) |
 | POST | /auth/callback | — | Exchange OIDC code + PKCE verifier for session token |
 | POST | /auth/logout | any | Revoke session token |
-| GET | /traces | viewer+ | List agent traces (metadata only — treated as public) |
+| GET | /traces | viewer+ | List traces with at least one readable span |
 | GET | /traces/{id} | viewer+ | Trace detail — spans filtered by clearance_level |
 | GET | /evals | viewer+ | List eval runs |
 | POST | /evals | developer+ | Create eval run |
@@ -187,10 +191,16 @@ call `POST /admin/users/{id}/revoke-sessions` yourself.)
 ## SDK Usage
 
 ```python
+import os
+
 from agent_observability import AgentTracer
 
 async def main():
-    async with AgentTracer(server="localhost:50051", agent_name="my-agent") as tracer:
+    async with AgentTracer(
+        server="localhost:50051",
+        agent_name="my-agent",
+        api_key=os.environ["EMIT_API_KEY"],
+    ) as tracer:
         async with tracer.trace("task-001") as trace:
             async with trace.span("llm_call", model="claude-sonnet-4-6") as span:
                 result = await call_llm(prompt)
@@ -203,6 +213,39 @@ async def main():
 
             trace.set_outcome("success")
 ```
+
+For an externally deployed agent, use the mTLS gateway configuration:
+
+```python
+AgentTracer(
+    server="agents.observability.example.com:443",
+    agent_name="my-agent",
+    api_key=os.environ["MY_AGENT_INGEST_KEY"],
+    tls_ca_file="/run/secrets/agent-ca.pem",
+    client_cert_file="/run/secrets/agent.pem",
+    client_key_file="/run/secrets/agent-key.pem",
+)
+```
+
+## Production Deployment
+
+The base Compose file is for local development. Production uses Caddy for
+public HTTPS and mTLS-protected agent ingestion:
+
+```bash
+# Create this protected file from the checked-in template.
+cp deploy/production.env.example .env.production
+python scripts/generate_secrets.py --agent my-agent
+python scripts/issue_agent_cert.py --agent my-agent
+
+# Point PUBLIC_DOMAIN and AGENT_INGEST_DOMAIN at DNS records for this host.
+docker compose -f docker-compose.yml -f deploy/docker-compose.production.yml up --build -d
+```
+
+The production collector forwards telemetry to `OTEL_UPSTREAM_ENDPOINT` and
+keeps a local recovery copy in the `otel_data` volume. Rotate the OIDC client
+secret at the identity provider before first production deployment; this
+repository cannot perform that provider-side action.
 
 ## Proto Generation
 
@@ -224,9 +267,10 @@ The Docker build runs proto generation automatically.
 # Start Postgres and Redis
 docker compose up postgres redis otel-collector -d
 
-# Backend
+# Backend (apply migrations before starting)
 cd backend
 pip install -r requirements.txt
+alembic upgrade head
 python scripts/generate_proto.py  # from repo root
 python -m app.main
 
@@ -234,4 +278,9 @@ python -m app.main
 cd frontend
 npm install
 npm run dev
+
+# Tests
+cd ../backend
+pip install -r requirements-dev.txt
+pytest
 ```

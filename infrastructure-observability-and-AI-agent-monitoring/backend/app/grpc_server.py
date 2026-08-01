@@ -13,8 +13,9 @@ from grpc import aio as grpc_aio
 from app.config import settings
 from app.generated import agent_events_pb2, agent_events_pb2_grpc
 from app.services.abac import check_span_access
-from app.services.auth_service import decode_token, is_revoked
+from app.services.auth_service import decode_token, is_revoked, is_user_active
 from app.services.event_bus import event_bus
+from app.services.ingest_auth import valid_emit_key
 from app.services.trace_service import handle_event
 
 
@@ -27,8 +28,16 @@ class AgentEventServicer(agent_events_pb2_grpc.AgentEventServiceServicer):
         # Writers must present the emit API key — the write path is otherwise
         # an unauthenticated upsert into traces/spans.
         metadata = dict(context.invocation_metadata())
-        if metadata.get("x-api-key", "") != settings.emit_api_key:
+        api_key = metadata.get("x-api-key", "")
+        if not valid_emit_key(api_key, request.agent_name):
             await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Invalid emit API key")
+            return
+
+        if not request.trace_id or not request.span_id or not request.agent_name:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "trace_id, span_id, and agent_name are required")
+            return
+        if len(request.attributes) > 64 or any(len(k) > 128 or len(v) > 4096 for k, v in request.attributes.items()):
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Invalid attribute payload")
             return
 
         try:
@@ -50,6 +59,9 @@ class AgentEventServicer(agent_events_pb2_grpc.AgentEventServiceServicer):
             payload = decode_token(token)
             if await is_revoked(payload.get("jti", "")):
                 await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Token revoked")
+                return
+            if not await is_user_active(str(payload.get("sub", ""))):
+                await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Account inactive")
                 return
         except Exception:
             await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Invalid token")

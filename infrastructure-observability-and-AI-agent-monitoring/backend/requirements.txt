@@ -16,6 +16,7 @@ redis[hiredis]==5.2.1
 
 # Auth (OIDC — password hashing removed with the custom login)
 python-jose[cryptography]==3.3.0
+cryptography==44.0.0
 python-multipart==0.0.20
 
 # Config

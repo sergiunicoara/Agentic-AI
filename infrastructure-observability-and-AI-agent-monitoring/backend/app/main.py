@@ -7,7 +7,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db import init_db
 from app.grpc_server import start_grpc_server
 from app.middleware.audit_log import AuditLogMiddleware
 from app.routers import admin, auth, evals, traces
@@ -51,8 +50,6 @@ async def health_v1():
 
 async def main() -> None:
     setup_otel(fastapi_app)
-    await init_db()
-
     grpc_server = await start_grpc_server(port=settings.grpc_port)
 
     uv_config = uvicorn.Config(

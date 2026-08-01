@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db import AsyncSessionLocal
 from app.models.trace import AgentTrace, Span
@@ -72,7 +73,13 @@ async def get_traces(
     limit: int = 50,
     offset: int = 0,
 ) -> list[AgentTrace]:
-    q = select(AgentTrace).order_by(AgentTrace.created_at.desc()).limit(limit).offset(offset)
+    q = (
+        select(AgentTrace)
+        .options(selectinload(AgentTrace.spans))
+        .order_by(AgentTrace.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     if agent_name:
         q = q.where(AgentTrace.agent_name == agent_name)
     result = await db.execute(q)

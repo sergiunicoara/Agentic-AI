@@ -27,4 +27,4 @@ RUN python -m grpc_tools.protoc \
 
 EXPOSE 8000 50051
 
-CMD ["python", "-m", "app.main"]
+CMD ["sh", "-c", "alembic upgrade head && python -m app.main"]

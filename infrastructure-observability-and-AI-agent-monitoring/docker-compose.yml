@@ -11,8 +11,6 @@ services:
       POSTGRES_DB: observability
     volumes:
       - pg_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U obs -d observability"]
       interval: 5s
@@ -22,8 +20,6 @@ services:
   # ── Redis ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -36,9 +32,7 @@ services:
     command: ["--config=/etc/otel/config.yaml"]
     volumes:
       - ./otel/otel-collector-config.yaml:/etc/otel/config.yaml:ro
-    ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
+      - otel_data:/var/lib/otel
     # No healthcheck — distroless image has no shell/wget; OTel SDK retries connections.
 
   # ── Backend (FastAPI + gRPC in one process) ───────────────────────────────────
@@ -46,14 +40,14 @@ services:
     build:
       context: .                      # repo root — needed so Dockerfile can reach proto/
       dockerfile: backend/Dockerfile
-    env_file: .env.example
+    env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://obs:obs@postgres:5432/observability
       REDIS_URL: redis://redis:6379/0
       OTEL_ENDPOINT: http://otel-collector:4317
     ports:
-      - "8000:8000"   # REST (internal — Envoy handles public-facing)
-      - "50051:50051" # gRPC (internal — Envoy handles public-facing)
+      # Local SDK development only. Production agents should use an mTLS gateway.
+      - "127.0.0.1:50051:50051"
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,9 +68,6 @@ services:
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"]
     volumes:
       - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
-    ports:
-      - "8080:8080"   # Public entry-point (REST + gRPC-Web)
-      - "9901:9901"   # Envoy admin
     depends_on:
       backend:
         condition: service_healthy
@@ -84,8 +75,8 @@ services:
   # ── Frontend (production build served by nginx) ───────────────────────────────
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
       - "5173:80"
     depends_on:
@@ -93,3 +84,4 @@ services:
 
 volumes:
   pg_data:
+  otel_data:

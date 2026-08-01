@@ -16,6 +16,8 @@ processors:
     send_batch_size: 512
 
 exporters:
+  file:
+    path: /var/lib/otel/telemetry.jsonl
   debug:
     verbosity: normal
 
@@ -25,8 +27,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [file, debug]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [file, debug]

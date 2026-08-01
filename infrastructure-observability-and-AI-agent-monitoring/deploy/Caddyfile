@@ -1,0 +1,20 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$PUBLIC_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy frontend:80
+}
+
+# SDK agents authenticate with a client certificate before Caddy forwards
+# standard gRPC over the private Compose network.
+{$AGENT_INGEST_DOMAIN} {
+    tls {
+        client_auth {
+            mode require_and_verify
+            trust_pool file /etc/caddy/agent-ca.pem
+        }
+    }
+    reverse_proxy h2c://backend:50051
+}

@@ -15,6 +15,12 @@ frontend/src/proto/
 
 # Environment
 .env
+.env.*
+!.env.example
+
+# Locally generated mTLS materials
+deploy/certs/
+deploy/agent-ca.pem
 
 # Node
 node_modules/

@@ -92,6 +92,16 @@ async def is_revoked(jti: str) -> bool:
     return bool(await r.exists(f"revoked:{jti}"))
 
 
+async def is_user_active(user_id: str) -> bool:
+    from sqlalchemy import select
+    from app.db import AsyncSessionLocal
+    from app.models.user import User
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User.is_active).where(User.id == str(user_id)))
+        return result.scalar_one_or_none() is True
+
+
 # --- FastAPI dependencies ---
 
 _bearer = HTTPBearer()
@@ -109,6 +119,11 @@ async def verified_payload(
 
     if await is_revoked(payload.get("jti", "")):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
+
+    # Revocation is normally triggered by the admin API, but checking the
+    # authoritative row also protects against direct DB changes and stale JWTs.
+    if not await is_user_active(str(payload.get("sub", ""))):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account inactive")
 
     return payload
 

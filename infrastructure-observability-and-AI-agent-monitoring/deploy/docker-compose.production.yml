@@ -1,0 +1,31 @@
+services:
+  backend:
+    ports: []
+
+  frontend:
+    ports: []
+
+  otel-collector:
+    env_file: ${PRODUCTION_ENV_FILE:-.env.production}
+    volumes:
+      - ./otel/otel-collector-production.yaml:/etc/otel/config.yaml:ro
+      - otel_data:/var/lib/otel
+
+  caddy:
+    image: caddy:2.8-alpine
+    env_file: ${PRODUCTION_ENV_FILE:-.env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/certs/agent-ca.pem:/etc/caddy/agent-ca.pem:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

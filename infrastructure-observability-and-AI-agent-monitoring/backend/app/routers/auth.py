@@ -123,6 +123,8 @@ async def callback(body: CallbackRequest, db: AsyncSession = Depends(get_db)):
 
     oidc_sub: str = claims["sub"]
     email: str = claims.get("email", "")
+    if not email or not claims.get("email_verified", False):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OIDC email is not verified")
 
     # JIT provision: create user on first login, or fetch existing
     result = await db.execute(select(User).where(User.oidc_sub == oidc_sub))
@@ -143,6 +145,8 @@ async def callback(body: CallbackRequest, db: AsyncSession = Depends(get_db)):
         )
         db.add(user)
     else:
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account inactive")
         # Bind OIDC sub to existing user
         user.oidc_sub = oidc_sub
 
