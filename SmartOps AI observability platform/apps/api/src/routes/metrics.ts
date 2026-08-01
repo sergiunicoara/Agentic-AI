@@ -62,25 +62,9 @@ export default async function metricsRoutes(fastify: FastifyInstance): Promise<v
   // ── GET /metrics/stream ─────────────────────────────────────
   // SSE — no schema (streaming response, not JSON)
   fastify.get("/stream", {
-    schema: { tags: ["metrics"], summary: "SSE stream of live region metrics (no auth header — use ?token=)" },
+    schema: { tags: ["metrics"], summary: "SSE stream of live region metrics" },
+    preHandler: [fastify.verifyJWT],
     async handler(request, reply) {
-      // Support token via query param for EventSource (can't set headers)
-      const token = (request.query as { token?: string }).token;
-      if (token) {
-        try {
-          fastify.jwt.verify(token);
-        } catch {
-          return reply.code(401).send({ error: "Unauthorized", message: "Invalid token" });
-        }
-      } else {
-        // Fall back to header auth
-        try {
-          await request.jwtVerify();
-        } catch {
-          return reply.code(401).send({ error: "Unauthorized", message: "Token required" });
-        }
-      }
-
       const unsubscribe = subscribe(reply);
       request.raw.on("close", unsubscribe);
 

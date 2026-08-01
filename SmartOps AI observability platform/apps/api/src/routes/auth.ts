@@ -6,6 +6,11 @@ import { eq } from "drizzle-orm";
 import { config } from "../config.js";
 
 export default async function authRoutes(fastify: FastifyInstance): Promise<void> {
+  const cookieOptions = (maxAge: number) => [
+    `Path=/`, `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Lax",
+    ...(config.nodeEnv === "production" ? ["Secure"] : []),
+  ].join("; ");
+
   // ── POST /auth/login ────────────────────────────────────────
   fastify.post<{
     Body: { email: string; password: string };
@@ -49,27 +54,34 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
         .set({ lastLoginAt: new Date() })
         .where(eq(users.id, user.id));
 
-      return reply.send({ accessToken, refreshToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+      reply.header("Set-Cookie", [
+        `smartops_token=${encodeURIComponent(accessToken)}; ${cookieOptions(60 * 60)}`,
+        `smartops_refresh=${encodeURIComponent(refreshToken)}; ${cookieOptions(7 * 24 * 60 * 60)}`,
+      ]);
+      return reply.send({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
     },
   });
 
   // ── POST /auth/refresh ──────────────────────────────────────
   fastify.post<{
-    Body: { refreshToken: string };
+    Body: { refreshToken?: string };
   }>("/refresh", {
     schema: {
       tags: ["auth"],
       summary: "Exchange refresh token for new access token",
       body: {
         type: "object",
-        required: ["refreshToken"],
+        required: [],
         properties: { refreshToken: { type: "string" } },
       },
     },
     async handler(request, reply) {
+      const cookie = request.headers.cookie?.split(";").map((part) => part.trim()).find((part) => part.startsWith("smartops_refresh="));
+      const refreshToken = request.body.refreshToken ?? (cookie ? decodeURIComponent(cookie.slice("smartops_refresh=".length)) : undefined);
+      if (!refreshToken) return reply.code(401).send({ error: "Unauthorized", message: "Refresh token required" });
       let payload: { sub: string; email: string; role: string; type: string };
       try {
-        payload = fastify.jwt.verify(request.body.refreshToken) as typeof payload;
+        payload = fastify.jwt.verify(refreshToken) as typeof payload;
       } catch {
         return reply.code(401).send({ error: "Unauthorized", message: "Invalid refresh token" });
       }
@@ -83,7 +95,8 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
         { expiresIn: config.jwtExpiresIn }
       );
 
-      return reply.send({ accessToken });
+      reply.header("Set-Cookie", `smartops_token=${encodeURIComponent(accessToken)}; ${cookieOptions(60 * 60)}`);
+      return reply.send({ ok: true });
     },
   });
 
@@ -99,5 +112,13 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
       if (!user) return reply.code(404).send({ error: "Not Found", message: "User not found" });
       return reply.send(user);
     },
+  });
+
+  fastify.post("/logout", { preHandler: [fastify.verifyJWT] }, async (_request, reply) => {
+    reply.header("Set-Cookie", [
+      `smartops_token=; ${cookieOptions(0)}`,
+      `smartops_refresh=; ${cookieOptions(0)}`,
+    ]);
+    return reply.send({ ok: true });
   });
 }

@@ -98,10 +98,7 @@ The Drizzle ORM client pool is configured via `DATABASE_URL`. For PgBouncer, use
 
 ## Mastra / AI Agent Scaling
 
-Mastra workflows persist state in LibSQL (`file:./mastra.db`). For multi-instance deployments:
-
-1. Replace with a shared LibSQL server (Turso): `url: libsql://smartops.turso.io`
-2. Or use the Mastra PostgreSQL storage backend (available in `@mastra/pg`).
+Mastra workflows persist state in the shared PostgreSQL database configured by `DATABASE_URL`, using the `@mastra/pg` backend:
 
 ```typescript
 // mastra.config.ts — production

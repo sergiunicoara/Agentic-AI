@@ -16,7 +16,7 @@ Server-Sent Events (SSE) via Fastify's raw response stream, consumed by the Next
 - **Unidirectional data flow** — metric streaming is server → client only. SSE is the right primitive; WebSocket's bidirectional channel is unnecessary overhead.
 - **Native browser support** — `EventSource` requires no client library. Reconnection is built-in (automatic retry with exponential backoff).
 - **Fastify compatible** — `reply.raw` gives direct access to the Node.js `http.ServerResponse`, enabling streaming without additional plugins. The response is kept open by awaiting a `Promise` that resolves on `request.raw.close`.
-- **Token via query param** — `EventSource` cannot set custom headers (browser limitation). The `/metrics/stream?token=<jwt>` pattern is standard for SSE auth. The API validates the query token before opening the stream.
+- **Cookie authentication** — the browser `EventSource` uses `withCredentials: true`; the API validates the `HttpOnly` access cookie before opening the stream. Tokens are never placed in URLs.
 - **Named events** — the API broadcasts `event: metrics\ndata: [...]\n\n` (a named event). The client uses `es.addEventListener("metrics", handler)` rather than `onmessage`, which receives all unnamed events.
 
 ## The 5-Second Polling Model

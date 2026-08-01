@@ -11,6 +11,7 @@ infra/docker/data/
 
 # Drizzle generated
 apps/api/drizzle/migrations/*.sql
+apps/api/mastra.db*
 
 # OS
 .DS_Store

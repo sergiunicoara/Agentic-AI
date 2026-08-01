@@ -24,10 +24,12 @@ api:
     PORT: "3000"
     VICTORIAMETRICS_URL: http://smartops-victoriametrics:8428
     ELASTICSEARCH_URL: http://smartops-elasticsearch:9200
+    ELASTICSEARCH_USERNAME: elastic
   envSecrets:
     DATABASE_URL: smartops-secrets
     JWT_SECRET: smartops-secrets
     ANTHROPIC_API_KEY: smartops-secrets
+    ELASTICSEARCH_PASSWORD: smartops-secrets
   autoscaling:
     enabled: false
     minReplicas: 2
@@ -142,7 +144,10 @@ postgresql:
 elasticsearch:
   enabled: true
   security:
-    enabled: false
+    enabled: true
+  auth:
+    existingSecret: smartops-secrets
+    existingSecretPasswordKey: ELASTICSEARCH_PASSWORD
   master:
     replicaCount: 1
     persistence:

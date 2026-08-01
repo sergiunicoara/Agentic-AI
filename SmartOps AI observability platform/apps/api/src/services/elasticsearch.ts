@@ -1,7 +1,12 @@
 import { Client } from "@elastic/elasticsearch";
 import { config } from "../config.js";
 
-export const esClient = new Client({ node: config.elasticsearchUrl });
+export const esClient = new Client({
+  node: config.elasticsearchUrl,
+  ...(config.elasticsearchUsername && config.elasticsearchPassword
+    ? { auth: { username: config.elasticsearchUsername, password: config.elasticsearchPassword } }
+    : {}),
+});
 
 export interface LogHit {
   id: string;

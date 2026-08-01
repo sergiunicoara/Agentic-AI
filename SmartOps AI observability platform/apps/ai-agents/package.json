@@ -13,12 +13,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@smartops/shared-types": "workspace:*",
-    "@mastra/core": "^1.50.1",
-    "@mastra/memory": "^1.22.2",
-    "@mastra/libsql": "^1.15.1",
     "@ai-sdk/anthropic": "^4.0.11",
     "@elastic/elasticsearch": "^8.14.0",
+    "@mastra/core": "^1.55.0",
+    "@mastra/memory": "^1.22.2",
+    "@mastra/pg": "^1.18.1",
+    "@smartops/shared-types": "workspace:*",
     "pg": "^8.12.0",
     "zod": "^3.23.8"
   },

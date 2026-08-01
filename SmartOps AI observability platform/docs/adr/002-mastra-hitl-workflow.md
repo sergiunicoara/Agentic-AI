@@ -40,7 +40,7 @@ POST /ai/workflows/:runId/resume { approved: true }
 
 ## Trade-offs
 
-- **LibSQL for state** — production should use a persistent LibSQL server (or Turso) rather than the file-based `mastra.db`. The file DB is suitable for single-instance deployments; distributed deployments need a shared store.
+- **PostgreSQL for state** — workflow checkpoints use the shared application PostgreSQL database, so suspend/resume survives restarts and works across API replicas.
 - **Same process** — `ai-agents` runs inside the Fastify process. If the Mastra workflow is CPU-intensive it could block the event loop. A separate Mastra server process is the production upgrade path.
 - **Mastra version coupling** — Mastra's API surface changed significantly between 0.x and 1.x. Pinned to `^1.50.1`.
 

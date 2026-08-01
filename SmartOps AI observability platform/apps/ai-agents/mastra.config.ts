@@ -1,5 +1,5 @@
 import { Mastra } from "@mastra/core";
-import { LibSQLStore } from "@mastra/libsql";
+import { PostgresStore } from "@mastra/pg";
 import { anomalyDetector } from "./src/agents/anomalyDetector.js";
 import { rootCauseAnalyzer } from "./src/agents/rootCauseAnalyzer.js";
 import { forecastingAgent } from "./src/agents/forecastingAgent.js";
@@ -16,8 +16,8 @@ export const mastra = new Mastra({
   workflows: {
     alertToTicketWorkflow,
   },
-  storage: new LibSQLStore({
+  storage: new PostgresStore({
     id: "smartops-mastra-storage",
-    url: "file:./mastra.db",
+    connectionString: process.env.DATABASE_URL ?? "postgresql://smartops:smartops_dev@localhost:5433/smartops",
   }),
 });

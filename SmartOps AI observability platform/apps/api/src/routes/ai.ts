@@ -117,6 +117,13 @@ export default async function aiRoutes(fastify: FastifyInstance): Promise<void> 
       const { runId } = request.params;
       const { approved } = request.body;
 
+      const [incident] = await db.select({ id: incidents.id, status: incidents.status })
+        .from(incidents).where(eq(incidents.workflowRunId, runId)).limit(1);
+      if (!incident) return reply.code(404).send({ error: "Not Found", message: "Workflow incident not found" });
+      if (incident.status !== "pending_approval") {
+        return reply.code(409).send({ error: "Conflict", message: "Incident has already been decided" });
+      }
+
       const workflow = mastra.getWorkflow("alertToTicketWorkflow");
       const run = await workflow.createRun({ runId });
 

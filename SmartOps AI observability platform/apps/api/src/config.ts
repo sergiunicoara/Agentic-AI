@@ -7,16 +7,27 @@ const required = (key: string): string => {
 const optional = (key: string, fallback: string): string =>
   process.env[key] ?? fallback;
 
+const secret = (key: string, developmentFallback: string): string => {
+  const value = process.env[key];
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`Missing required production env var: ${key}`);
+  }
+  return developmentFallback;
+};
+
 export const config = {
   port:     parseInt(optional("PORT", "3000"), 10),
   host:     optional("HOST", "0.0.0.0"),
   nodeEnv:  optional("NODE_ENV", "development"),
 
-  databaseUrl:        optional("DATABASE_URL", "postgresql://smartops:smartops_dev@localhost:5433/smartops"),
+  databaseUrl:        secret("DATABASE_URL", "postgresql://smartops:smartops_dev@localhost:5433/smartops"),
   victoriaMetricsUrl: optional("VICTORIAMETRICS_URL", "http://localhost:8428"),
   elasticsearchUrl:   optional("ELASTICSEARCH_URL", "http://localhost:9200"),
+  elasticsearchUsername: optional("ELASTICSEARCH_USERNAME", ""),
+  elasticsearchPassword: optional("ELASTICSEARCH_PASSWORD", ""),
 
-  jwtSecret:         optional("JWT_SECRET", "smartops-dev-secret-change-in-prod"),
+  jwtSecret:         secret("JWT_SECRET", "smartops-dev-secret-change-in-prod"),
   jwtExpiresIn:      optional("JWT_EXPIRES_IN", "1h"),
   refreshExpiresIn:  optional("REFRESH_EXPIRES_IN", "7d"),
 

@@ -26,9 +26,21 @@ declare module "fastify" {
 export default fp(async (fastify: FastifyInstance) => {
   await fastify.register(jwt, { secret: config.jwtSecret });
 
+  const readCookie = (request: FastifyRequest, name: string): string | undefined => {
+    const header = request.headers.cookie;
+    if (!header) return undefined;
+    const pair = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+    return pair ? decodeURIComponent(pair.slice(name.length + 1)) : undefined;
+  };
+
   fastify.decorate("verifyJWT", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      await request.jwtVerify();
+      const authorization = request.headers.authorization;
+      const token = authorization?.startsWith("Bearer ")
+        ? authorization.slice("Bearer ".length)
+        : readCookie(request, "smartops_token");
+      if (!token) throw new Error("Token required");
+      request.user = fastify.jwt.verify(token);
       if (request.user.type !== "access") {
         return reply.code(401).send({ error: "Unauthorized", message: "Access token required" });
       }
