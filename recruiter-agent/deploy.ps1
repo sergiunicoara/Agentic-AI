@@ -135,7 +135,8 @@ gcloud run deploy $SERVICE `
     --timeout $TIMEOUT `
     --min-instances 0 `
     --cpu-throttling `
-    --set-secrets "GOOGLE_API_KEY=GOOGLE_API_KEY:latest,DEEPGRAM_API_KEY=DEEPGRAM_API_KEY:latest,ELEVENLABS_API_KEY=ELEVENLABS_API_KEY:latest"
+    --set-secrets "GOOGLE_API_KEY=GOOGLE_API_KEY:latest,DEEPGRAM_API_KEY=DEEPGRAM_API_KEY:latest,ELEVENLABS_API_KEY=ELEVENLABS_API_KEY:latest,INTERNAL_API_KEY=INTERNAL_API_KEY:latest" `
+    --set-env-vars "AUTO_VALIDATE_REPLIES=true,INTERNAL_API_RATE_LIMIT_PER_MINUTE=30"
 CheckExit "Cloud Run deployment"
 
 # ==================================================

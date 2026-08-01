@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
+
+from ..utils.normalize import normalize_criteria
 
 # ---------------------------------------------------------------------------
 # Golden dataset path — ops/eval_data.json
@@ -34,6 +37,8 @@ class EvalResult:
     factuality: float
     label: str
     reasoning: str
+    expected_state_passed: bool = True
+    state_issues: List[str] = field(default_factory=list)
     raw: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -79,6 +84,32 @@ _DEFAULT_EVAL_CASES: List[EvalCase] = [
 ]
 
 
+def _internal_headers() -> Dict[str, str]:
+    """Authenticate eval calls to protected MCP/A2A endpoints when configured."""
+    key = os.environ.get("INTERNAL_API_KEY", "").strip()
+    return {"X-Internal-Api-Key": key} if key else {}
+
+
+def _state_issues(case: EvalCase, state: Any) -> List[str]:
+    """Make expected role/criteria executable golden assertions."""
+    if not isinstance(state, dict):
+        return ["missing response state"] if (case.expected_role or case.expected_criteria is not None) else []
+
+    issues: List[str] = []
+    if case.expected_role:
+        actual_role = str(state.get("role") or "").casefold()
+        if actual_role != case.expected_role.casefold():
+            issues.append(f"role expected {case.expected_role!r}, got {state.get('role')!r}")
+
+    if case.expected_criteria is not None:
+        expected = sorted(normalize_criteria(case.expected_criteria))
+        actual = sorted(normalize_criteria(state.get("criteria") or []))
+        if actual != expected:
+            issues.append(f"criteria expected {expected!r}, got {actual!r}")
+
+    return issues
+
+
 # ---------------------------------------------------------------------------
 # Run eval suite
 # ---------------------------------------------------------------------------
@@ -121,6 +152,7 @@ def run_eval_suite(
         chat_resp.raise_for_status()
         data = chat_resp.json()
         reply = data["reply"]
+        state_issues = _state_issues(case, data.get("state"))
 
         # --- Step 2: judge via MCP tool endpoint ---
         judge_resp = requests.post(
@@ -134,6 +166,7 @@ def run_eval_suite(
                     "agent_reply": reply,
                 },
             },
+            headers=_internal_headers(),
             timeout=60,
         )
         judge_resp.raise_for_status()
@@ -146,7 +179,8 @@ def run_eval_suite(
         label = str(judge_data.get("label", "unknown"))
         reasoning = str(judge_data.get("reasoning", judge_data.get("notes", "")))
 
-        passed = score >= 3.5  # pass threshold: 3.5 / 5
+        expected_state_passed = not state_issues
+        passed = score >= 3.5 and expected_state_passed  # pass threshold: 3.5 / 5 + golden assertions
 
         results.append(
             EvalResult(
@@ -158,6 +192,8 @@ def run_eval_suite(
                 factuality=factuality,
                 label=label,
                 reasoning=reasoning,
+                expected_state_passed=expected_state_passed,
+                state_issues=state_issues,
                 raw={"chat": data, "judge": judge_data},
             )
         )

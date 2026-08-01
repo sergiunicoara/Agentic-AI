@@ -238,9 +238,10 @@ BENCH_MESSAGES = [
     "What are Sergiu's main technical skills?",
 ]
 
-async def bench_e2e() -> list[float]:
+async def bench_e2e() -> tuple[list[float], list[float]]:
     ws_url = BASE_URL.replace("https://", "wss://").replace("http://", "ws://") + "/voice/bench"
-    latencies = []
+    first_audio_latencies: list[float] = []
+    completion_latencies: list[float] = []
 
     for i, msg in enumerate(BENCH_MESSAGES):
         try:
@@ -263,8 +264,13 @@ async def bench_e2e() -> list[float]:
                             reply_text = data.get("text", "")[:60]
                         elif data.get("type") == "audio_end":
                             total_ms = (time.perf_counter() - t0) * 1000
-                            latencies.append(total_ms)
-                            print(f"  msg {i+1}: first_audio={first_audio_ms:.0f}ms  total={total_ms:.0f}ms  audio={audio_bytes}b")
+                            if first_audio_ms is not None:
+                                first_audio_latencies.append(first_audio_ms)
+                            completion_latencies.append(total_ms)
+                            first_audio_label = (
+                                f"{first_audio_ms:.0f}ms" if first_audio_ms is not None else "n/a"
+                            )
+                            print(f"  msg {i+1}: first_audio={first_audio_label}  total={total_ms:.0f}ms  audio={audio_bytes}b")
                             break
                         elif data.get("type") == "error":
                             print(f"  msg {i+1}: ERROR {data.get('message')}")
@@ -272,7 +278,7 @@ async def bench_e2e() -> list[float]:
         except Exception as exc:
             print(f"  msg {i+1}: ERROR {exc}")
 
-    return latencies
+    return first_audio_latencies, completion_latencies
 
 
 # ---------------------------------------------------------------------------
@@ -346,12 +352,11 @@ if __name__ == "__main__":
     # --- E2E WebSocket (agent + TTS, real deployed stack) ---
     print("\n" + "=" * 50)
     print("Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)")
-    e2e_latencies = asyncio.run(bench_e2e())
-    results["e2e_agent_tts_ms"] = e2e_latencies
-    _stats("E2E (agent+TTS)", e2e_latencies)
-    if e2e_latencies:
-        full_e2e = statistics.median(e2e_latencies) + 200  # +200ms Deepgram streaming estimate
-        print(f"  Full E2E estimate (incl. ~200ms Deepgram streaming): {full_e2e:.0f}ms")
+    e2e_first_audio, e2e_completion = asyncio.run(bench_e2e())
+    results["e2e_transcript_to_first_audio_ms"] = e2e_first_audio
+    results["e2e_transcript_to_audio_end_ms"] = e2e_completion
+    _stats("E2E first audio", e2e_first_audio)
+    _stats("E2E audio end  ", e2e_completion)
 
     # Save results
     out_path = "benchmark_voice_results.json"

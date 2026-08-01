@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Request, Response, WebSocket
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from opentelemetry import trace
@@ -22,6 +23,7 @@ from .mcp import call_mcp_tool, list_mcp_tools
 from .models import ChatRequest, ChatResponse, State
 from .quality import StepKind, Trajectory
 from .session_store import load_session, save_session, session_store_info
+from .security import require_internal_access
 from .telemetry.langfuse_setup import flush as langfuse_flush, init_langfuse
 from .telemetry.logging import configure_logging
 from .telemetry.tracing import configure_tracer
@@ -40,6 +42,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _auto_validation_enabled() -> bool:
+    return os.environ.get("AUTO_VALIDATE_REPLIES", "false").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+
+
+def _validate_reply_in_background(
+    user_message: str,
+    reply: str,
+    role: Optional[str],
+    criteria: List[str],
+    session_id: str,
+) -> None:
+    """Run optional critic validation without adding latency to the chat response."""
+    try:
+        validate_turn(
+            user_message=user_message,
+            agent_reply=reply,
+            role=role,
+            criteria=criteria,
+            session_id=session_id,
+        )
+    except Exception:
+        logger.exception("automatic critic validation failed for session=%s", session_id)
 
 
 # ------------------------------------------------------------------
@@ -90,7 +118,7 @@ async def serve_frontend_root():
 # ------------------------------------------------------------------
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(req: ChatRequest) -> ChatResponse:
+async def chat_endpoint(req: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
     """
     Main chat endpoint with full trajectory logging and OTel tracing.
 
@@ -153,10 +181,10 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
         span.set_attribute("role", new_state.role or "")
         span.set_attribute("reply_length", len(reply))
 
-        # Trajectory: log agent turn
+        # Trajectory: log the agent turn with candidate contact details redacted.
         trajectory.add(
             StepKind.agent,
-            reply,
+            redact_pii(reply),
             meta={
                 "role": new_state.role,
                 "criteria": new_state.criteria,
@@ -178,6 +206,16 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
         save_session(session_id, new_state)
     except Exception as exc:
         logger.warning("session save failed session=%s error=%s", session_id, exc)
+
+    if _auto_validation_enabled():
+        background_tasks.add_task(
+            _validate_reply_in_background,
+            req.message,
+            reply,
+            new_state.role,
+            new_state.criteria,
+            session_id,
+        )
 
     # Strip project objects from client payload — they're large and cause the
     # round-trip state to bloat / get dropped, resetting deep_dive_index to 0.
@@ -203,7 +241,7 @@ async def chat_endpoint(req: ChatRequest) -> ChatResponse:
 # /mcp/tools — discover available MCP tools
 # ------------------------------------------------------------------
 
-@app.get("/mcp/tools")
+@app.get("/mcp/tools", dependencies=[Depends(require_internal_access)])
 async def mcp_list_tools_endpoint() -> Dict[str, Any]:
     """
     Returns the registry of MCP-style tools with JSON input/output schemas.
@@ -221,7 +259,7 @@ class MCPCallRequest(BaseModel):
     arguments: Dict[str, Any] = {}
 
 
-@app.post("/mcp/call")
+@app.post("/mcp/call", dependencies=[Depends(require_internal_access)])
 async def mcp_call_endpoint(req: MCPCallRequest) -> Dict[str, Any]:
     """
     MCP-inspired Agent-to-Agent dispatch endpoint.
@@ -242,6 +280,74 @@ async def mcp_call_endpoint(req: MCPCallRequest) -> Dict[str, Any]:
             raise HTTPException(status_code=500, detail=str(exc))
 
 
+class MCPProtocolRequest(BaseModel):
+    """Minimal JSON-RPC envelope for standard MCP tool discovery and calls."""
+    jsonrpc: str = "2.0"
+    id: Optional[str | int] = None
+    method: str
+    params: Dict[str, Any] = {}
+
+
+def _mcp_result(request_id: Optional[str | int], result: Dict[str, Any]) -> Dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": request_id, "result": result}
+
+
+def _mcp_error(request_id: Optional[str | int], code: int, message: str) -> Dict[str, Any]:
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "error": {"code": code, "message": message},
+    }
+
+
+@app.post("/mcp", dependencies=[Depends(require_internal_access)], response_model=None)
+async def mcp_protocol_endpoint(req: MCPProtocolRequest) -> Dict[str, Any] | Response:
+    """Expose the tool registry through MCP JSON-RPC methods.
+
+    The existing /mcp/tools and /mcp/call routes remain as protected legacy
+    compatibility endpoints. New clients can use initialize, tools/list, and
+    tools/call without relying on repository-specific request shapes.
+    """
+    if req.jsonrpc != "2.0":
+        return _mcp_error(req.id, -32600, "jsonrpc must be 2.0")
+
+    if req.method == "notifications/initialized":
+        return Response(status_code=202)
+    if req.method == "initialize":
+        return _mcp_result(
+            req.id,
+            {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": SERVICE_NAME, "version": "1.0.0"},
+            },
+        )
+    if req.method == "tools/list":
+        return _mcp_result(req.id, {"tools": list_mcp_tools()})
+    if req.method == "tools/call":
+        name = str(req.params.get("name", ""))
+        arguments = req.params.get("arguments") or {}
+        if not isinstance(arguments, dict):
+            return _mcp_error(req.id, -32602, "tools/call arguments must be an object")
+        try:
+            result = call_mcp_tool(name, arguments)
+        except KeyError:
+            return _mcp_error(req.id, -32602, f"Unknown tool: {name!r}")
+        except Exception as exc:
+            logger.exception("MCP protocol tool call failed: tool=%s", name)
+            return _mcp_error(req.id, -32603, str(exc))
+        return _mcp_result(
+            req.id,
+            {
+                "content": [{"type": "text", "text": json.dumps(result)}],
+                "structuredContent": result,
+                "isError": False,
+            },
+        )
+
+    return _mcp_error(req.id, -32601, f"Unsupported MCP method: {req.method}")
+
+
 # ------------------------------------------------------------------
 # /a2a/validate — Critic Agent A2A validation endpoint
 # ------------------------------------------------------------------
@@ -254,7 +360,7 @@ class A2AValidateRequest(BaseModel):
     session_id: str = "default"
 
 
-@app.post("/a2a/validate")
+@app.post("/a2a/validate", dependencies=[Depends(require_internal_access)])
 async def a2a_validate_endpoint(req: A2AValidateRequest) -> Dict[str, Any]:
     """
     Agent-to-Agent validation endpoint.
@@ -447,7 +553,7 @@ async def voice_bench_endpoint(ws: WebSocket, session_id: str = "bench"):
     await voice_bench_handler(ws, session_id)
 
 
-@app.get("/a2a/summary/{session_id}")
+@app.get("/a2a/summary/{session_id}", dependencies=[Depends(require_internal_access)])
 async def a2a_summary_endpoint(session_id: str) -> Dict[str, Any]:
     """
     Returns aggregate validation metrics for a given critic session.

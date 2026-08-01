@@ -8,6 +8,7 @@ Run:
 """
 
 import sys
+import os
 import requests
 import time
 
@@ -18,6 +19,11 @@ if hasattr(sys.stdout, "reconfigure"):
 BACKEND = "https://recruiter-agent-969006882005.europe-west1.run.app"
 VALIDATE = f"{BACKEND}/a2a/validate"
 CHAT     = f"{BACKEND}/chat"
+INTERNAL_HEADERS = (
+    {"X-Internal-Api-Key": os.environ["INTERNAL_API_KEY"]}
+    if os.environ.get("INTERNAL_API_KEY")
+    else {}
+)
 
 # ── Golden dataset ──────────────────────────────────────────────────────────
 
@@ -103,7 +109,7 @@ def validate(user_msg: str, agent_reply: str, role: str | None, criteria: list) 
         "session_id":   f"eval-{int(time.time()*1000)}",
     }
     try:
-        r = requests.post(VALIDATE, json=payload, timeout=30)
+        r = requests.post(VALIDATE, json=payload, headers=INTERNAL_HEADERS, timeout=30)
         r.raise_for_status()
         return r.json()
     except Exception as e:

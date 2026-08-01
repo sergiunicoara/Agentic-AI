@@ -20,6 +20,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from .mcp import call_mcp_tool
+from .models.state import State
+from .session_store import load_session, save_session
 
 logger = logging.getLogger(__name__)
 
@@ -27,55 +29,51 @@ logger = logging.getLogger(__name__)
 _PASS_THRESHOLD = 3.5
 
 
-# ---------------------------------------------------------------------------
-# Critic session state
-# ---------------------------------------------------------------------------
-
-class CriticState:
-    """
-    Lightweight per-session memory for the critic agent.
-    Tracks all validation results and computes running aggregate metrics.
-    """
-
-    def __init__(self, session_id: str) -> None:
-        self.session_id = session_id
-        self.validations: List[Dict[str, Any]] = []
-
-    def record(self, result: Dict[str, Any]) -> None:
-        self.validations.append(result)
-
-    def aggregate(self) -> Dict[str, Any]:
-        n = len(self.validations)
-        if not n:
-            return {"n_validations": 0}
-
-        passed = sum(1 for v in self.validations if v.get("passed"))
-        return {
-            "n_validations": n,
-            "pass_rate": round(passed / n, 3),
-            "avg_score": round(
-                sum(v.get("score", 0) for v in self.validations) / n, 3
-            ),
-            "avg_faithfulness": round(
-                sum(v.get("faithfulness", 0) for v in self.validations) / n, 3
-            ),
-            "avg_relevancy": round(
-                sum(v.get("relevancy", 0) for v in self.validations) / n, 3
-            ),
-            "avg_factuality": round(
-                sum(v.get("factuality", 0) for v in self.validations) / n, 3
-            ),
-        }
+_VALIDATIONS_KEY = "critic_validations"
+_MAX_VALIDATIONS_PER_SESSION = 100
 
 
-# In-memory critic sessions keyed by session_id
-_critic_sessions: Dict[str, CriticState] = {}
+def _aggregate(validations: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Calculate a durable session aggregate from persisted verdicts."""
+    n = len(validations)
+    if not n:
+        return {"n_validations": 0}
+
+    passed = sum(1 for validation in validations if validation.get("passed"))
+    return {
+        "n_validations": n,
+        "pass_rate": round(passed / n, 3),
+        "avg_score": round(sum(v.get("score", 0) for v in validations) / n, 3),
+        "avg_faithfulness": round(
+            sum(v.get("faithfulness", 0) for v in validations) / n, 3
+        ),
+        "avg_relevancy": round(
+            sum(v.get("relevancy", 0) for v in validations) / n, 3
+        ),
+        "avg_factuality": round(
+            sum(v.get("factuality", 0) for v in validations) / n, 3
+        ),
+    }
 
 
-def _get_critic_state(session_id: str) -> CriticState:
-    if session_id not in _critic_sessions:
-        _critic_sessions[session_id] = CriticState(session_id)
-    return _critic_sessions[session_id]
+def _load_validations(session_id: str) -> List[Dict[str, Any]]:
+    state = load_session(session_id)
+    if not state:
+        return []
+    values = state.extra.get(_VALIDATIONS_KEY, [])
+    return [value for value in values if isinstance(value, dict)] if isinstance(values, list) else []
+
+
+def _save_validation(session_id: str, validation: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Persist verdicts alongside the session so Redis-backed deployments share them."""
+    state = load_session(session_id) or State()
+    values = state.extra.get(_VALIDATIONS_KEY, [])
+    validations = [value for value in values if isinstance(value, dict)] if isinstance(values, list) else []
+    stored = {key: value for key, value in validation.items() if key != "session_aggregate"}
+    validations.append(stored)
+    state.extra[_VALIDATIONS_KEY] = validations[-_MAX_VALIDATIONS_PER_SESSION:]
+    save_session(session_id, state)
+    return state.extra[_VALIDATIONS_KEY]
 
 
 # ---------------------------------------------------------------------------
@@ -153,8 +151,6 @@ def validate_turn(
             "session_aggregate":    Dict[str, Any],
         }
     """
-    critic_state = _get_critic_state(session_id)
-
     # --- A2A handoff: call judge tool via MCP interface ---
     try:
         judge_result = call_mcp_tool(
@@ -194,10 +190,13 @@ def validate_turn(
         "issues": issues,
         "reasoning": judge_result.get("reasoning", ""),
         "recommended_actions": _recommended_actions(score, issues),
-        "session_aggregate": critic_state.aggregate(),
+        "session_aggregate": {},
     }
-
-    critic_state.record(validation)
+    try:
+        validation["session_aggregate"] = _aggregate(_save_validation(session_id, validation))
+    except Exception as exc:
+        logger.warning("critic_agent: could not persist validation for %s: %s", session_id, exc)
+        validation["session_aggregate"] = _aggregate(_load_validations(session_id) + [validation])
 
     logger.info(
         "critic_agent | session=%s verdict=%s score=%.1f "
@@ -215,7 +214,4 @@ def validate_turn(
 
 def get_critic_session_summary(session_id: str) -> Dict[str, Any]:
     """Return aggregate validation metrics for a given critic session."""
-    state = _critic_sessions.get(session_id)
-    if state is None:
-        return {"session_id": session_id, "n_validations": 0}
-    return {"session_id": session_id, **state.aggregate()}
+    return {"session_id": session_id, **_aggregate(_load_validations(session_id))}

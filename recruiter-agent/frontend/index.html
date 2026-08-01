@@ -238,7 +238,7 @@ document.addEventListener("DOMContentLoaded", function () {
       params.get("backend") ||
       window.localStorage.getItem("backendUrl") ||
       window.BACKEND_URL;
-    const defaultBackend = "https://recruiter-agent-969006882005.europe-west1.run.app/chat";
+    const defaultBackend = "https://recruiter-agent-6ngnig6aua-ew.a.run.app/chat";
 
     if (override) {
       return new URL(override, window.location.href).toString();
@@ -454,6 +454,12 @@ document.addEventListener("DOMContentLoaded", function () {
     let micStream = null;
     let audioChunks = [];
     let currentAudio = null;
+    let mediaSource = null;
+    let sourceBuffer = null;
+    let audioQueue = [];
+    let streamFinished = false;
+    let streamingAudioActive = false;
+    let streamingAudioUrl = null;
     let autoSpeak = false;
 
     function stripHtml(html) {
@@ -510,7 +516,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const btn = document.getElementById(id);
       if (!btn) return;
       btn.addEventListener("click", function () {
-        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+        _resetStreamingAudio();
         audioChunks = [];
         // server will send audio_cancelled instead of audio_end — bytes are discarded there
         if (window.speechSynthesis) window.speechSynthesis.cancel();
@@ -569,6 +575,98 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
+    function _resetStreamingAudio() {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+      }
+      if (streamingAudioUrl) {
+        URL.revokeObjectURL(streamingAudioUrl);
+        streamingAudioUrl = null;
+      }
+      mediaSource = null;
+      sourceBuffer = null;
+      audioQueue = [];
+      streamFinished = false;
+      streamingAudioActive = false;
+    }
+
+    function _appendNextAudioChunk() {
+      if (!sourceBuffer || sourceBuffer.updating) return;
+      if (audioQueue.length) {
+        sourceBuffer.appendBuffer(audioQueue.shift());
+        return;
+      }
+      if (streamFinished && mediaSource && mediaSource.readyState === "open") {
+        mediaSource.endOfStream();
+      }
+    }
+
+    function _startStreamingAudio() {
+      if (!window.MediaSource || !MediaSource.isTypeSupported("audio/mpeg")) return false;
+      try {
+        mediaSource = new MediaSource();
+        streamingAudioUrl = URL.createObjectURL(mediaSource);
+        currentAudio = new Audio(streamingAudioUrl);
+        streamingAudioActive = true;
+
+        currentAudio.onplay = function () {
+          ttsPlaying = true;
+          showStopBtns(true);
+        };
+        currentAudio.onended = function () {
+          ttsPlaying = false;
+          showStopBtns(false);
+          _resetStreamingAudio();
+          audioChunks = [];
+        };
+        currentAudio.onerror = function () {
+          // Preserve buffered chunks and play them normally when the stream ends.
+          const shouldFallback = streamFinished && audioChunks.length;
+          _resetStreamingAudio();
+          ttsPlaying = false;
+          if (shouldFallback) playAudioChunks();
+        };
+
+        mediaSource.addEventListener("sourceopen", function () {
+          try {
+            sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
+            sourceBuffer.addEventListener("updateend", _appendNextAudioChunk);
+            _appendNextAudioChunk();
+          } catch (err) {
+            console.warn("[voice] MediaSource setup failed:", err);
+            _resetStreamingAudio();
+          }
+        }, { once: true });
+
+        currentAudio.play().catch(function (err) {
+          console.warn("[voice] streamed TTS play() blocked:", err);
+        });
+        return true;
+      } catch (err) {
+        console.warn("[voice] MediaSource unavailable:", err);
+        _resetStreamingAudio();
+        return false;
+      }
+    }
+
+    function queueAudioChunk(chunk) {
+      // Retain a fallback copy for browsers without MediaSource MP3 support.
+      audioChunks.push(new Blob([chunk], { type: "audio/mpeg" }));
+      if (!streamingAudioActive && !_startStreamingAudio()) return;
+      audioQueue.push(chunk.slice(0));
+      _appendNextAudioChunk();
+    }
+
+    function finishAudioStream() {
+      if (!streamingAudioActive) {
+        playAudioChunks();
+        return;
+      }
+      streamFinished = true;
+      _appendNextAudioChunk();
+    }
+
     let ttsPlaying = false;
     let bargeinChunks = 0;
 
@@ -588,7 +686,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         voiceWs.onmessage = function (e) {
           if (e.data instanceof ArrayBuffer) {
-            audioChunks.push(new Blob([e.data], { type: "audio/mpeg" }));
+            queueAudioChunk(e.data);
             return;
           }
           try {
@@ -617,7 +715,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   if (bargeinChunks >= 2) {
                     console.log("[voice] auto barge-in rms=" + rms.toFixed(4));
                     bargeinChunks = 0;
-                    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+                    _resetStreamingAudio();
                     audioChunks = [];
                     // server will send audio_cancelled instead of audio_end — bytes are discarded there
                     ttsPlaying = false;
@@ -646,8 +744,9 @@ document.addEventListener("DOMContentLoaded", function () {
             } else if (msg.type === "reply") {
               addAI(msg.text);
             } else if (msg.type === "audio_end") {
-              playAudioChunks();
+              finishAudioStream();
             } else if (msg.type === "audio_cancelled") {
+              _resetStreamingAudio();
               // TTS was interrupted by barge-in — discard buffered bytes, don't play
               audioChunks = [];
               console.log("[voice] TTS cancelled, chunks discarded");
@@ -678,6 +777,8 @@ document.addEventListener("DOMContentLoaded", function () {
       if (audioProcessor) { audioProcessor.disconnect(); audioProcessor = null; }
       if (audioContext) { audioContext.close(); audioContext = null; }
       if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      _resetStreamingAudio();
+      audioChunks = [];
       voiceWs = null;
     }
 

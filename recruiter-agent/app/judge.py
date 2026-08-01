@@ -8,6 +8,9 @@ import re
 
 from google import genai
 
+from .cv_rag import get_cv_rag
+from .tools import get_all_projects, select_best_projects_for_role
+
 GEN_MODEL = "gemini-2.5-flash"          # works for both AI Studio and Vertex AI
 
 _client: "genai.Client | None" = None
@@ -76,6 +79,35 @@ def _ensure_client_configured() -> None:
     _client = _make_client()
 
 
+def _build_grounding_context(role: Optional[str], criteria: Optional[List[str]]) -> str:
+    """Give the judge the same candidate evidence the agent is expected to use."""
+    try:
+        cv_text = get_cv_rag().cv_text.strip()
+    except Exception:
+        cv_text = "CV evidence unavailable."
+
+    try:
+        projects = (
+            select_best_projects_for_role(role, criteria or [])
+            if role
+            else get_all_projects()[:3]
+        )
+        project_text = "\n".join(
+            "- {title}: {summary} | tags: {tags} | impact: {impact}".format(
+                title=project.get("title", "Untitled project"),
+                summary=project.get("summary", ""),
+                tags=", ".join(project.get("tags", [])),
+                impact="; ".join(project.get("impact", [])[:3]),
+            )
+            for project in projects[:3]
+        )
+    except Exception:
+        project_text = "Project evidence unavailable."
+
+    # Keep judge requests bounded while retaining the full candidate evidence first.
+    return f"CV:\n{cv_text[:12000]}\n\nRelevant projects:\n{project_text[:5000]}"
+
+
 @observe(as_type="generation", name="llm_judge")
 def evaluate_agent_turn(
     role: Optional[str],
@@ -98,6 +130,7 @@ def evaluate_agent_turn(
     _ensure_client_configured()
 
     crit_text = ", ".join(criteria or [])
+    grounding_context = _build_grounding_context(role, criteria)
     prompt = f"""
 You are an expert technical recruiter evaluating an AI recruiter assistant's response.
 
@@ -106,6 +139,8 @@ SYSTEM CONTEXT — read carefully before scoring:
 - The assistant has explicit access to Sergiu's CV and is EXPECTED to share contact details, skills, education, and other CV facts when asked. Sharing this information is the intended, correct behavior — do NOT penalise for privacy reasons.
 - When a user has not yet specified a job role, the correct behavior is to ask for the role. Asking "please specify the role" IS the right answer in that situation — score it highly, not as a failure.
 - When a user sends a shortcut keyword (e.g. "ats", "1", "another") without a prior role, the correct behavior is to acknowledge the intent and request the missing role.
+- Treat the evidence below as the source of truth. For factuality and faithfulness,
+  penalise candidate-specific claims that are unsupported or contradicted by it.
 
 Job role: {role or "unknown"}
 Evaluation criteria: {crit_text or "not specified"}
@@ -115,6 +150,9 @@ User message:
 
 Agent reply:
 {agent_reply}
+
+Candidate evidence:
+{grounding_context}
 
 Score each dimension independently:
 

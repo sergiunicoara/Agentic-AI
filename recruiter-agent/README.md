@@ -23,7 +23,7 @@ AI Recruiter is an autonomous voice-first agent that represents a candidate's po
 - **Guardrails** — PII redaction (email/phone/SSN/card) on the logging path + topic enforcement that deflects off-topic messages before they reach the agent
 - **LLM-as-Judge** — multi-metric eval per turn: faithfulness, relevancy, factuality (0.0–1.0 each). 6 golden test cases, 100% pass rate, 5.0/5 avg score.
 - **Critic Agent (A2A)** — autonomous critic calls the judge via MCP tool interface, issues PASS/FAIL verdicts, tracks session-level quality
-- **MCP tool registry** — agent capabilities exposed as named JSON-schema tools via `/mcp/tools` + `/mcp/call`
+- **MCP tool registry** — standard JSON-RPC MCP methods at `/mcp` (`initialize`, `tools/list`, `tools/call`), with protected legacy discovery/dispatch endpoints
 - **Langfuse tracing** — every agent turn and judge call traced with input/output/scores in Langfuse dashboard
 - **OTel tracing** — every `/chat`, `/voice`, `/mcp/call`, `/a2a/validate` request has a span wired to Cloud Trace
 - **Redis session state** — shared store across Cloud Run instances (`REDIS_URL`, 24h TTL) with automatic SQLite fallback
@@ -110,8 +110,9 @@ Browser (index.html)
                                │
 ┌──────────────────────────────▼──────────────────────────────────────┐
 │                         MCP / A2A LAYER                              │
-│  /mcp/tools        tool discovery (JSON schemas)                    │
-│  /mcp/call         tool dispatch                                    │
+│  /mcp              MCP JSON-RPC: initialize, tools/list, tools/call │
+│  /mcp/tools        protected legacy tool discovery                  │
+│  /mcp/call         protected legacy tool dispatch                   │
 │  /a2a/validate     critic agent endpoint                            │
 │  /a2a/summary      session aggregate metrics                        │
 └──────────────────────────────┬──────────────────────────────────────┘
@@ -256,6 +257,7 @@ Browser Audio element
 |---|---|
 | `POST /a2a/validate` | Submit a turn for critic agent validation |
 | `GET  /a2a/summary/{session_id}` | Aggregate quality metrics for a session |
+| `POST /mcp` | MCP JSON-RPC endpoint (`initialize`, `tools/list`, `tools/call`) |
 | `GET  /mcp/tools` | Discover available tools and their JSON schemas |
 | `POST /mcp/call` | Dispatch a named tool call |
 
@@ -364,6 +366,7 @@ gcloud run deploy recruiter-agent --source . --region europe-west1 \
 
 **Required secrets:**
 - `GOOGLE_API_KEY` — Gemini API key
+- `INTERNAL_API_KEY` — required by `/mcp` and `/a2a` endpoints; pass it as `X-Internal-Api-Key`
 - `DEEPGRAM_API_KEY` — Deepgram STT
 - `GOOGLE_APPLICATION_CREDENTIALS` — service account JSON for Google Cloud TTS
 - `LANGFUSE_PUBLIC_KEY` + `LANGFUSE_SECRET_KEY` — Langfuse (optional, traces disabled if absent)

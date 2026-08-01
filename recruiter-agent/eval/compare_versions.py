@@ -21,6 +21,12 @@ from typing import Optional
 
 import requests
 
+INTERNAL_HEADERS = (
+    {"X-Internal-Api-Key": os.environ["INTERNAL_API_KEY"]}
+    if os.environ.get("INTERNAL_API_KEY")
+    else {}
+)
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -108,6 +114,7 @@ def _validate(base: str, user: str, reply: str, role, criteria) -> dict:
                 "role": role, "criteria": criteria,
                 "session_id": f"cmp-{int(time.time()*1000)}",
             },
+            headers=INTERNAL_HEADERS,
             timeout=35,
         )
         r.raise_for_status()
