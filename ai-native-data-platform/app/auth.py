@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+
 from fastapi import Header, HTTPException
 from sqlalchemy import text
 
@@ -13,12 +16,13 @@ def require_workspace_key(
     if not x_workspace_id or not x_api_key:
         raise HTTPException(401, "Missing X-Workspace-Id or X-API-Key")
 
+    api_key_hash = hashlib.sha256(x_api_key.encode("utf-8")).hexdigest()
     with read_session_scope() as db:
         row = db.execute(
-            text("SELECT 1 FROM workspace_api_key WHERE workspace_id=:w AND api_key=:k"),
-            {"w": x_workspace_id, "k": x_api_key},
-        ).first()
+            text("SELECT api_key_hash FROM workspace_api_key WHERE workspace_id=:w"),
+            {"w": x_workspace_id},
+        ).mappings().first()
 
-    if not row:
+    if not row or not hmac.compare_digest(str(row["api_key_hash"]), api_key_hash):
         raise HTTPException(403, "Invalid workspace credentials")
     return x_workspace_id

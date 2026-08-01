@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import text
 
-from app.data.db import write_session_scope
+from app.data.db import workspace_session_scope
 
 TOPICS = [
     "incident response", "access control", "API key rotation", "observability", "sharding", "evaluation harness", "reliability", "backfill pipelines"
@@ -39,7 +39,7 @@ def main() -> int:
     ap.add_argument("--source", default="seed")
     args = ap.parse_args()
 
-    with write_session_scope() as db:
+    with workspace_session_scope(args.workspace, write=True) as db:
         for i in range(int(args.docs)):
             doc_id = str(uuid.uuid4())
             db.execute(

@@ -56,7 +56,7 @@ def run_nl_query(nl_query: str, workspace_id: str) -> dict:
         emit_event("nl_query_sql_built", {"workspace_id": workspace_id, "sql": sql})
 
         # 4. Execute
-        results = execute_query(sql, params)
+        results = execute_query(sql, params, workspace_id)
 
     except NLQueryError:
         raise

@@ -134,6 +134,7 @@ LLM_PROVIDER=openai                # openai | mock (default: mock)
 EMBED_PROVIDER=openai              # openai | mock (default: mock)
 OPENAI_CHAT_MODEL=gpt-4.1-mini
 OPENAI_EMBED_MODEL=text-embedding-3-small
+EMBED_DIM=384                       # must match the pgvector column dimension
 
 # Retrieval
 RETRIEVAL_MODE=hybrid              # dense | lexical | hybrid | multimodal

@@ -20,7 +20,7 @@ ALLOWED_SCHEMA: dict[str, list[str]] = {
         "chunk_text", "chunk_hash", "embedding_version", "created_at",
     ],
     "ingestion_run": [
-        "id", "document_id", "status", "embedding_version",
+        "id", "document_id", "workspace_id", "status", "embedding_version",
         "error", "created_at", "finished_at",
     ],
     "trace_log": [

@@ -5,19 +5,19 @@ import uuid
 
 from sqlalchemy import text
 
-from app.data.db import read_session_scope
+from app.data.db import workspace_session_scope
 
 # Hard ceiling on query execution time — protects the shared DB under load.
 _TIMEOUT_MS = 5000
 
 
-def execute_query(sql: str, params: dict) -> list[dict]:
+def execute_query(sql: str, params: dict, workspace_id: str) -> list[dict]:
     """Execute a read-only parameterized query and return rows as dicts.
 
     Enforces a per-query statement_timeout so runaway analytical queries
     cannot starve the online retrieval path.
     """
-    with read_session_scope() as db:
+    with workspace_session_scope(workspace_id) as db:
         db.execute(text(f"SET LOCAL statement_timeout = '{_TIMEOUT_MS}'"))
         result = db.execute(text(sql), params)
         cols = list(result.keys())

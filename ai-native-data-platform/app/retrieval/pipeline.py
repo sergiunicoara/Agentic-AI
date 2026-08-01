@@ -39,7 +39,15 @@ class Retriever(Protocol):
 
 
 class Reranker(Protocol):
-    def rerank(self, query: str, query_vec: list[float], docs: list[RetrievedChunk], k: int) -> list[RetrievedChunk]: ...
+    def rerank(
+        self,
+        query: str,
+        query_vec: list[float],
+        docs: list[RetrievedChunk],
+        k: int,
+        *,
+        workspace_id: str,
+    ) -> list[RetrievedChunk]: ...
 
 
 def _shards(workspace_id: str, query: str):
@@ -147,7 +155,9 @@ class RetrievalPipeline:
                 },
                 latency_ms=int(cached.get("latency_ms", 0)),
             )
-            return hits[:k], int(cached.get("latency_ms", 0))
+            # Return 0 latency for cache hits — enforce_latency must not penalise
+            # requests that are served instantly from Redis.
+            return hits[:k], 0
 
         with timer(RETRIEVAL_LATENCY):
             t0 = time.time()
@@ -210,7 +220,7 @@ class RetrievalPipeline:
 
             out = fused
             if self.reranker and budget.allow(settings.reranker_timeout_ms):
-                out = self.reranker.rerank(query, query_vec, fused, k=k)
+                out = self.reranker.rerank(query, query_vec, fused, k=k, workspace_id=workspace_id)
             else:
                 out = out[:k]
 

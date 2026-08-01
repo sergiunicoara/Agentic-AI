@@ -26,7 +26,7 @@ from app.core.exp.router import choose_experiment
 from app.core.reliability.slo_window import rolling_slo
 from app.core.reliability.anomaly import observe_slo_signals
 from app.core.reliability.remediation_controller import start_controller as start_remediation_controller
-from app.data.db import read_session_scope, write_session_scope
+from app.data.db import read_session_scope, workspace_session_scope
 from app.eval.service import compute_online_signals
 from app.generation.groundedness import evidence_minimum, verify_citation_snippets
 from app.generation.service import run_rag_safe
@@ -34,8 +34,8 @@ from app.providers.embeddings import embed
 from app.retrieval.factory import build_pipeline
 from app.schemas import AskIn, AskOut, Citation, ImageIngestOut, NLQueryIn, NLQueryOut, TranscriptIn
 from app.nl_query.service import NLQueryError, run_nl_query
-from app.ingestion.pipeline import enqueue, start_worker
-from app.ingestion.multimodal import enqueue_images, pdf_to_images, start_multimodal_worker
+from app.ingestion.pipeline import enqueue
+from app.ingestion.multimodal import enqueue_images, pdf_to_images
 from app.core.safety.prompt_guard import check_query
 from app.core.safety.output_moderation import moderate_output
 
@@ -50,11 +50,9 @@ contract = default_contract()
 
 @app.on_event("startup")
 def _startup():
-    start_worker()
-    start_multimodal_worker()
-    # Leader-elected automated remediation controller (portfolio feature).
-    # Only one API replica becomes leader and applies mitigation.
-    start_remediation_controller()
+    if settings.enable_auto_remediation:
+        # Only one API replica becomes leader and applies mitigation.
+        start_remediation_controller()
 
 
 @app.middleware("http")
@@ -93,7 +91,7 @@ def ingest_transcript(payload: TranscriptIn, workspace_id: str = Depends(require
 
     doc_id = str(uuid.uuid4())
     try:
-        with write_session_scope() as db:
+        with workspace_session_scope(payload.workspace_id, write=True) as db:
             db.execute(
                 text(
                     """
@@ -111,7 +109,7 @@ def ingest_transcript(payload: TranscriptIn, workspace_id: str = Depends(require
                 },
             )
     except IntegrityError:
-        with read_session_scope(region=settings.region) as db:
+        with workspace_session_scope(payload.workspace_id) as db:
             row = db.execute(
                 text(
                     """
@@ -123,7 +121,7 @@ def ingest_transcript(payload: TranscriptIn, workspace_id: str = Depends(require
             ).mappings().first()
         return {"status": "already_ingested", "document_id": row["id"] if row else None}
 
-    enqueue(doc_id)
+    enqueue(doc_id, payload.workspace_id)
     emit_event("ingest_enqueued", {"document_id": doc_id, "workspace_id": payload.workspace_id})
     return {"status": "queued", "document_id": doc_id}
 
@@ -149,13 +147,13 @@ async def ingest_image(
     else:
         images = [(content, mime)]
 
-    enqueue_images(
+    job_id = enqueue_images(
         workspace_id,
         source or file.filename or "upload",
         images,
         external_id=external_id,
     )
-    emit_event("multimodal_ingest_enqueued", {"workspace_id": workspace_id, "page_count": len(images)})
+    emit_event("multimodal_ingest_enqueued", {"workspace_id": workspace_id, "page_count": len(images), "job_id": job_id})
     return ImageIngestOut(status="queued", page_count=len(images))
 
 
@@ -274,6 +272,14 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
                 answer = moderation.redacted
 
     latency_ms = int((time.time() - t0) * 1000)
+    try:
+        # The online contract applies to the complete user-visible path, not
+        # merely the retrieval stage.
+        enforce_latency(latency_ms, contract)
+    except ReliabilityViolation:
+        answer = "I don't know based on the indexed documents in this workspace."
+        citations = []
+        unknown = True
 
     # Store online quality signals for debugging and offline eval sampling.
     compute_online_signals(

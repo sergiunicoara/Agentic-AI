@@ -90,6 +90,28 @@ def write_session_scope() -> Generator[Session, None, None]:
 
 
 @contextmanager
+def workspace_session_scope(
+    workspace_id: str,
+    *,
+    write: bool = False,
+    url: str | None = None,
+) -> Generator[Session, None, None]:
+    """Open a tenant-bound session for RLS-protected application tables."""
+    if not workspace_id:
+        raise ValueError("workspace_id is required for tenant-bound database access")
+    if write:
+        scope = session_scope(url) if url else write_session_scope()
+    else:
+        scope = session_scope(url) if url else read_session_scope(region=settings.region)
+    with scope as session:
+        session.execute(
+            text("SELECT set_config('app.workspace_id', :workspace_id, true)"),
+            {"workspace_id": workspace_id},
+        )
+        yield session
+
+
+@contextmanager
 def read_session_scope(region: str | None = None) -> Generator[Session, None, None]:
     """Session for read operations.
 
@@ -136,4 +158,5 @@ __all__ = [
     "session_scope",
     "write_session_scope",
     "read_session_scope",
+    "workspace_session_scope",
 ]

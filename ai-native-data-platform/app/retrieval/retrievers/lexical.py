@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.schemas import RetrievedChunk
-from app.data.db import session_scope
+from app.data.db import workspace_session_scope
 
 
 class LexicalRetriever:
@@ -43,7 +43,7 @@ class LexicalRetriever:
             """
         )
 
-        with session_scope(database_url) as db:
+        with workspace_session_scope(workspace_id, url=database_url) as db:
             db.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": int(settings.retriever_timeout_ms)})
             rows = db.execute(sql, {"q": query, "workspace_id": workspace_id, "k": int(k), "embedding_version": (embedding_version or settings.embedding_version)}).mappings().all()
 

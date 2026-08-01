@@ -2,31 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import io
-import queue
-import threading
 import uuid
-from dataclasses import dataclass, field
 
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.observability import INGEST_JOBS, emit_event
-from app.data.db import write_session_scope
+from app.data.db import workspace_session_scope
 from app.providers.embeddings import embed
 from app.providers.vision import caption_image
-
-_mm_jobs: "queue.Queue[_ImageJob]" = queue.Queue()
-_started = False
-
-
-@dataclass
-class _ImageJob:
-    workspace_id: str
-    source_name: str
-    images: list[tuple[bytes, str]]  # (image_bytes, mime_type)
-    external_id: str | None = None
-    document_id: str | None = None  # parent document, set when source is a PDF document
-
 
 def enqueue_images(
     workspace_id: str,
@@ -35,28 +19,16 @@ def enqueue_images(
     *,
     external_id: str | None = None,
     document_id: str | None = None,
-) -> None:
-    _mm_jobs.put(_ImageJob(workspace_id, source_name, images, external_id, document_id))
+) -> str:
+    from app.ingestion.jobs import enqueue_images as enqueue_durable_images
 
-
-def start_multimodal_worker() -> None:
-    global _started
-    if _started:
-        return
-    _started = True
-    t = threading.Thread(target=_loop, daemon=True)
-    t.start()
-
-
-def _loop() -> None:
-    while True:
-        job = _mm_jobs.get()
-        try:
-            _process_job(job)
-        except Exception as e:
-            emit_event("multimodal_ingest_failed", {"source": job.source_name, "error": str(e)})
-        finally:
-            _mm_jobs.task_done()
+    return enqueue_durable_images(
+        workspace_id,
+        source_name,
+        images,
+        external_id=external_id,
+        document_id=document_id,
+    )
 
 
 def _hash_bytes(data: bytes) -> str:
@@ -67,18 +39,25 @@ def _vec_literal(vec: list[float]) -> str:
     return "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
 
 
-def _process_job(job: _ImageJob) -> None:
-    for page_number, (img_bytes, mime_type) in enumerate(job.images):
+def process_images(
+    *,
+    workspace_id: str,
+    source_name: str,
+    images: list[tuple[bytes, str]],
+    external_id: str | None = None,
+    document_id: str | None = None,
+) -> None:
+    for page_number, (img_bytes, mime_type) in enumerate(images):
         image_hash = _hash_bytes(img_bytes)
 
         # Content-hash dedup — skip if already indexed for this workspace.
-        with write_session_scope() as db:
+        with workspace_session_scope(workspace_id, write=True) as db:
             existing = db.execute(
                 text(
                     "SELECT id FROM image_chunk "
                     "WHERE image_hash = :h AND workspace_id = :w LIMIT 1"
                 ),
-                {"h": image_hash, "w": job.workspace_id},
+                {"h": image_hash, "w": workspace_id},
             ).first()
         if existing:
             continue
@@ -87,7 +66,7 @@ def _process_job(job: _ImageJob) -> None:
         caption = caption_image(img_bytes, mime_type)
         embedding = embed(caption)
 
-        with write_session_scope() as db:
+        with workspace_session_scope(workspace_id, write=True) as db:
             db.execute(
                 text(
                     """
@@ -102,10 +81,10 @@ def _process_job(job: _ImageJob) -> None:
                 ),
                 {
                     "id": str(uuid.uuid4()),
-                    "workspace_id": job.workspace_id,
-                    "document_id": job.document_id,
-                    "source_name": job.source_name,
-                    "external_id": job.external_id,
+                    "workspace_id": workspace_id,
+                    "document_id": document_id,
+                    "source_name": source_name,
+                    "external_id": external_id,
                     "page_number": page_number,
                     "caption": caption,
                     "embedding": _vec_literal(embedding),
@@ -117,7 +96,7 @@ def _process_job(job: _ImageJob) -> None:
         INGEST_JOBS.labels(status="success").inc()
         emit_event(
             "image_chunk_ingested",
-            {"workspace_id": job.workspace_id, "source": job.source_name, "page": page_number},
+            {"workspace_id": workspace_id, "source": source_name, "page": page_number},
         )
 
 

@@ -60,3 +60,16 @@ def check_query(query: str) -> GuardResult:
         if pattern.search(query):
             return GuardResult(safe=False, reason=reason)
     return GuardResult(safe=True, reason="ok")
+
+
+def is_safe_context(text: str) -> bool:
+    """Return whether retrieved content is safe to include in an LLM prompt.
+
+    Documents are untrusted data, not instructions. Filtering only the high
+    confidence injection forms avoids treating ordinary prose as suspicious
+    while preventing common direct-instruction payloads from reaching the
+    generator.
+    """
+    high_confidence = {"instruction_override", "system_prompt_extraction", "special_token_injection"}
+    result = check_query(text)
+    return result.safe or result.reason not in high_confidence

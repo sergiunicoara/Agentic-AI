@@ -8,28 +8,45 @@ lightweight leader election.
 """
 
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import text
 
-from app.data.db import write_session_scope
+from app.data.db import engine
 
 
-@dataclass(frozen=True)
+@dataclass
 class LeaderLock:
     """Cluster-wide leader lock."""
 
     key: int
+    connection: Any | None = None
 
 
 def try_acquire(lock: LeaderLock) -> bool:
     """Try to acquire the leader lock. Returns True if acquired."""
 
-    with write_session_scope() as db:
-        row = db.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": int(lock.key)}).fetchone()
-        return bool(row and row[0])
+    if lock.connection is not None:
+        return True
+    connection = engine.connect()
+    try:
+        row = connection.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": int(lock.key)}).fetchone()
+        if row and row[0]:
+            lock.connection = connection
+            return True
+    except Exception:
+        connection.close()
+        raise
+    connection.close()
+    return False
 
 
 def release(lock: LeaderLock) -> None:
     """Release the lock if held by this session."""
-    with write_session_scope() as db:
-        db.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": int(lock.key)})
+    if lock.connection is None:
+        return
+    try:
+        lock.connection.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": int(lock.key)})
+    finally:
+        lock.connection.close()
+        lock.connection = None

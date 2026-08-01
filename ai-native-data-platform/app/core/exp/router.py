@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import json
-from pathlib import Path
 from dataclasses import dataclass
 
+from sqlalchemy import text
+
 from app.core.config import settings
+from app.data.db import read_session_scope
 
 
 @dataclass(frozen=True)
@@ -28,17 +29,16 @@ def choose_experiment(workspace_id: str, requested: str | None = None) -> Experi
     3) Default experiment
     """
 
-    # Automated remediation can set an override file to force all traffic
-    # to a safe control experiment.
-    override_path = Path(".runtime/ab_override.json")
-    if override_path.exists():
-        try:
-            data = json.loads(override_path.read_text(encoding="utf-8"))
-            forced = data.get("force_all") or data.get("force_by_workspace", {}).get(workspace_id)
-            if forced:
-                return ExperimentAssignment(name=str(forced), reason="remediation_override")
-        except Exception:
-            pass
+    # Overrides live in Postgres so every API replica observes remediation.
+    try:
+        with read_session_scope() as db:
+            row = db.execute(
+                text("SELECT experiment FROM runtime_experiment_override WHERE scope = 'global'"),
+            ).mappings().first()
+        if row and row.get("experiment"):
+            return ExperimentAssignment(name=str(row["experiment"]), reason="remediation_override")
+    except Exception:
+        pass
 
     if requested:
         return ExperimentAssignment(name=requested, reason="header")

@@ -5,7 +5,7 @@ import uuid
 
 from sqlalchemy import text
 
-from app.data.db import write_session_scope
+from app.data.db import workspace_session_scope
 
 
 def write_audit_log(
@@ -23,7 +23,7 @@ def write_audit_log(
     safe_params = {k: v for k, v in params.items() if k != "_workspace_id"}
 
     try:
-        with write_session_scope() as db:
+        with workspace_session_scope(workspace_id, write=True) as db:
             db.execute(
                 text(
                     """

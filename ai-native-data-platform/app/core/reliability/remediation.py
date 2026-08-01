@@ -13,27 +13,35 @@ In a production platform this logic would likely live in a separate controller
 service and interact with a feature flag system / deployment system.
 """
 
-import json
 import threading
 import time
-from pathlib import Path
+
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.observability import emit_event
 from app.core.reliability.slo_window import rolling_slo
-
-
-_override_path = Path(".runtime/ab_override.json")
+from app.data.db import write_session_scope
 
 
 def _write_override(experiment: str) -> None:
-    _override_path.parent.mkdir(parents=True, exist_ok=True)
-    _override_path.write_text(json.dumps({"force_all": experiment, "ts": time.time()}), encoding="utf-8")
+    with write_session_scope() as db:
+        db.execute(
+            text(
+                """
+                INSERT INTO runtime_experiment_override (scope, experiment, updated_at)
+                VALUES ('global', :experiment, now())
+                ON CONFLICT (scope)
+                DO UPDATE SET experiment = EXCLUDED.experiment, updated_at = now()
+                """
+            ),
+            {"experiment": experiment},
+        )
 
 
 def clear_override() -> None:
-    if _override_path.exists():
-        _override_path.unlink()
+    with write_session_scope() as db:
+        db.execute(text("DELETE FROM runtime_experiment_override WHERE scope = 'global'"))
 
 
 def start_remediation_loop(

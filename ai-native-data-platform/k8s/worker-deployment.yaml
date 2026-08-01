@@ -27,6 +27,20 @@ spec:
                 secretKeyRef:
                   name: ai-platform-secrets
                   key: redis_url
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-platform-secrets
+                  key: openai_api_key
+            - name: OPENSEARCH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ai-platform-secrets
+                  key: opensearch_url
+            - name: EMBED_PROVIDER
+              value: "openai"
+            - name: VISION_PROVIDER
+              value: "openai"
           resources:
             requests:
               cpu: "200m"

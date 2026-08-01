@@ -137,6 +137,24 @@ def promote_target_to_active(workspace_id: str) -> None:
     _state_cache_expiry.pop(workspace_id, None)
 
 
+def bump_index_epoch(workspace_id: str) -> None:
+    """Increment index_epoch after ingestion to invalidate retrieval caches."""
+    with write_session_scope() as db:
+        db.execute(
+            text(
+                """
+                INSERT INTO workspace_index_state (workspace_id, active_embedding_version, target_embedding_version, index_epoch)
+                VALUES (:w, :active, NULL, 1)
+                ON CONFLICT (workspace_id)
+                DO UPDATE SET index_epoch = workspace_index_state.index_epoch + 1, updated_at = NOW()
+                """
+            ),
+            {"w": workspace_id, "active": settings.embedding_version},
+        )
+    _state_cache.pop(workspace_id, None)
+    _state_cache_expiry.pop(workspace_id, None)
+
+
 def clear_target_embedding_version(workspace_id: str) -> None:
     with write_session_scope() as db:
         db.execute(

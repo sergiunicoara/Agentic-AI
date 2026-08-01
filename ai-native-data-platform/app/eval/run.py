@@ -311,6 +311,8 @@ def run_experiment(
         gate("recall_mean", summary["metrics"]["recall_mean"], float(gates["recall_mean"]), ">=")
     if "mrr_mean" in gates:
         gate("mrr_mean", summary["metrics"]["mrr_mean"], float(gates["mrr_mean"]), ">=")
+    if "groundedness_mean" in gates:
+        gate("groundedness_mean", summary["metrics"]["groundedness_mean"], float(gates["groundedness_mean"]), ">=")
     if "rubric_pass_rate" in gates:
         gate("rubric_pass_rate", summary["metrics"]["rubric_pass_rate"], float(gates["rubric_pass_rate"]), ">=")
     if "hard_negative_hit_rate" in gates:

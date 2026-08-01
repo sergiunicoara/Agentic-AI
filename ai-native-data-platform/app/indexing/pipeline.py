@@ -14,7 +14,7 @@ from sqlalchemy import text
 from app.chunking import chunk_text
 from app.core.config import settings
 from app.core.observability import emit_event
-from app.data.db import session_scope, write_session_scope
+from app.data.db import workspace_session_scope
 from app.providers.embeddings import embed_batch
 
 
@@ -61,7 +61,7 @@ def build_manifest(*, workspace_id: str, limit: int | None = None) -> Path:
     if limit is not None:
         sql += " LIMIT :lim"
 
-    with session_scope() as db:
+    with workspace_session_scope(workspace_id) as db:
         rows = db.execute(text(sql), {"ws": workspace_id, "lim": int(limit or 0)}).mappings().all()
 
     with out.open("w", encoding="utf-8") as f:
@@ -109,7 +109,7 @@ def run_manifest(
         attempt = 0
         while True:
             try:
-                with write_session_scope() as db:
+                with workspace_session_scope(workspace_id, write=True) as db:
                     db.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": int(cfg.statement_timeout_ms)})
                     db.execute(
                         text(
@@ -146,7 +146,7 @@ def run_manifest(
     for i in range(0, len(doc_ids), cfg.batch_size_docs):
         batch = doc_ids[i : i + cfg.batch_size_docs]
 
-        with session_scope() as db:
+        with workspace_session_scope(workspace_id) as db:
             db.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": int(cfg.statement_timeout_ms)})
             rows = db.execute(
                 text(

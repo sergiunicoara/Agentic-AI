@@ -38,9 +38,9 @@ class TestWorkspaceScoping:
         q = QueryIntent(table="trace_log")
         assert "workspace_id = :_workspace_id" in sql(q)
 
-    def test_ingestion_run_is_not_workspace_scoped(self):
+    def test_ingestion_run_is_workspace_scoped(self):
         q = QueryIntent(table="ingestion_run")
-        assert "workspace_id" not in sql(q)
+        assert "workspace_id = :_workspace_id" in sql(q)
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ class TestFullQueries:
         s = sql(q)
         assert "FROM ingestion_run" in s
         assert "status = :_v0" in s
-        assert "workspace_id" not in s   # not scoped
+        assert "workspace_id = :_workspace_id" in s
 
     def test_slowest_traces(self):
         q = QueryIntent(

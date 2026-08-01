@@ -14,7 +14,7 @@ from prometheus_client import Counter, Histogram
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.data.db import write_session_scope
+from app.data.db import workspace_session_scope
 
 import logging
 log = structlog.get_logger() if structlog is not None else logging.getLogger("ai_platform")
@@ -70,7 +70,7 @@ def persist_trace(*, trace_type: str, workspace_id: str, body: dict[str, Any], l
         return
 
     try:
-        with write_session_scope() as db:
+        with workspace_session_scope(workspace_id, write=True) as db:
             db.execute(
                 text(
                     """

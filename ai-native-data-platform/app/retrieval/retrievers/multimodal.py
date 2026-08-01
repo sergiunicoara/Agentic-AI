@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.data.db import session_scope
+from app.data.db import workspace_session_scope
 from app.schemas import RetrievedChunk
 
 
@@ -69,7 +69,7 @@ class MultimodalDenseRetriever:
             """
         )
 
-        with session_scope(database_url) as db:
+        with workspace_session_scope(workspace_id, url=database_url) as db:
             db.execute(
                 text("SET LOCAL statement_timeout = :ms"),
                 {"ms": int(settings.retriever_timeout_ms)},

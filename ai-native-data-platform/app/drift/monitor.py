@@ -5,7 +5,7 @@ import time
 
 from sqlalchemy import text
 
-from app.data.db import session_scope
+from app.data.db import workspace_session_scope
 from app.core.observability import persist_trace
 
 
@@ -37,7 +37,7 @@ def compute_drift_signal(workspace_id: str, window_minutes: int = 1440) -> dict:
     n = 0
     top_scores: list[float] = []
 
-    with session_scope() as db:
+    with workspace_session_scope(workspace_id) as db:
         rows = db.execute(sql, {"w": workspace_id, "since": since}).mappings().all()
 
     for r in rows:

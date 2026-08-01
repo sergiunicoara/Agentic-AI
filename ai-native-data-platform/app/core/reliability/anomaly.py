@@ -16,6 +16,12 @@ Signals are exported as Prometheus gauges and can also be logged via trace_log.
 from dataclasses import dataclass
 
 from prometheus_client import Gauge
+from app.core.config import settings
+
+try:
+    import redis  # type: ignore
+except Exception:  # pragma: no cover
+    redis = None
 
 
 ANOMALY_SCORE = Gauge(
@@ -29,14 +35,42 @@ ANOMALY_SCORE = Gauge(
 class EWMAAnomalyDetector:
     alpha: float = 0.2
     min_var: float = 1e-6
+    state_key: str = "slo:anomaly:default"
 
     def __post_init__(self) -> None:
         self.mean = 0.0
         self.var = 0.0
         self.initialized = False
+        self._redis = redis.Redis.from_url(settings.redis_url, decode_responses=True) if settings.redis_url and redis else None
+
+    _LUA = """
+    local x = tonumber(ARGV[1])
+    local alpha = tonumber(ARGV[2])
+    local min_var = tonumber(ARGV[3])
+    local initialized = redis.call('HGET', KEYS[1], 'initialized')
+    if initialized ~= '1' then
+      redis.call('HMSET', KEYS[1], 'initialized', '1', 'mean', x, 'var', 0)
+      redis.call('EXPIRE', KEYS[1], 86400)
+      return 0
+    end
+    local mean = tonumber(redis.call('HGET', KEYS[1], 'mean')) or 0
+    local var = tonumber(redis.call('HGET', KEYS[1], 'var')) or 0
+    local previous_mean = mean
+    mean = alpha * x + (1 - alpha) * mean
+    local resid = x - previous_mean
+    var = alpha * resid * resid + (1 - alpha) * var
+    redis.call('HMSET', KEYS[1], 'mean', mean, 'var', var)
+    redis.call('EXPIRE', KEYS[1], 86400)
+    return math.abs(x - mean) / math.sqrt(math.max(var, min_var))
+    """
 
     def update(self, x: float) -> float:
         x = float(x)
+        if self._redis is not None:
+            try:
+                return float(self._redis.eval(self._LUA, 1, self.state_key, x, self.alpha, self.min_var))
+            except Exception:
+                pass
         if not self.initialized:
             self.mean = x
             self.var = 0.0
@@ -55,9 +89,9 @@ class EWMAAnomalyDetector:
         return float(z)
 
 
-latency_detector = EWMAAnomalyDetector(alpha=0.15)
-error_detector = EWMAAnomalyDetector(alpha=0.20)
-unknown_detector = EWMAAnomalyDetector(alpha=0.20)
+latency_detector = EWMAAnomalyDetector(alpha=0.15, state_key="slo:anomaly:latency")
+error_detector = EWMAAnomalyDetector(alpha=0.20, state_key="slo:anomaly:error")
+unknown_detector = EWMAAnomalyDetector(alpha=0.20, state_key="slo:anomaly:unknown")
 
 
 def observe_slo_signals(p95_latency_ms: float, error_rate: float, unknown_rate: float) -> dict[str, float]:

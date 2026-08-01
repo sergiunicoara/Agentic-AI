@@ -111,6 +111,14 @@ class Settings(BaseSettings):
     cache_ttl_s: int = Field(default=300)
     cache_max_items: int = Field(default=10_000)
 
+    # --- Durable ingestion queue
+    ingestion_job_poll_s: float = Field(default=0.5)
+    ingestion_job_lease_s: int = Field(default=300)
+    ingestion_job_max_attempts: int = Field(default=5)
+
+    # Embeddings must match the pgvector column dimension.
+    embed_dim: int = Field(default=384, ge=1)
+
     # --- Backpressure / rate control
     max_in_flight_requests: int = Field(default=128)
     per_workspace_rps: float = Field(default=10.0)

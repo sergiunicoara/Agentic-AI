@@ -73,6 +73,13 @@ services:
       DATABASE_URL: postgresql+psycopg2://app:app@db:5432/app
       REDIS_URL: redis://redis:6379/0
       OPENSEARCH_URL: http://opensearch:9200
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      EMBED_PROVIDER: ${EMBED_PROVIDER:-mock}
+      VISION_PROVIDER: ${VISION_PROVIDER:-mock}
+      OPENAI_EMBED_MODEL: ${OPENAI_EMBED_MODEL:-text-embedding-3-small}
+      EMBEDDING_VERSION: ${EMBEDDING_VERSION:-v1}
+      EMBED_DIM: ${EMBED_DIM:-384}
+      OPENSEARCH_DUAL_WRITE: ${OPENSEARCH_DUAL_WRITE:-true}
     depends_on:
       - db
       - redis

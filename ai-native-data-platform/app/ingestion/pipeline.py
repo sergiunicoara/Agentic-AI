@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 import hashlib
-import queue
 import threading
-import time
 import uuid
 
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.observability import INGEST_JOBS, INGEST_LATENCY, emit_event, timer
-from app.data.db import write_session_scope
+from app.data.db import workspace_session_scope
 from app.chunking import chunk_text
 from app.providers.embeddings import embed
-
-_jobs: "queue.Queue[str]" = queue.Queue()
-
 
 def _opensearch_dual_write_batch(chunk_payloads: list[dict]) -> None:
     """Best-effort batched dual-write to OpenSearch.
@@ -43,8 +38,9 @@ def _opensearch_dual_write_batch(chunk_payloads: list[dict]) -> None:
 _started = False
 
 
-def enqueue(document_id: str) -> None:
-    _jobs.put(document_id)
+def enqueue(document_id: str, workspace_id: str) -> None:
+    from app.ingestion.jobs import enqueue_document
+    enqueue_document(document_id, workspace_id)
 
 
 def start_worker() -> None:
@@ -52,19 +48,33 @@ def start_worker() -> None:
     if _started:
         return
     _started = True
-    t = threading.Thread(target=_loop, daemon=True)
+    t = threading.Thread(target=_loop, daemon=True, name="durable-ingestion-worker")
     t.start()
 
 
 def _loop() -> None:
-    while True:
-        doc_id = _jobs.get()
+    from app.ingestion.jobs import IngestionJob, run_forever
+    from app.ingestion.multimodal import process_images
+
+    def _handle(job: IngestionJob) -> None:
         try:
-            process_document(doc_id)
-        except Exception as e:
-            emit_event("ingest_failed", {"document_id": doc_id, "error": str(e)})
-        finally:
-            _jobs.task_done()
+            if job.job_type == "document" and job.document_id:
+                process_document(job.document_id, job.workspace_id)
+            elif job.job_type == "image":
+                process_images(
+                    workspace_id=job.workspace_id,
+                    source_name=str(job.payload.get("source_name") or "upload"),
+                    images=job.media,
+                    external_id=job.payload.get("external_id"),
+                    document_id=job.document_id,
+                )
+            else:
+                raise ValueError(f"unsupported ingestion job type: {job.job_type}")
+        except Exception as exc:
+            emit_event("ingest_failed", {"job_id": job.id, "job_type": job.job_type, "error": str(exc)})
+            raise
+
+    run_forever(_handle)
 
 
 def _vec_literal(vec: list[float]) -> str:
@@ -75,7 +85,7 @@ def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
 
 
-def process_document(document_id: str) -> None:
+def process_document(document_id: str, workspace_id: str) -> None:
     """Idempotent ingestion run: chunk, embed, and persist.
 
     Demonstrates platform concerns:
@@ -85,23 +95,23 @@ def process_document(document_id: str) -> None:
     """
 
     run_id = str(uuid.uuid4())
-    with write_session_scope() as db:
+    with workspace_session_scope(workspace_id, write=True) as db:
         db.execute(
             text(
                 """
-                INSERT INTO ingestion_run (id, document_id, status, embedding_version)
-                VALUES (:id, :doc, 'running', :v)
+                INSERT INTO ingestion_run (id, document_id, workspace_id, status, embedding_version)
+                VALUES (:id, :doc, :workspace_id, 'running', :v)
                 """
             ),
-            {"id": run_id, "doc": document_id, "v": settings.embedding_version},
+            {"id": run_id, "doc": document_id, "workspace_id": workspace_id, "v": settings.embedding_version},
         )
 
     with timer(INGEST_LATENCY):
         try:
             os_payloads: list[dict] = []
-            with write_session_scope() as db:
+            with workspace_session_scope(workspace_id, write=True) as db:
                 doc = db.execute(
-                    text("SELECT id::text, workspace_id, source_name, text FROM document WHERE id=:id"),
+                    text("SELECT id::text, workspace_id, source_name, text FROM document WHERE id=CAST(:id AS uuid)"),
                     {"id": document_id},
                 ).mappings().first()
                 if not doc:
@@ -158,10 +168,14 @@ def process_document(document_id: str) -> None:
             # Dual-write only after the Postgres transaction has committed.
             _opensearch_dual_write_batch(os_payloads)
 
+            # Bump epoch so the retrieval cache is invalidated for this workspace.
+            from app.indexing.index_state import bump_index_epoch
+            bump_index_epoch(ws)
+
             INGEST_JOBS.labels(status="success").inc()
 
         except Exception as e:
-            with write_session_scope() as db:
+            with workspace_session_scope(workspace_id, write=True) as db:
                 db.execute(
                     text("UPDATE ingestion_run SET status='failed', error=:err, finished_at=now() WHERE id=:id"),
                     {"id": run_id, "err": str(e)},

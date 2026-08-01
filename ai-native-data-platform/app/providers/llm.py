@@ -13,6 +13,11 @@ from tenacity import (
     wait_exponential,
 )
 
+try:
+    import redis  # type: ignore
+except Exception:  # pragma: no cover
+    redis = None
+
 PROVIDER = os.getenv("LLM_PROVIDER", "mock").lower()
 TIMEOUT = float(os.getenv("REQUEST_TIMEOUT_S", "20"))
 
@@ -39,9 +44,25 @@ class CircuitBreaker:
         self._state = "closed"  # closed | open | half_open
         self._failures = 0
         self._opened_at = 0.0
+        redis_url = os.getenv("REDIS_URL", "")
+        self._redis = redis.Redis.from_url(redis_url, decode_responses=True) if redis_url and redis else None
+        self._redis_key = "llm:circuit_breaker"
 
     def allow(self) -> bool:
         now = time.time()
+        if self._redis is not None:
+            try:
+                state = self._redis.hgetall(self._redis_key)
+                if state.get("state") != "open":
+                    return True
+                opened_at = float(state.get("opened_at", "0"))
+                if (now - opened_at) < self.cooldown_s:
+                    return False
+                # Exactly one replica gets a half-open probe while the rest
+                # continue to fail fast during recovery.
+                return bool(self._redis.set(f"{self._redis_key}:probe", "1", nx=True, ex=max(1, int(self.cooldown_s))))
+            except Exception:
+                pass
         with self._lock:
             if self._state == "closed":
                 return True
@@ -56,6 +77,12 @@ class CircuitBreaker:
             return True
 
     def on_success(self) -> None:
+        if self._redis is not None:
+            try:
+                self._redis.delete(self._redis_key, f"{self._redis_key}:probe")
+                return
+            except Exception:
+                pass
         with self._lock:
             self._state = "closed"
             self._failures = 0
@@ -63,6 +90,18 @@ class CircuitBreaker:
 
     def on_failure(self) -> None:
         now = time.time()
+        if self._redis is not None:
+            try:
+                failures = int(self._redis.hincrby(self._redis_key, "failures", 1))
+                values: dict[str, str | float] = {"state": "closed"}
+                if failures >= self.failure_threshold:
+                    values = {"state": "open", "opened_at": now}
+                self._redis.hset(self._redis_key, mapping=values)
+                self._redis.expire(self._redis_key, max(60, int(self.cooldown_s * 3)))
+                self._redis.delete(f"{self._redis_key}:probe")
+                return
+            except Exception:
+                pass
         with self._lock:
             self._failures += 1
             if self._failures >= self.failure_threshold:

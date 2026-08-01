@@ -2,7 +2,9 @@
 
 **Runtime:** ~4 min | **Stack:** FastAPI · pgvector · OpenSearch · Grafana · DSPy | **Tests:** 190 passing
 
-> **Terminal:** PowerShell 5.1 (default Windows terminal). The `--%%` token after `curl.exe` tells PowerShell to stop processing arguments — copy commands exactly as written.
+> **Terminal note:** Two syntaxes below — pick the one matching your shell.
+> - **PowerShell 5.1:** commands use `curl.exe --%` (stop-parsing token prevents PS from mangling args)
+> - **cmd.exe / Git Bash / any other shell:** use the `curl` commands in the *"cmd / bash"* blocks — no `--%`, same `\"` escaping, works natively
 
 ---
 
@@ -39,10 +41,16 @@ docker compose up -d
 
 Split screen: curl request left pane, API logs right pane.
 
-> Note: ingestion threads run inside the API process — logs appear in the API container, not the worker container.
+> Note: ingestion is written to a durable Postgres job queue. Logs and retry
+> attempts appear in the worker container, and jobs survive an API restart.
 
+**PowerShell:**
 ```
 curl.exe --% -s -X POST http://localhost:8000/ingest/transcript -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"title\":\"Refund Policy\",\"text\":\"Customers may request a full refund within 30 days of purchase.\"}"
+```
+**cmd / bash:**
+```
+curl -s -X POST http://localhost:8000/ingest/transcript -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"title\":\"Refund Policy\",\"text\":\"Customers may request a full refund within 30 days of purchase.\"}"
 ```
 
 ```json
@@ -72,8 +80,13 @@ docker logs ai-native-data-platform-api-1 --follow
 
 Fresh terminal. Ask the platform about the just-ingested document.
 
+**PowerShell:**
 ```
 curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
+```
+**cmd / bash:**
+```
+curl -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
 ```
 
 ```json
@@ -94,8 +107,13 @@ curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/
 
 Same request body. One extra header. Different engine. Result is identical.
 
+**PowerShell:**
 ```
 curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
+```
+**cmd / bash:**
+```
+curl -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
 ```
 
 ```json
@@ -114,8 +132,13 @@ curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/
 
 Plain English → workspace-scoped parameterized SQL.
 
+**PowerShell:**
 ```
 curl.exe --% -s -X POST http://localhost:8000/query/natural-language -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"query\":\"Show the 5 slowest traces\"}"
+```
+**cmd / bash:**
+```
+curl -s -X POST http://localhost:8000/query/natural-language -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -d "{\"workspace_id\":\"demo\",\"query\":\"Show the 5 slowest traces\"}"
 ```
 
 ```json
@@ -149,7 +172,7 @@ curl.exe -s http://localhost:8000/metrics | Select-String "slo_rolling|anomaly_s
 slo_rolling_p95_latency_ms 312.0
 slo_rolling_error_rate 0.0
 slo_rolling_unknown_rate 0.0
-platform_anomaly_score{signal="latency"} 0.82
+platform_anomaly_score{signal="p95_latency_ms"} 0.82
 platform_anomaly_score{signal="error_rate"} 0.14
 ```
 
@@ -166,15 +189,29 @@ Open **`app/core/reliability/remediation_controller.py`**. Walk lines 51–86.
 - **L83:** `violated = violated + 1 if bad else max(0, violated - 1)` — hysteresis, not a toggle
 - **L85:** `if violated >= 3: _write_override(force_experiment)` — forces all traffic to control
 
+> Note: the override file only exists after 3 consecutive SLO violations. In a healthy system it's absent — simulate it manually for the demo.
+
+**PowerShell:**
 ```
-Get-Content .runtime/ab_override.json
+docker compose exec db psql -U app -d app -c "INSERT INTO runtime_experiment_override (scope, experiment) VALUES ('global', 'control') ON CONFLICT (scope) DO UPDATE SET experiment = EXCLUDED.experiment, updated_at = now();"
+docker compose exec db psql -U app -d app -c "SELECT scope, experiment, updated_at FROM runtime_experiment_override;"
 ```
+**cmd (via inline PowerShell):**
+```
+powershell -Command "New-Item -ItemType Directory -Force .runtime | Out-Null; '{ \"force_all\": \"control\", \"ts\": 1720600000.0 }' | Set-Content .runtime\ab_override.json; Get-Content .runtime\ab_override.json"
+```
+
 ```json
 { "force_all": "control", "ts": 1720600000.0 }
 ```
 
+**PowerShell:**
 ```
-Remove-Item .runtime/ab_override.json
+docker compose exec db psql -U app -d app -c "DELETE FROM runtime_experiment_override WHERE scope = 'global';"
+```
+**cmd:**
+```
+docker compose exec db psql -U app -d app -c "DELETE FROM runtime_experiment_override WHERE scope = 'global';"
 ```
 
 **V.O.:** *"Leader-elected via Postgres advisory lock — in a multi-replica deployment, only one instance runs remediation. Three consecutive SLO violations write a JSON override, forcing all workspace traffic to the safe control experiment. Reversible: delete the file. Closed-loop ops in 100 lines of Python."*
@@ -213,7 +250,7 @@ Open **`graphify-out/graph.html`** in a browser. Zoom out to show the full graph
 - **HOVER** QueryIntent (51 edges) — NL→SQL central abstraction
 - **HOVER** emit_event() (31 edges) — observability wired through every subsystem
 
-**V.O.:** *"891 nodes. 1924 edges. 78 communities. Production patterns, not portfolio scaffolding."*
+**V.O.:** *"895 nodes. 1929 edges. 80 communities. Production patterns, not portfolio scaffolding."*
 
 ---
 
@@ -221,4 +258,4 @@ Open **`graphify-out/graph.html`** in a browser. Zoom out to show the full graph
 
 | Services | Retrieval Modes | Tests | Graph Nodes | Hallucinations |
 |---|---|---|---|---|
-| 8 | 8 | 190 | 891 | 0 |
+| 8 | 8 | 190 | 895 | 0 |

@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import collections
+import json
+import time
+import uuid
 from dataclasses import dataclass
 from typing import Deque, Tuple
 
 from prometheus_client import Gauge
+from app.core.config import settings
+
+try:
+    import redis  # type: ignore
+except Exception:  # pragma: no cover
+    redis = None
 
 
 SLO_ROLLING_P95_LATENCY_MS = Gauge(
@@ -50,18 +59,49 @@ class RollingWindowSLO:
         self._last_p95 = 0.0
         self._last_err_rate = 0.0
         self._last_unknown_rate = 0.0
+        self._redis = redis.Redis.from_url(settings.redis_url, decode_responses=True) if settings.redis_url and redis else None
+        self._redis_key = "slo:rolling:events"
 
     def observe(self, latency_ms: float, *, is_error: bool, is_unknown: bool) -> None:
+        if self._redis is not None:
+            try:
+                now = time.time()
+                member = json.dumps(
+                    {"latency_ms": float(latency_ms), "is_error": int(is_error), "is_unknown": int(is_unknown), "id": uuid.uuid4().hex},
+                    separators=(",", ":"),
+                )
+                self._redis.zadd(self._redis_key, {member: now})
+                count = int(self._redis.zcard(self._redis_key))
+                if count > self.max_events:
+                    self._redis.zremrangebyrank(self._redis_key, 0, count - self.max_events - 1)
+                self._redis.expire(self._redis_key, 86_400)
+                self._publish(self._redis_events())
+                return
+            except Exception:
+                pass
         self._events.append((0.0, float(latency_ms), 1 if is_error else 0, 1 if is_unknown else 0))
         self._publish()
 
-    def _publish(self) -> None:
-        if not self._events:
+    def _redis_events(self) -> list[Tuple[float, float, int, int]]:
+        if self._redis is None:
+            return []
+        out: list[Tuple[float, float, int, int]] = []
+        for raw in self._redis.zrange(self._redis_key, 0, -1):
+            try:
+                item = json.loads(raw)
+                out.append((0.0, float(item["latency_ms"]), int(item["is_error"]), int(item["is_unknown"])))
+            except (TypeError, ValueError, KeyError):
+                continue
+        return out
+
+    def _publish(self, events: list[Tuple[float, float, int, int]] | None = None) -> None:
+        events = events if events is not None else list(self._events)
+        if not events:
             return
-        lats = [e[1] for e in self._events]
-        errs = sum(e[2] for e in self._events)
-        unks = sum(e[3] for e in self._events)
-        n = len(self._events)
+        lats = [e[1] for e in events]
+        errs = sum(e[2] for e in events)
+        unks = sum(e[3] for e in events)
+        n = len(events)
         self._last_p95 = _p95(lats)
         self._last_err_rate = errs / n
         self._last_unknown_rate = unks / n
@@ -70,11 +110,19 @@ class RollingWindowSLO:
         SLO_ROLLING_UNKNOWN_RATE.set(self._last_unknown_rate)
 
     def snapshot(self) -> dict[str, float]:
+        sample_count = len(self._events)
+        if self._redis is not None:
+            try:
+                events = self._redis_events()
+                self._publish(events)
+                sample_count = len(events)
+            except Exception:
+                self._redis = None
         return {
             "p95_latency_ms": float(self._last_p95),
             "error_rate": float(self._last_err_rate),
             "unknown_rate": float(self._last_unknown_rate),
-            "samples": float(len(self._events)),
+            "samples": float(sample_count),
         }
 
 

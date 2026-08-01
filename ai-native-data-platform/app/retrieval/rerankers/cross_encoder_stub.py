@@ -20,7 +20,7 @@ import math
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.data.db import read_session_scope
+from app.data.db import workspace_session_scope
 from app.schemas import RetrievedChunk
 
 
@@ -53,7 +53,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / math.sqrt(na * nb)
 
 
-def _fetch_embeddings(chunk_ids: list[str], *, embedding_version: str) -> dict[str, list[float]]:
+def _fetch_embeddings(chunk_ids: list[str], *, embedding_version: str, workspace_id: str) -> dict[str, list[float]]:
     if not chunk_ids:
         return {}
 
@@ -75,7 +75,7 @@ def _fetch_embeddings(chunk_ids: list[str], *, embedding_version: str) -> dict[s
               AND embedding_version = :embedding_version
             """
         )
-        with read_session_scope() as db:
+        with workspace_session_scope(workspace_id) as db:
             rows = db.execute(sql, {"ids": missing, "embedding_version": embedding_version}).mappings().all()
 
         for r in rows:
@@ -100,13 +100,21 @@ class CrossEncoderStubReranker:
         # alpha weights semantic cosine; (1-alpha) weights lexical overlap
         self.alpha = max(0.0, min(1.0, float(alpha)))
 
-    def rerank(self, query: str, query_vec: list[float], docs: list[RetrievedChunk], k: int) -> list[RetrievedChunk]:
+    def rerank(
+        self,
+        query: str,
+        query_vec: list[float],
+        docs: list[RetrievedChunk],
+        k: int,
+        *,
+        workspace_id: str,
+    ) -> list[RetrievedChunk]:
         if not docs:
             return []
         cand = docs[:]
         ids = [d.id for d in cand]
         ev = str((cand[0].meta or {}).get("embedding_version") or settings.embedding_version)
-        embs = _fetch_embeddings(ids, embedding_version=ev)
+        embs = _fetch_embeddings(ids, embedding_version=ev, workspace_id=workspace_id)
 
         scored: list[tuple[float, RetrievedChunk]] = []
         for d in cand:

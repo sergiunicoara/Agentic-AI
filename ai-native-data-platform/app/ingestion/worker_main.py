@@ -1,6 +1,7 @@
 from __future__ import annotations
 import time
-from app.worker import start_worker
+
+from app.ingestion.pipeline import start_worker
 
 if __name__ == "__main__":
     start_worker()
