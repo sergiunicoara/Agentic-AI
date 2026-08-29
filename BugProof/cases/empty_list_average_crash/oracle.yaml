@@ -1,0 +1,7 @@
+case_id: empty_list_average_crash
+difficulty: easy
+failure_family: empty_input_crash
+exception_type: ZeroDivisionError
+message_pattern: division by zero
+decoy_expected_reason: WRONG_SYMPTOM
+description: average_score() divides by len(scores) unconditionally and raises ZeroDivisionError for an empty list instead of returning a sensible default.

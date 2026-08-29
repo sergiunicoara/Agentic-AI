@@ -1,0 +1,30 @@
+I read `report.md` and `buggy/handles.py`, wrote `candidate_test.py` reproducing the double/triple-space-to-underscore bug, ran it once (copied into `buggy/`, ran with pytest, then removed the copy along with `__pycache__`/`.pytest_cache`), and confirmed `buggy/` is restored to only `handles.py`. Both tests failed as expected, reproducing the exact behavior in the report (`jane__doe` / `jane___doe`).
+
+EVIDENCE:
+ITEM: bug-symptom-string
+KIND: literal
+VALUE: "jane___doe"
+QUOTE: "like \"jane___doe\" instead of the usual single-underscore style"
+SOURCE: report.md
+---
+ITEM: trigger-condition
+KIND: literal
+VALUE: "Jane  Doe"
+QUOTE: "typing \"Jane  Doe\" with two spaces instead of one"
+SOURCE: report.md
+---
+ITEM: replace-implementation
+KIND: literal
+VALUE: raw.strip().lower().replace(" ", "_")
+QUOTE: "return raw.strip().lower().replace(\" \", \"_\")"
+SOURCE: buggy/handles.py
+---
+ITEM: expected-single-underscore-output
+KIND: qualitative
+NOTE: The desired/correct output "jane_doe" (single underscore) is not itself quoted verbatim anywhere in report.md — the report only quotes the buggy triple-underscore output "jane___doe" and describes the general problem as extra underscores instead of "the usual single-underscore style." The single-underscore expected value is the natural normalized form implied by "the usual single-underscore style everyone else has," not a literal string copied from source, so I could not label it literal; it also isn't an arithmetic derivation, so qualitative is the honest label.
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The source code's `replace(" ", "_")` demonstrably replaces each space character independently rather than collapsing runs of spaces, which is a direct, verifiable mechanism for the reported symptom (extra spaces at signup producing multiple consecutive underscores in the handle). I ran the test exactly once as required, copying it into `buggy/`, executing it with pytest, and observing both assertions fail with `AssertionError: assert 'jane__doe' == 'jane_doe'` and `AssertionError: assert 'jane___doe' == 'jane_doe'` — the second failure's actual value, `jane___doe`, is byte-for-byte the exact string quoted in report.md. I then removed the temporary copy and all pytest-generated cache directories from `buggy/`, leaving it byte-for-byte identical to its original state (verified via `ls -la`). The only non-literal, non-derived assertion (the single-underscore expected output) is disclosed above as qualitative with an honest justification, and every other exact value/quote in the test is grounded directly in report.md or buggy/handles.py.

@@ -1,0 +1,17 @@
+EVIDENCE:
+ITEM: field_count_three
+KIND: derived
+VALUE: 3
+BASIS: 2 + 1
+QUOTE: "respecting double-quoted fields"
+SOURCE: buggy/linefmt.py
+---
+ITEM: content_stays_together
+KIND: qualitative
+NOTE: These are `in` (substring membership) checks, not `==`/`!=`/`is`/`is not` comparisons or `pytest.raises`, so per the task's own rule they're not subject to the exact-value grounding requirement; they're structural sanity checks (that "He said", "sure", "today" all remain in the same field) supporting the same field-boundary-shift symptom already grounded above, not independent exact-value claims.
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The buggy `parse_line` in `buggy/linefmt.py` toggles `in_quotes` on every literal `"` character with no handling of a quoted phrase embedded inside an already-quoted field. I constructed `101,"He said "ok, sure" today",29.99` — a description field that must be quoted (it contains the delimiter) and additionally contains an embedded quoted phrase `"ok, sure"` — mirroring the report's "quoted phrase inside it" scenario. I copied `candidate_test.py` into `buggy/`, ran `python -m pytest candidate_test.py -v` from there, and observed a genuine failure: `assert len(fields) == 3` failed with `AssertionError: assert 4 == 3`, where the actual result was `['101', 'He said ok', ' sure today', '29.99']` — the quote marks around "ok, sure" are gone from the output and the field boundary shifted right after that embedded phrase, splitting one field into two. This matches both symptoms in report.md exactly. I then removed the temporary copy and all pytest-generated cache directories from `buggy/`, confirming it contains only the original 474-byte `linefmt.py`, unmodified.

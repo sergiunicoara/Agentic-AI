@@ -1,0 +1,7 @@
+case_id: discount_unit_mismatch
+difficulty: medium
+failure_family: incorrect_returned_value
+exception_type:
+message_pattern: -1900
+decoy_expected_reason: FAILS_ON_FIXED
+description: apply_discount() treats percent_off as an already-normalized fraction instead of a 0-100 percentage, so a 20%-off discount multiplies the price by 20 instead of 0.2.

@@ -1,0 +1,225 @@
+{
+  "A": {
+    "variant": "A",
+    "n": 12,
+    "CVR": {
+      "count": 9,
+      "total": 12,
+      "pct": 75.0
+    },
+    "DVRR": {
+      "count": 9,
+      "total": 12,
+      "pct": 75.0
+    },
+    "claim_precision": {
+      "count": 9,
+      "total": 12,
+      "pct": 75.0
+    },
+    "false_delivered_claims": {
+      "count": 3
+    },
+    "coverage": {
+      "count": 12,
+      "total": 12,
+      "pct": 100.0
+    },
+    "delivered_valid_case_ids": [
+      "cart_coupon_ordering",
+      "contact_dedup_case_sensitivity",
+      "discount_unit_mismatch",
+      "inventory_negative_quantity",
+      "off_by_one_pagination",
+      "reminder_lead_time_units",
+      "stale_cache_between_users",
+      "ttl_cache_boundary",
+      "username_normalization"
+    ],
+    "false_delivered_case_ids": [
+      "csv_quoted_field_parsing",
+      "empty_list_average_crash",
+      "roster_lookup_wrong_exception"
+    ],
+    "not_delivered_case_ids": []
+  },
+  "B": {
+    "variant": "B",
+    "n": 12,
+    "CVR": {
+      "count": 9,
+      "total": 12,
+      "pct": 75.0
+    },
+    "DVRR": {
+      "count": 9,
+      "total": 12,
+      "pct": 75.0
+    },
+    "claim_precision": {
+      "count": 9,
+      "total": 12,
+      "pct": 75.0
+    },
+    "false_delivered_claims": {
+      "count": 3
+    },
+    "coverage": {
+      "count": 12,
+      "total": 12,
+      "pct": 100.0
+    },
+    "delivered_valid_case_ids": [
+      "cart_coupon_ordering",
+      "contact_dedup_case_sensitivity",
+      "discount_unit_mismatch",
+      "inventory_negative_quantity",
+      "off_by_one_pagination",
+      "reminder_lead_time_units",
+      "stale_cache_between_users",
+      "ttl_cache_boundary",
+      "username_normalization"
+    ],
+    "false_delivered_case_ids": [
+      "csv_quoted_field_parsing",
+      "empty_list_average_crash",
+      "roster_lookup_wrong_exception"
+    ],
+    "not_delivered_case_ids": []
+  },
+  "C": {
+    "variant": "C",
+    "n": 12,
+    "CVR": {
+      "count": 8,
+      "total": 12,
+      "pct": 66.7
+    },
+    "DVRR": {
+      "count": 3,
+      "total": 12,
+      "pct": 25.0
+    },
+    "claim_precision": {
+      "count": 3,
+      "total": 4,
+      "pct": 75.0
+    },
+    "false_delivered_claims": {
+      "count": 1
+    },
+    "coverage": {
+      "count": 4,
+      "total": 12,
+      "pct": 33.3
+    },
+    "delivered_valid_case_ids": [
+      "cart_coupon_ordering",
+      "discount_unit_mismatch",
+      "reminder_lead_time_units"
+    ],
+    "false_delivered_case_ids": [
+      "inventory_negative_quantity"
+    ],
+    "not_delivered_case_ids": [
+      "contact_dedup_case_sensitivity",
+      "csv_quoted_field_parsing",
+      "empty_list_average_crash",
+      "off_by_one_pagination",
+      "roster_lookup_wrong_exception",
+      "stale_cache_between_users",
+      "ttl_cache_boundary",
+      "username_normalization"
+    ]
+  },
+  "D": {
+    "variant": "D",
+    "n": 12,
+    "CVR": {
+      "count": 9,
+      "total": 12,
+      "pct": 75.0
+    },
+    "DVRR": {
+      "count": 5,
+      "total": 12,
+      "pct": 41.7
+    },
+    "claim_precision": {
+      "count": 5,
+      "total": 8,
+      "pct": 62.5
+    },
+    "false_delivered_claims": {
+      "count": 3
+    },
+    "coverage": {
+      "count": 8,
+      "total": 12,
+      "pct": 66.7
+    },
+    "delivered_valid_case_ids": [
+      "cart_coupon_ordering",
+      "discount_unit_mismatch",
+      "reminder_lead_time_units",
+      "roster_lookup_wrong_exception",
+      "username_normalization"
+    ],
+    "false_delivered_case_ids": [
+      "csv_quoted_field_parsing",
+      "inventory_negative_quantity",
+      "ttl_cache_boundary"
+    ],
+    "not_delivered_case_ids": [
+      "contact_dedup_case_sensitivity",
+      "empty_list_average_crash",
+      "off_by_one_pagination",
+      "stale_cache_between_users"
+    ]
+  },
+  "D_exec": {
+    "variant": "D_exec",
+    "n": 12,
+    "CVR": {
+      "count": 10,
+      "total": 12,
+      "pct": 83.3
+    },
+    "DVRR": {
+      "count": 4,
+      "total": 12,
+      "pct": 33.3
+    },
+    "claim_precision": {
+      "count": 4,
+      "total": 5,
+      "pct": 80.0
+    },
+    "false_delivered_claims": {
+      "count": 1
+    },
+    "coverage": {
+      "count": 5,
+      "total": 12,
+      "pct": 41.7
+    },
+    "delivered_valid_case_ids": [
+      "cart_coupon_ordering",
+      "discount_unit_mismatch",
+      "reminder_lead_time_units",
+      "roster_lookup_wrong_exception"
+    ],
+    "false_delivered_case_ids": [
+      "inventory_negative_quantity"
+    ],
+    "not_delivered_case_ids": [
+      "contact_dedup_case_sensitivity",
+      "csv_quoted_field_parsing",
+      "empty_list_average_crash",
+      "off_by_one_pagination",
+      "stale_cache_between_users",
+      "ttl_cache_boundary",
+      "username_normalization"
+    ]
+  }
+}

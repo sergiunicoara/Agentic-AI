@@ -1,0 +1,28 @@
+{
+  "variant": "C",
+  "n": 12,
+  "claim_rate": {
+    "count": 4,
+    "total": 12,
+    "pct": 33.3
+  },
+  "vrr": {
+    "count": 8,
+    "total": 12,
+    "pct": 66.7
+  },
+  "fcrr": {
+    "count": 1,
+    "claimed_total": 4,
+    "pct": 25.0
+  },
+  "oracle_counts": {
+    "VALID": 8,
+    "WRONG_SYMPTOM": 2,
+    "PASSES_ON_BUGGY": 2,
+    "COLLECTION_ERROR": 0,
+    "FAILS_ON_FIXED": 0,
+    "SUITE_REGRESSION": 0,
+    "ORACLE_ERROR_TIMEOUT": 0
+  }
+}

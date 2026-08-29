@@ -1,0 +1,21 @@
+Summary: buggy/throttle.py's RequestThrottle.is_throttled() uses elapsed < self.window_seconds, so the instant elapsed time reaches exactly window_seconds, the client is already reported as "not throttled" — one tick before the window has actually been left behind. This matches the report's description of a client getting through "right around the edge of the cooldown window, when it should have still been blocked for another moment."
+
+Test written: candidate_test.py uses an injectable fake clock returning 0 then 10 (== window_seconds) to deterministically land exactly on the boundary, then asserts is_throttled(...) is still True.
+
+Observed run (copied temporarily into buggy/, run with pytest, then removed):
+candidate_test.py::test_client_still_blocked_exactly_at_window_boundary FAILED
+AssertionError: assert False is True
+ where False = is_throttled('client-1')
+
+This confirms the reported behavior: the throttle lets the client through exactly at the window boundary. buggy/ was restored to contain only the original throttle.py.
+
+EVIDENCE:
+ITEM: still_blocked_at_boundary
+KIND: qualitative
+NOTE: The asserted value (is_throttled(...) is True at elapsed == window_seconds) is not a verbatim numeric literal from the source nor a simple arithmetic derivation — it is an interpretation of the docstring "Blocks a client from repeating a request until the cooldown window has fully elapsed" (buggy/throttle.py) combined with the report's own phrasing "should have still been blocked for another moment" (report.md), both of which indicate the client should remain blocked through the exact boundary instant rather than being released at it. There is no exact numeric value stated anywhere to quote as a literal.
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The test deterministically simulates the exact scenario report.md describes — a client getting through right at the edge of the cooldown window when it should still be blocked — using an injected fake clock so it does not depend on real-time flakiness. I ran it exactly once (temporarily copied into buggy/, executed with pytest from there, then removed, leaving buggy/throttle.py byte-for-byte unchanged) and observed it fail with AssertionError: assert False is True, directly confirming that is_throttled() returns False at the exact window boundary instead of True. The one assertion in the test is grounded qualitatively in the class docstring and the report's own wording rather than a bare numeric literal, since the report describes a boundary/timing behavior rather than citing exact numbers, and I've disclosed that honestly above.

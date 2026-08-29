@@ -1,0 +1,6 @@
+case_id: inventory_negative_quantity
+difficulty: easy
+failure_family: input_validation
+exception_type: ValueError
+message_pattern: DID NOT RAISE
+description: adjust_stock() applies any delta unconditionally with no lower-bound check, silently letting a stock count go negative instead of rejecting the adjustment.

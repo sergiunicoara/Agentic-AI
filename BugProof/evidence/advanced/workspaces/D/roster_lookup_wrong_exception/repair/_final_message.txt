@@ -1,0 +1,51 @@
+Summary
+
+Fixed candidate_test.py so it actually reproduces the bug reported in report.md (roster lookup on a missing id throws unhandled IndexError instead of a normal "not found" response).
+
+Root cause of prior failure: the old test wrapped the missing-id lookup in pytest.raises(IndexError) — that expects and catches the current buggy IndexError, so it passes on buggy/ instead of failing.
+
+Fix: since report.md never states what the corrected behavior should be (no specific replacement exception/return value is grounded in the text), I narrowed the assertion instead of inventing one: the test now calls find_member(members, 999) inside try/except IndexError: pytest.fail(...), treating any other outcome (return value, or a different/handleable exception) as acceptable. This directly encodes the one fact report.md supports — that an unhandled IndexError is the bug — without overclaiming a specific fix shape.
+
+Verified by copying the test into buggy/, running it once, and removing the copy plus pytest artifacts afterward: 1 failed, 1 passed — the existing-id test passes, the missing-id test fails with IndexError: list index out of range from roster.py:4. buggy/roster.py is confirmed untouched.
+
+EVIDENCE:
+
+- item: existing-id-works
+  KIND: literal
+  claim: report.md states that looking up an id that does exist works fine
+  quote: "looking up ids that do exist works fine"
+  source: report.md
+
+- item: missing-id-unhandled-error
+  KIND: literal
+  claim: report.md states the missing-id case throws an unhandled error
+  quote: "throws an unhandled error"
+  source: report.md
+
+- item: missing-id-not-found-response
+  KIND: literal
+  claim: report.md states the desired response category is a "member not found" response
+  quote: "member not found"
+  source: report.md
+
+- item: missing-id-indexerror
+  KIND: literal
+  claim: report.md states the observed error is IndexError: list index out of range
+  quote: "IndexError: list index out of range"
+  source: report.md
+
+- item: buggy-source-raises-indexerror
+  KIND: literal
+  claim: buggy/roster.py returns matches[0], which raises IndexError when matches is empty (missing id)
+  quote: "return matches[0]"
+  source: buggy/roster.py
+
+- item: narrowed-assertion-rationale
+  KIND: qualitative
+  claim: report.md does not specify what the corrected behavior should be (no None/KeyError/LookupError mentioned in report.md itself), so the test only asserts absence of the specific unhandled IndexError rather than pinning an unverified replacement behavior
+
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The revised test was executed exactly once, freshly, against the real unmodified buggy/roster.py (temp-copied in, run, removed), and the observed result — 1 failed, 1 passed, with the failing test's traceback showing IndexError: list index out of range raised from roster.py:4 inside the except IndexError: branch — directly matches the defect report.md describes (a support ticket about an unhandled IndexError on missing-id lookups). Every literal item above is a verbatim quote traceable to report.md or buggy/roster.py, and the one place I could not ground an exact replacement value (what the fixed behavior should look like) was handled by narrowing the assertion to only what's supported, per the repair instructions, rather than inventing a specific exception type. This satisfies both the evidence-grounding requirement and the execution requirement (test fails on buggy/, would pass once the code is fixed to not raise a raw IndexError), so I'm confident marking this VERIFIED_REPRODUCTION rather than falling back to INSUFFICIENT_EVIDENCE.

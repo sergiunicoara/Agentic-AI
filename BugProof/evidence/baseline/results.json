@@ -1,0 +1,98 @@
+[
+  {
+    "case_id": "cart_coupon_ordering",
+    "difficulty": "medium",
+    "failure_family": "ordering_state_dependent",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "contact_dedup_case_sensitivity",
+    "difficulty": "medium",
+    "failure_family": "silent_incorrect_result",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "csv_quoted_field_parsing",
+    "difficulty": "hard",
+    "failure_family": "malformed_input_parsing",
+    "status": "REJECTED",
+    "reason": "WRONG_SYMPTOM",
+    "detail": "expected exception_type='' message_pattern='hi to the customer'; observed failure text did not match"
+  },
+  {
+    "case_id": "discount_unit_mismatch",
+    "difficulty": "medium",
+    "failure_family": "incorrect_returned_value",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "empty_list_average_crash",
+    "difficulty": "easy",
+    "failure_family": "empty_input_crash",
+    "status": "REJECTED",
+    "reason": "FAILS_ON_FIXED",
+    "detail": "def test_average_score_empty_list_does_not_crash():\n        \"\"\"A brand-new quiz with no submitted scores should not crash the\n        stats helper with a ZeroDivisionError. Averaging zero scores should\n        be treated as \"no data\" (0) rather than raising.\n        \"\"\"\n>       assert average_score([]) == 0\nE       assert None == 0\nE        +  where None = average_score([])\n\ncandidate_test.py:9: AssertionError"
+  },
+  {
+    "case_id": "inventory_negative_quantity",
+    "difficulty": "easy",
+    "failure_family": "input_validation",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "off_by_one_pagination",
+    "difficulty": "easy",
+    "failure_family": "silent_wrong_result",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "reminder_lead_time_units",
+    "difficulty": "hard",
+    "failure_family": "multi_module_interaction",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "roster_lookup_wrong_exception",
+    "difficulty": "easy",
+    "failure_family": "wrong_exception_type",
+    "status": "REJECTED",
+    "reason": "FAILS_ON_FIXED",
+    "detail": "def test_find_member_missing_id_does_not_raise_indexerror():\n        \"\"\"\n        Regression test for the reported bug: looking up an id that is not\n        present in the roster must not blow up with an unhandled IndexError.\n        Callers rely on a normal \"not found\" result (e.g. None) so they can\n        respond gracefully instead of the request failing hard.\n        \"\"\"\n        members = [\n            {\"id\": 1, \"name\": \"Alice\"},\n            {\"id\": 2, \"name\": \"Bob\"},\n        ]\n    \n>       re"
+  },
+  {
+    "case_id": "stale_cache_between_users",
+    "difficulty": "medium",
+    "failure_family": "state_leak_between_calls",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "ttl_cache_boundary",
+    "difficulty": "hard",
+    "failure_family": "boundary_off_by_one",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "username_normalization",
+    "difficulty": "medium",
+    "failure_family": "transformation_normalization_error",
+    "status": "VALID",
+    "reason": null,
+    "detail": "all five conditions satisfied"
+  }
+]

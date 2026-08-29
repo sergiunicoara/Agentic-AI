@@ -1,0 +1,7 @@
+case_id: stale_cache_between_users
+difficulty: medium
+failure_family: state_leak_between_calls
+exception_type:
+message_pattern: apple
+decoy_expected_reason: COLLECTION_ERROR
+description: add_item() uses a mutable default list argument, so callers who don't pass an explicit cart share the same underlying list and accumulate each other's items across unrelated calls.

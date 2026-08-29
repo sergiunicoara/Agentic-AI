@@ -1,0 +1,6 @@
+case_id: contact_dedup_case_sensitivity
+difficulty: medium
+failure_family: silent_incorrect_result
+exception_type:
+message_pattern: 2 == 1
+description: unique_emails() compares raw email strings for equality, so two records differing only in letter case are treated as distinct and both survive the dedup pass.

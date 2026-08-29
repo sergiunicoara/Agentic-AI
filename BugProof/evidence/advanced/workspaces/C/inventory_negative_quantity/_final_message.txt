@@ -1,0 +1,26 @@
+I read `report.md` and `buggy/inventory.py`, wrote `candidate_test.py` reproducing the reported negative-stock bug, ran it once (copied into `buggy/`, ran with pytest, removed the copy and cache afterward), and confirmed `buggy/` is unmodified. Full details are in `trajectory.md`.
+
+Key file paths:
+- `C:\Users\Sergiu\Desktop\Projects\Micro1 Frontier Engineering Claude\evidence\advanced\workspaces\C\inventory_negative_quantity\report.md`
+- `C:\Users\Sergiu\Desktop\Projects\Micro1 Frontier Engineering Claude\evidence\advanced\workspaces\C\inventory_negative_quantity\buggy\inventory.py`
+- `C:\Users\Sergiu\Desktop\Projects\Micro1 Frontier Engineering Claude\evidence\advanced\workspaces\C\inventory_negative_quantity\candidate_test.py`
+- `C:\Users\Sergiu\Desktop\Projects\Micro1 Frontier Engineering Claude\evidence\advanced\workspaces\C\inventory_negative_quantity\trajectory.md`
+
+Observed test run: `test_adjustment_does_not_drop_stock_below_zero` FAILED with `AssertionError: assert -3 >= 0` at the line `assert result >= 0`, after the preceding `assert result == -3` passed. This confirms `adjust_stock` in `buggy/inventory.py` applies a negative delta with no floor/validation, letting stock go negative — exactly matching the report's "-3 units in stock."
+
+EVIDENCE:
+ITEM: negative_three_result
+KIND: literal
+VALUE: -3
+QUOTE: "-3 units in stock"
+SOURCE: report.md
+---
+ITEM: never_negative_invariant
+KIND: qualitative
+NOTE: The `result >= 0` / `stock["SKU-1"] >= 0` checks encode report.md's stated invariant ("Stock counts should never go negative") as a lower-bound comparison, not an exact ==/!=/is/is not comparison or a pytest.raises(...) exception type, so there is no exact value to ground as literal/derived here.
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The test sets up a SKU with 2 units on hand and applies a -5 adjustment via the only function in `buggy/inventory.py`, `adjust_stock`, which unconditionally does `stock[sku] = stock.get(sku, 0) + delta` with no non-negativity check. The first assertion (`result == -3`) is grounded as a literal match to the report's own wording ("-3 units in stock") and passed on execution, confirming the test scenario reproduces the exact figure from the bug report. The second and third assertions encode the report's explicit invariant ("Stock counts should never go negative") and failed when actually run (`AssertionError: assert -3 >= 0`), which is the observed, actual failure I captured by running the test once (copied into `buggy/`, executed with pytest, then removed) rather than an assumption. `buggy/inventory.py` was left byte-for-byte unmodified, verified after the run.

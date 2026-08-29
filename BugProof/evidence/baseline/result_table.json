@@ -1,0 +1,134 @@
+[
+  {
+    "case_id": "cart_coupon_ordering",
+    "difficulty": "medium",
+    "failure_family": "ordering_state_dependent",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 52.3,
+    "tokens": 50567,
+    "tool_uses": 6
+  },
+  {
+    "case_id": "contact_dedup_case_sensitivity",
+    "difficulty": "medium",
+    "failure_family": "silent_incorrect_result",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 42.0,
+    "tokens": 49680,
+    "tool_uses": 7
+  },
+  {
+    "case_id": "csv_quoted_field_parsing",
+    "difficulty": "hard",
+    "failure_family": "malformed_input_parsing",
+    "claimed_reproduced": true,
+    "oracle_verdict": "REJECTED",
+    "rejection_reason": "WRONG_SYMPTOM",
+    "latency_seconds": 214.5,
+    "tokens": 66618,
+    "tool_uses": 16
+  },
+  {
+    "case_id": "discount_unit_mismatch",
+    "difficulty": "medium",
+    "failure_family": "incorrect_returned_value",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 39.4,
+    "tokens": 49268,
+    "tool_uses": 7
+  },
+  {
+    "case_id": "empty_list_average_crash",
+    "difficulty": "easy",
+    "failure_family": "empty_input_crash",
+    "claimed_reproduced": true,
+    "oracle_verdict": "REJECTED",
+    "rejection_reason": "FAILS_ON_FIXED",
+    "latency_seconds": 40.6,
+    "tokens": 49191,
+    "tool_uses": 7
+  },
+  {
+    "case_id": "inventory_negative_quantity",
+    "difficulty": "easy",
+    "failure_family": "input_validation",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 51.2,
+    "tokens": 49674,
+    "tool_uses": 6
+  },
+  {
+    "case_id": "off_by_one_pagination",
+    "difficulty": "easy",
+    "failure_family": "silent_wrong_result",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 38.3,
+    "tokens": 49654,
+    "tool_uses": 6
+  },
+  {
+    "case_id": "reminder_lead_time_units",
+    "difficulty": "hard",
+    "failure_family": "multi_module_interaction",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 34.3,
+    "tokens": 49554,
+    "tool_uses": 7
+  },
+  {
+    "case_id": "roster_lookup_wrong_exception",
+    "difficulty": "easy",
+    "failure_family": "wrong_exception_type",
+    "claimed_reproduced": true,
+    "oracle_verdict": "REJECTED",
+    "rejection_reason": "FAILS_ON_FIXED",
+    "latency_seconds": 54.6,
+    "tokens": 50998,
+    "tool_uses": 7
+  },
+  {
+    "case_id": "stale_cache_between_users",
+    "difficulty": "medium",
+    "failure_family": "state_leak_between_calls",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 40.9,
+    "tokens": 49484,
+    "tool_uses": 9
+  },
+  {
+    "case_id": "ttl_cache_boundary",
+    "difficulty": "hard",
+    "failure_family": "boundary_off_by_one",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 63.2,
+    "tokens": 52054,
+    "tool_uses": 7
+  },
+  {
+    "case_id": "username_normalization",
+    "difficulty": "medium",
+    "failure_family": "transformation_normalization_error",
+    "claimed_reproduced": true,
+    "oracle_verdict": "VALID",
+    "rejection_reason": null,
+    "latency_seconds": 42.9,
+    "tokens": 49496,
+    "tool_uses": 8
+  }
+]

@@ -1,0 +1,85 @@
+You are revising a previously-written pytest regression test that failed
+an automated evidence check. You are a fresh agent with no memory of
+writing it; everything you need is below and in your working directory.
+This call is self-contained -- do not reference any earlier conversation;
+there is none.
+
+Your working directory is:
+
+    C:\Users\Sergiu\Desktop\Projects\Micro1 Frontier Engineering Claude\evidence\advanced\workspaces\D\username_normalization\repair
+
+It contains exactly: report.md, buggy/, and candidate_test.py (the test
+you are revising, shown again below). Nothing else on disk is relevant.
+
+THE CANDIDATE TEST AS WRITTEN:
+
+```python
+from handles import normalize_handle
+
+
+def test_double_space_produces_single_underscore():
+    """report.md: 'jane___doe' instead of the usual single-underscore style
+    happens when 'Jane  Doe' has two spaces instead of one.
+
+    normalize_handle uses raw.strip().lower().replace(" ", "_"), which
+    replaces every individual space character with an underscore, so two
+    consecutive spaces become two consecutive underscores instead of
+    collapsing into one. The expected/desired behavior is a single
+    underscore between words regardless of how many spaces separated them.
+    """
+    result = normalize_handle("Jane  Doe")
+    assert result == "jane_doe"
+
+
+def test_triple_space_produces_single_underscore():
+    result = normalize_handle("Jane   Doe")
+    assert result == "jane_doe"
+
+```
+
+WHAT THE ORCHESTRATOR OBSERVED WHEN IT ACTUALLY RAN THIS TEST AGAINST
+buggy/ (real, not hypothetical -- trust it over your own read of the code):
+
+status=OK reason=None detail=2 failing testcase(s) observed on buggy/
+
+WHY THIS CANDIDATE FAILED ITS EVIDENCE CHECK:
+
+- equality contract asserting "'jane_doe'": NOT GROUNDED -- no verified literal or valid derived EVIDENCE item matches this exact contract -- labeling it qualitative or omitting it does not exempt it
+- equality contract asserting "'jane_doe'": NOT GROUNDED -- no verified literal or valid derived EVIDENCE item matches this exact contract -- labeling it qualitative or omitting it does not exempt it
+
+Your task:
+
+1. Read report.md and re-inspect buggy/ as needed.
+2. Revise candidate_test.py to fix the specific evidence gap(s) named
+   above. For each flagged exact value: either ground it with a real
+   verbatim quote from report.md or a named buggy/*.py file (KIND:
+   literal), ground it with a simple, real, re-computable arithmetic
+   derivation from your own setup numbers plus a quoted rule (KIND:
+   derived), or -- if you honestly cannot ground the exact value at all
+   -- narrow your assertion to only what IS supported (e.g. that a
+   failure/exception occurs, without pinning the exact value) rather than
+   inventing one. Fix the test's logic too if the execution result above
+   shows it wasn't actually failing on buggy/ for the reported reason.
+3. Do not modify any file under buggy/. Final state must be byte-for-byte
+   unchanged.
+4. Overwrite candidate_test.py with your revision. Imports stay flat.
+5. You MUST run your revised test exactly ONCE before finalizing, same
+   procedure as before (temp-copy into buggy/, run, record, remove).
+6. Overwrite trajectory.md: what changed and why, what you observed, plus
+   "Files read / commands run:" (self-reported).
+7. Write a fresh EVIDENCE block in the same format as before (literal /
+   derived / qualitative items, or NO_EVIDENCE_ITEMS_NEEDED, ending with
+   END_EVIDENCE). Same rules: literal quotes and derived BASIS
+   expressions are independently checked against the real source, not
+   trusted because you wrote them.
+8. Finish with:
+
+   CLAIM: VERIFIED_REPRODUCTION
+   or
+   CLAIM: INSUFFICIENT_EVIDENCE
+
+   followed by one paragraph of reasoning.
+
+THIS IS YOUR ONLY REVISION. No second repair attempt regardless of
+outcome -- an honest CLAIM: INSUFFICIENT_EVIDENCE is correct if you
+cannot honestly ground the candidate this time, not a guess.

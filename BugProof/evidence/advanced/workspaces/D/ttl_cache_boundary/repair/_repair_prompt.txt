@@ -1,0 +1,94 @@
+You are revising a previously-written pytest regression test that failed
+an automated evidence check. You are a fresh agent with no memory of
+writing it; everything you need is below and in your working directory.
+This call is self-contained -- do not reference any earlier conversation;
+there is none.
+
+Your working directory is:
+
+    C:\Users\Sergiu\Desktop\Projects\Micro1 Frontier Engineering Claude\evidence\advanced\workspaces\D\ttl_cache_boundary\repair
+
+It contains exactly: report.md, buggy/, and candidate_test.py (the test
+you are revising, shown again below). Nothing else on disk is relevant.
+
+THE CANDIDATE TEST AS WRITTEN:
+
+```python
+"""
+Reproduces the bug from report.md: a client can repeat an action exactly at
+the boundary of the cooldown window, when the throttle should still be
+blocking it for that instant.
+
+RequestThrottle.is_throttled() uses `elapsed < self.window_seconds` to decide
+whether a client is still blocked. This means that once elapsed time reaches
+*exactly* window_seconds, is_throttled() returns False (not throttled) --
+letting the client through at the very edge of the cooldown window, rather
+than only after the window has strictly passed. This matches the report's
+description of clients getting through "right around the edge of the
+cooldown window, when it should have still been blocked for another moment".
+"""
+
+from throttle import RequestThrottle
+
+
+def test_client_still_blocked_exactly_at_window_boundary():
+    # Fake clock: first call (during mark_request) returns 0, second call
+    # (during is_throttled) returns exactly window_seconds later.
+    times = iter([0, 10])
+    clock = lambda: next(times)
+
+    throttle = RequestThrottle(window_seconds=10, clock=clock)
+    throttle.mark_request("client-1")
+
+    # Exactly window_seconds has elapsed -- the cooldown window has not yet
+    # been left behind, only just reached, so the client should still be
+    # blocked for that instant.
+    assert throttle.is_throttled("client-1") is True
+
+```
+
+WHAT THE ORCHESTRATOR OBSERVED WHEN IT ACTUALLY RAN THIS TEST AGAINST
+buggy/ (real, not hypothetical -- trust it over your own read of the code):
+
+status=OK reason=None detail=1 failing testcase(s) observed on buggy/
+
+WHY THIS CANDIDATE FAILED ITS EVIDENCE CHECK:
+
+- identity contract asserting 'True': NOT GROUNDED -- no verified literal or valid derived EVIDENCE item matches this exact contract -- labeling it qualitative or omitting it does not exempt it
+
+Your task:
+
+1. Read report.md and re-inspect buggy/ as needed.
+2. Revise candidate_test.py to fix the specific evidence gap(s) named
+   above. For each flagged exact value: either ground it with a real
+   verbatim quote from report.md or a named buggy/*.py file (KIND:
+   literal), ground it with a simple, real, re-computable arithmetic
+   derivation from your own setup numbers plus a quoted rule (KIND:
+   derived), or -- if you honestly cannot ground the exact value at all
+   -- narrow your assertion to only what IS supported (e.g. that a
+   failure/exception occurs, without pinning the exact value) rather than
+   inventing one. Fix the test's logic too if the execution result above
+   shows it wasn't actually failing on buggy/ for the reported reason.
+3. Do not modify any file under buggy/. Final state must be byte-for-byte
+   unchanged.
+4. Overwrite candidate_test.py with your revision. Imports stay flat.
+5. You MUST run your revised test exactly ONCE before finalizing, same
+   procedure as before (temp-copy into buggy/, run, record, remove).
+6. Overwrite trajectory.md: what changed and why, what you observed, plus
+   "Files read / commands run:" (self-reported).
+7. Write a fresh EVIDENCE block in the same format as before (literal /
+   derived / qualitative items, or NO_EVIDENCE_ITEMS_NEEDED, ending with
+   END_EVIDENCE). Same rules: literal quotes and derived BASIS
+   expressions are independently checked against the real source, not
+   trusted because you wrote them.
+8. Finish with:
+
+   CLAIM: VERIFIED_REPRODUCTION
+   or
+   CLAIM: INSUFFICIENT_EVIDENCE
+
+   followed by one paragraph of reasoning.
+
+THIS IS YOUR ONLY REVISION. No second repair attempt regardless of
+outcome -- an honest CLAIM: INSUFFICIENT_EVIDENCE is correct if you
+cannot honestly ground the candidate this time, not a guess.

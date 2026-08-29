@@ -1,0 +1,337 @@
+{
+  "metadata": {
+    "corpus_size": 12,
+    "historical_vrr_alias": "CVR",
+    "historical_vrr_alias_note": "Prior frozen Phase 2/3 artifacts (evidence/baseline/*, evidence/advanced/summary.md, ablations/{A,B,C,D,D_exec}_metrics.json, D_exec_summary.md, src/bugproof/advanced.py docstrings, config.json) use 'VRR' to mean exactly what this document calls CVR: count(oracle_status == VALID) / total_cases, regardless of runtime delivery. Those files are historical and were not rewritten. Current submission-facing terminology (this file and the top-level README) uses CVR/DVRR/Claim_Precision/Coverage exclusively.",
+    "metric_definitions": {
+      "CVR": "Candidate Validity Rate = count(oracle_status==VALID) / total_cases. Does NOT imply delivery.",
+      "DVRR": "Delivered Valid Reproduction Rate = count(delivered AND oracle_status==VALID) / total_cases.",
+      "Claim_Precision": "count(delivered AND oracle_status==VALID) / count(delivered).",
+      "false_delivered": "count(delivered AND oracle_status!=VALID), absolute count.",
+      "Coverage": "count(delivered) / total_cases. 'delivered' == runtime final_claim == VERIFIED_REPRODUCTION."
+    },
+    "D_exec_post_hoc_disclosure": "D_exec's selection policy (repair only cases where C.final_claim == EXECUTION_FAILURE) was chosen after observing full Phase 3 (A/B/C/D) behavior on this same 12-case corpus. It is evaluated on the same corpus that informed it and is NOT independent held-out validation. Selection is a pure function of C.final_claim only -- never oracle status, fixed/, oracle.yaml, reference_test.py, or decoy outcomes -- verified in eval/build_dexec_candidates.py and re-confirmed by this script's own dominance derivation.",
+    "break_even_P_over_M": 2.5,
+    "break_even_note": "Symbolic only: Cost = M*(N-DV) + DF*P. Break-even P/M=2.5 for A vs D_exec is a modeled threshold, not a measured empirical value. The n=3 human+AI timing pilot is separate, LOW-confidence evidence and is not used here."
+  },
+  "variants": {
+    "A": {
+      "variant": "A",
+      "total_cases": 12,
+      "candidate_valid_count": 9,
+      "CVR": {
+        "count": 9,
+        "total": 12,
+        "pct": 75.0
+      },
+      "delivered_claims": 12,
+      "Coverage": {
+        "count": 12,
+        "total": 12,
+        "pct": 100.0
+      },
+      "correct_delivered": 9,
+      "DVRR": {
+        "count": 9,
+        "total": 12,
+        "pct": 75.0
+      },
+      "false_delivered": 3,
+      "Claim_Precision": {
+        "count": 9,
+        "total": 12,
+        "pct": 75.0
+      },
+      "oracle_rejection_distribution": {
+        "WRONG_SYMPTOM": 1,
+        "PASSES_ON_BUGGY": 0,
+        "COLLECTION_ERROR": 0,
+        "FAILS_ON_FIXED": 2,
+        "SUITE_REGRESSION": 0,
+        "ORACLE_ERROR_TIMEOUT": 0
+      },
+      "case_ids": {
+        "delivered_correct": [
+          "cart_coupon_ordering",
+          "contact_dedup_case_sensitivity",
+          "discount_unit_mismatch",
+          "inventory_negative_quantity",
+          "off_by_one_pagination",
+          "reminder_lead_time_units",
+          "stale_cache_between_users",
+          "ttl_cache_boundary",
+          "username_normalization"
+        ],
+        "delivered_false": [
+          "csv_quoted_field_parsing",
+          "empty_list_average_crash",
+          "roster_lookup_wrong_exception"
+        ],
+        "not_delivered": []
+      }
+    },
+    "B": {
+      "variant": "B",
+      "total_cases": 12,
+      "candidate_valid_count": 9,
+      "CVR": {
+        "count": 9,
+        "total": 12,
+        "pct": 75.0
+      },
+      "delivered_claims": 12,
+      "Coverage": {
+        "count": 12,
+        "total": 12,
+        "pct": 100.0
+      },
+      "correct_delivered": 9,
+      "DVRR": {
+        "count": 9,
+        "total": 12,
+        "pct": 75.0
+      },
+      "false_delivered": 3,
+      "Claim_Precision": {
+        "count": 9,
+        "total": 12,
+        "pct": 75.0
+      },
+      "oracle_rejection_distribution": {
+        "WRONG_SYMPTOM": 1,
+        "PASSES_ON_BUGGY": 0,
+        "COLLECTION_ERROR": 0,
+        "FAILS_ON_FIXED": 2,
+        "SUITE_REGRESSION": 0,
+        "ORACLE_ERROR_TIMEOUT": 0
+      },
+      "case_ids": {
+        "delivered_correct": [
+          "cart_coupon_ordering",
+          "contact_dedup_case_sensitivity",
+          "discount_unit_mismatch",
+          "inventory_negative_quantity",
+          "off_by_one_pagination",
+          "reminder_lead_time_units",
+          "stale_cache_between_users",
+          "ttl_cache_boundary",
+          "username_normalization"
+        ],
+        "delivered_false": [
+          "csv_quoted_field_parsing",
+          "empty_list_average_crash",
+          "roster_lookup_wrong_exception"
+        ],
+        "not_delivered": []
+      }
+    },
+    "C": {
+      "variant": "C",
+      "total_cases": 12,
+      "candidate_valid_count": 8,
+      "CVR": {
+        "count": 8,
+        "total": 12,
+        "pct": 66.7
+      },
+      "delivered_claims": 4,
+      "Coverage": {
+        "count": 4,
+        "total": 12,
+        "pct": 33.3
+      },
+      "correct_delivered": 3,
+      "DVRR": {
+        "count": 3,
+        "total": 12,
+        "pct": 25.0
+      },
+      "false_delivered": 1,
+      "Claim_Precision": {
+        "count": 3,
+        "total": 4,
+        "pct": 75.0
+      },
+      "oracle_rejection_distribution": {
+        "WRONG_SYMPTOM": 2,
+        "PASSES_ON_BUGGY": 2,
+        "COLLECTION_ERROR": 0,
+        "FAILS_ON_FIXED": 0,
+        "SUITE_REGRESSION": 0,
+        "ORACLE_ERROR_TIMEOUT": 0
+      },
+      "case_ids": {
+        "delivered_correct": [
+          "cart_coupon_ordering",
+          "discount_unit_mismatch",
+          "reminder_lead_time_units"
+        ],
+        "delivered_false": [
+          "inventory_negative_quantity"
+        ],
+        "not_delivered": [
+          "contact_dedup_case_sensitivity",
+          "csv_quoted_field_parsing",
+          "empty_list_average_crash",
+          "off_by_one_pagination",
+          "roster_lookup_wrong_exception",
+          "stale_cache_between_users",
+          "ttl_cache_boundary",
+          "username_normalization"
+        ]
+      }
+    },
+    "D": {
+      "variant": "D",
+      "total_cases": 12,
+      "candidate_valid_count": 9,
+      "CVR": {
+        "count": 9,
+        "total": 12,
+        "pct": 75.0
+      },
+      "delivered_claims": 8,
+      "Coverage": {
+        "count": 8,
+        "total": 12,
+        "pct": 66.7
+      },
+      "correct_delivered": 5,
+      "DVRR": {
+        "count": 5,
+        "total": 12,
+        "pct": 41.7
+      },
+      "false_delivered": 3,
+      "Claim_Precision": {
+        "count": 5,
+        "total": 8,
+        "pct": 62.5
+      },
+      "oracle_rejection_distribution": {
+        "WRONG_SYMPTOM": 3,
+        "PASSES_ON_BUGGY": 0,
+        "COLLECTION_ERROR": 0,
+        "FAILS_ON_FIXED": 0,
+        "SUITE_REGRESSION": 0,
+        "ORACLE_ERROR_TIMEOUT": 0
+      },
+      "case_ids": {
+        "delivered_correct": [
+          "cart_coupon_ordering",
+          "discount_unit_mismatch",
+          "reminder_lead_time_units",
+          "roster_lookup_wrong_exception",
+          "username_normalization"
+        ],
+        "delivered_false": [
+          "csv_quoted_field_parsing",
+          "inventory_negative_quantity",
+          "ttl_cache_boundary"
+        ],
+        "not_delivered": [
+          "contact_dedup_case_sensitivity",
+          "empty_list_average_crash",
+          "off_by_one_pagination",
+          "stale_cache_between_users"
+        ]
+      }
+    },
+    "D_exec": {
+      "variant": "D_exec",
+      "total_cases": 12,
+      "candidate_valid_count": 10,
+      "CVR": {
+        "count": 10,
+        "total": 12,
+        "pct": 83.3
+      },
+      "delivered_claims": 5,
+      "Coverage": {
+        "count": 5,
+        "total": 12,
+        "pct": 41.7
+      },
+      "correct_delivered": 4,
+      "DVRR": {
+        "count": 4,
+        "total": 12,
+        "pct": 33.3
+      },
+      "false_delivered": 1,
+      "Claim_Precision": {
+        "count": 4,
+        "total": 5,
+        "pct": 80.0
+      },
+      "oracle_rejection_distribution": {
+        "WRONG_SYMPTOM": 2,
+        "PASSES_ON_BUGGY": 0,
+        "COLLECTION_ERROR": 0,
+        "FAILS_ON_FIXED": 0,
+        "SUITE_REGRESSION": 0,
+        "ORACLE_ERROR_TIMEOUT": 0
+      },
+      "case_ids": {
+        "delivered_correct": [
+          "cart_coupon_ordering",
+          "discount_unit_mismatch",
+          "reminder_lead_time_units",
+          "roster_lookup_wrong_exception"
+        ],
+        "delivered_false": [
+          "inventory_negative_quantity"
+        ],
+        "not_delivered": [
+          "contact_dedup_case_sensitivity",
+          "csv_quoted_field_parsing",
+          "empty_list_average_crash",
+          "off_by_one_pagination",
+          "stale_cache_between_users",
+          "ttl_cache_boundary",
+          "username_normalization"
+        ]
+      }
+    }
+  },
+  "pareto": {
+    "pairwise": {
+      "A_vs_B": "equivalent",
+      "A_vs_D": "a_dominates_b",
+      "C_vs_D_exec": "a_dominates_b",
+      "A_vs_D_exec": "non_dominated"
+    },
+    "non_dominated_operating_points": [
+      "A",
+      "D_exec"
+    ],
+    "qualifier": "on the 12-case evaluation corpus -- not a claim of universal Pareto optimality"
+  },
+  "source_artifacts": [
+    {
+      "path": "evidence/baseline/result_table.json",
+      "sha256": "5a8afd13058e5c54ca9a203669cdab08414bb3af0e4df232dd2f05e2c78bda2a",
+      "role": "frozen Phase 2 baseline (A) per-case claim + oracle verdict"
+    },
+    {
+      "path": "evidence/advanced/results/B/results.json",
+      "sha256": "b128075059b53071947c76c56c1ed1c4a2b098e9380516edb59419d3fdae1787",
+      "role": "frozen B per-case claim + oracle verdict"
+    },
+    {
+      "path": "evidence/advanced/results/C/results.json",
+      "sha256": "7e9c6378a834a0395351394627f6de7b46bc7b66cb03e4c2fe8f8b6667ace47b",
+      "role": "frozen C per-case claim + oracle verdict"
+    },
+    {
+      "path": "evidence/advanced/results/D/results.json",
+      "sha256": "8a3e7e1cb183506e83f14c6008765c194ab9dbefe6de0a86a8232f94a5f6324f",
+      "role": "frozen D per-case claim + oracle verdict"
+    },
+    {
+      "path": "evidence/advanced/ablations/D_exec_per_case.json",
+      "sha256": "88b0b780a3b190633638621668d82b1f3d93c87962213340d00686452f2705ab",
+      "role": "frozen D_exec per-case selection + claim + oracle verdict"
+    }
+  ]
+}
