@@ -49,3 +49,14 @@ vector-arena/.cache/
 
 # ---- Project-specific excludes ----
 VectorDatabases/
+
+# ---- Local tool output ----
+**/graphify-out/
+**/*.tsbuildinfo
+**/.claude/settings.local.json
+**/.claude/worktrees/
+Sentinel/.claude/
+SmartOps AI observability platform/.claude/
+recruiter-agent/docs/walkthrough-render/
+recruiter-agent/docs/two-minute-project-walkthrough.md
+recruiter-agent/docs/two-minute-project-walkthrough.mp4
