@@ -1,0 +1,14 @@
+{
+  "off_by_one_pagination": {"tokens": 49654, "duration_ms": 38319, "tool_uses": 6, "claim": "REPRODUCED"},
+  "empty_list_average_crash": {"tokens": 49191, "duration_ms": 40632, "tool_uses": 7, "claim": "REPRODUCED"},
+  "stale_cache_between_users": {"tokens": 49484, "duration_ms": 40869, "tool_uses": 9, "claim": "REPRODUCED"},
+  "roster_lookup_wrong_exception": {"tokens": 50998, "duration_ms": 54598, "tool_uses": 7, "claim": "REPRODUCED"},
+  "inventory_negative_quantity": {"tokens": 49674, "duration_ms": 51250, "tool_uses": 6, "claim": "REPRODUCED"},
+  "discount_unit_mismatch": {"tokens": 49268, "duration_ms": 39412, "tool_uses": 7, "claim": "REPRODUCED"},
+  "contact_dedup_case_sensitivity": {"tokens": 49680, "duration_ms": 42000, "tool_uses": 7, "claim": "REPRODUCED"},
+  "cart_coupon_ordering": {"tokens": 50567, "duration_ms": 52326, "tool_uses": 6, "claim": "REPRODUCED"},
+  "username_normalization": {"tokens": 49496, "duration_ms": 42866, "tool_uses": 8, "claim": "REPRODUCED"},
+  "reminder_lead_time_units": {"tokens": 49554, "duration_ms": 34262, "tool_uses": 7, "claim": "REPRODUCED"},
+  "ttl_cache_boundary": {"tokens": 52054, "duration_ms": 63169, "tool_uses": 7, "claim": "REPRODUCED"},
+  "csv_quoted_field_parsing": {"tokens": 66618, "duration_ms": 214512, "tool_uses": 16, "claim": "REPRODUCED"}
+}

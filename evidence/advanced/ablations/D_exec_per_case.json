@@ -1,0 +1,134 @@
+[
+  {
+    "case_id": "cart_coupon_ordering",
+    "difficulty": "medium",
+    "failure_family": "ordering_state_dependent",
+    "c_final_claim": "VERIFIED_REPRODUCTION",
+    "selected_source": "C",
+    "d_exec_final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "contact_dedup_case_sensitivity",
+    "difficulty": "medium",
+    "failure_family": "silent_incorrect_result",
+    "c_final_claim": "INSUFFICIENT_EVIDENCE",
+    "selected_source": "C",
+    "d_exec_final_claim": "INSUFFICIENT_EVIDENCE",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "csv_quoted_field_parsing",
+    "difficulty": "hard",
+    "failure_family": "malformed_input_parsing",
+    "c_final_claim": "INSUFFICIENT_EVIDENCE",
+    "selected_source": "C",
+    "d_exec_final_claim": "INSUFFICIENT_EVIDENCE",
+    "oracle_status": "REJECTED",
+    "oracle_reason": "WRONG_SYMPTOM",
+    "detail": "expected exception_type='' message_pattern='hi to the customer'; observed failure text did not match"
+  },
+  {
+    "case_id": "discount_unit_mismatch",
+    "difficulty": "medium",
+    "failure_family": "incorrect_returned_value",
+    "c_final_claim": "VERIFIED_REPRODUCTION",
+    "selected_source": "C",
+    "d_exec_final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "empty_list_average_crash",
+    "difficulty": "easy",
+    "failure_family": "empty_input_crash",
+    "c_final_claim": "EXECUTION_FAILURE",
+    "selected_source": "D",
+    "d_exec_final_claim": "INSUFFICIENT_EVIDENCE",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "inventory_negative_quantity",
+    "difficulty": "easy",
+    "failure_family": "input_validation",
+    "c_final_claim": "VERIFIED_REPRODUCTION",
+    "selected_source": "C",
+    "d_exec_final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_status": "REJECTED",
+    "oracle_reason": "WRONG_SYMPTOM",
+    "detail": "expected exception_type='ValueError' message_pattern='DID NOT RAISE'; observed failure text did not match"
+  },
+  {
+    "case_id": "off_by_one_pagination",
+    "difficulty": "easy",
+    "failure_family": "silent_wrong_result",
+    "c_final_claim": "INSUFFICIENT_EVIDENCE",
+    "selected_source": "C",
+    "d_exec_final_claim": "INSUFFICIENT_EVIDENCE",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "reminder_lead_time_units",
+    "difficulty": "hard",
+    "failure_family": "multi_module_interaction",
+    "c_final_claim": "VERIFIED_REPRODUCTION",
+    "selected_source": "C",
+    "d_exec_final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "roster_lookup_wrong_exception",
+    "difficulty": "easy",
+    "failure_family": "wrong_exception_type",
+    "c_final_claim": "EXECUTION_FAILURE",
+    "selected_source": "D",
+    "d_exec_final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "stale_cache_between_users",
+    "difficulty": "medium",
+    "failure_family": "state_leak_between_calls",
+    "c_final_claim": "INSUFFICIENT_EVIDENCE",
+    "selected_source": "C",
+    "d_exec_final_claim": "INSUFFICIENT_EVIDENCE",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "ttl_cache_boundary",
+    "difficulty": "hard",
+    "failure_family": "boundary_off_by_one",
+    "c_final_claim": "INSUFFICIENT_EVIDENCE",
+    "selected_source": "C",
+    "d_exec_final_claim": "INSUFFICIENT_EVIDENCE",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  },
+  {
+    "case_id": "username_normalization",
+    "difficulty": "medium",
+    "failure_family": "transformation_normalization_error",
+    "c_final_claim": "INSUFFICIENT_EVIDENCE",
+    "selected_source": "C",
+    "d_exec_final_claim": "INSUFFICIENT_EVIDENCE",
+    "oracle_status": "VALID",
+    "oracle_reason": null,
+    "detail": "all five conditions satisfied"
+  }
+]

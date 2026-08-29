@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bugproof"
+version = "0.1.0"
+description = "Turns a vague, human-written bug report into a verified failing regression test."
+requires-python = ">=3.10"
+dependencies = [
+    "pytest>=8.4,<9",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# Scopes bare `python -m pytest` / `pytest` (no args, run from the repo
+# root) to BugProof's own unit/regression suite. Without this, pytest's
+# default recursive discovery also walks cases/ and evidence/baseline/ --
+# benchmark corpus and frozen candidate files that are executed by
+# sandbox.py in isolated temp directories, not meant to be collected here,
+# and that fail to import when collected from the repo root (no case's
+# buggy/fixed module is on sys.path from here).
+#
+# This does not affect benchmark execution semantics: sandbox.py always
+# runs pytest with cwd set to a scratch directory under the OS temp root,
+# outside this repository tree entirely, so pytest's config-file search
+# from there never finds this file. Explicit invocations naming a path
+# directly (e.g. `pytest cases/<case>/reference_test.py`) still work too --
+# testpaths only changes the *default* target when none is given.
+testpaths = ["tests"]

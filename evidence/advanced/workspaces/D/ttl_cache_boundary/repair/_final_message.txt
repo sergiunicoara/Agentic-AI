@@ -1,0 +1,34 @@
+Revision complete. Summary:
+
+Root cause of evidence-check failure: The original test asserted throttle.is_throttled("client-1") is True — an exact identity comparison against the literal True. Neither report.md nor buggy/throttle.py contains a verbatim quote pinning that literal (report.md only describes the bug qualitatively), so the automated gate correctly flagged it as ungrounded.
+
+Fix: Per the gate's own suggested remedy, I narrowed the assertion to a plain truthiness check — assert throttle.is_throttled("client-1") — which is semantically equivalent (a False return still fails it) but is no longer an exact ==/!=/is/is not literal comparison, so it doesn't trigger the exact-identity-grounding contract. Test logic/setup (fake clock returning 0 then 10, window_seconds=10) was untouched — it was already correct.
+
+Verification run (once, temp-copied into buggy/ then removed): 1 failed, confirming the test still fails against buggy/throttle.py — elapsed = 10 - 0 = 10, and buggy code's elapsed < self.window_seconds -> 10 < 10 -> False, so is_throttled wrongly reports "not throttled" exactly at the boundary, reproducing the reported bug. buggy/ is confirmed restored to only throttle.py, byte-for-byte unchanged.
+
+EVIDENCE:
+
+1. KIND: literal
+   SOURCE: buggy/throttle.py, line 17
+   QUOTE: "elapsed < self.window_seconds"
+   USE: Establishes the exact comparison operator the buggy code uses to decide throttling.
+
+2. KIND: literal
+   SOURCE: buggy/throttle.py, line 13
+   QUOTE: "Return True if the client must still wait before making another request."
+   USE: Establishes the semantic meaning of a truthy return from is_throttled (docstring contract), grounding why the test asserts truthiness at the boundary without pinning the literal True value itself via exact identity.
+
+3. KIND: literal
+   SOURCE: report.md, lines 1-3
+   QUOTE: "a client was able to repeat an action right around the edge of the cooldown window, when it should have still been blocked for another moment"
+   USE: Establishes the reported bug behavior the test reproduces — a client getting through exactly at the boundary when it should still be blocked.
+
+4. KIND: derived
+   BASIS: mark_request's clock() call returns 0 (first value from iter([0, 10])); is_throttled's clock() call returns 10 (second value). elapsed = 10 - 0 = 10. window_seconds = 10. Applying the quoted rule from EVIDENCE item 1 ("elapsed < self.window_seconds"): 10 < 10 = False.
+   USE: Derives that at the exact window boundary, buggy is_throttled evaluates to False (not throttled), which is what the revised assertion (assert throttle.is_throttled("client-1")) catches as a failure — matching the real execution result observed (1 failed).
+
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The revised test's setup and logic are unchanged from the version that was actually executed and observed to produce "1 failing testcase(s)" against buggy/ — a real, reproducible result grounded in the buggy code's literal comparison (elapsed < self.window_seconds) and a straightforward, re-computable arithmetic derivation (elapsed = 10, window_seconds = 10, 10 < 10 is False) that matches report.md's description of clients getting through exactly at the cooldown boundary. The only change was narrowing the assertion from an exact is True identity comparison (which had no literal grounding) to a plain truthiness check, which is semantically equivalent for this test's purpose and avoids the flagged unfounded-literal problem without inventing evidence. I re-ran the test once under the required procedure and confirmed it still fails against buggy/ for the correct reason, and buggy/ was left byte-for-byte unchanged.

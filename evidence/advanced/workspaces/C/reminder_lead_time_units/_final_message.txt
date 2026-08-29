@@ -1,0 +1,28 @@
+I read report.md and both files in buggy/, wrote candidate_test.py in the working directory, ran it once (copied into buggy/, ran pytest, removed the copy and the generated __pycache__), and wrote trajectory.md.
+
+EVIDENCE:
+ITEM: default_lead_minutes_value
+KIND: literal
+VALUE: 15
+QUOTE: "DEFAULT_REMINDER_LEAD_MINUTES = 15"
+SOURCE: buggy/config.py
+---
+ITEM: default_expected_seconds
+KIND: derived
+VALUE: 999100
+BASIS: 1000000 - 15 * 60
+QUOTE: "lead = lead_minutes if lead_minutes is not None else DEFAULT_REMINDER_LEAD_MINUTES\n    return event_time_epoch - lead"
+SOURCE: buggy/scheduler.py
+---
+ITEM: custom_lead_expected_seconds
+KIND: derived
+VALUE: 1999400
+BASIS: 2000000 - 10 * 60
+QUOTE: "def reminder_trigger_time(event_time_epoch, lead_minutes=None):"
+SOURCE: buggy/scheduler.py
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The `reminder_trigger_time` function subtracts `lead` (a value explicitly named/documented in minutes, sourced from `DEFAULT_REMINDER_LEAD_MINUTES` or a caller-supplied `lead_minutes`) directly from `event_time_epoch` (an epoch timestamp in seconds) without multiplying by 60, so a nominal "15 minute" lead only pushes the reminder back by 15 seconds. This matches the report's description of reminders firing "only a few seconds before the event" for both default and custom lead times. I ran the test file exactly once, temporarily inside `buggy/`, and observed both assertions fail with `assert 999985 == 999100` and `assert 1999990 == 1999400` — the buggy code returning event_time_epoch minus lead-in-seconds-mistaken-for-minutes rather than the expected minutes-converted-to-seconds value. `buggy/` was restored to its original two files (config.py, scheduler.py) after the run, and `candidate_test.py` / `trajectory.md` are in the working directory as required.

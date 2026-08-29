@@ -1,0 +1,76 @@
+{
+  "executor": "claude-code-agent-subagent",
+  "subagent_type": "general-purpose",
+  "model": "sonnet",
+  "model_family_note": "Same family as the model authoring this project (Claude Sonnet 5), chosen for consistency with the intended advanced-system model per BUGPROOF_AGENT_BRIEF.md's model-consistency requirement, and because no other provider's key was authorized for this purpose.",
+  "temperature": "not configurable at this layer (Claude Code subagent default)",
+  "max_output_tokens": "not configurable at this layer (Claude Code subagent default)",
+  "reasoning_effort": "not configurable at this layer (Claude Code subagent default)",
+  "tools_available_to_subagent": "all (general-purpose subagent default: Read, Write, Edit, Bash, Grep, Glob, ...)",
+  "tools_actually_needed": "read files under buggy/, write one test file, run pytest at most once",
+  "attempts_per_case": {
+    "B": 0,
+    "C": 1,
+    "D": "0, or 1 repair iff C != VERIFIED_REPRODUCTION -- never more"
+  },
+  "candidates_generated_per_case": {
+    "B": 0,
+    "C": 1,
+    "D": "0 unless repair fires, then 1 replacement"
+  },
+  "oracle_feedback_before_freeze": false,
+  "fixed_revision_visible": false,
+  "retry_after_evaluation": false,
+  "token_usage_available": true,
+  "token_usage_note": "Claude Code's Agent tool reports a single subagent_tokens total per completed subagent (not split into input/output) plus tool_uses and duration_ms; recorded verbatim in evidence/baseline/usage.json.",
+  "cost_available": false,
+  "cost_unavailable_reason": "Claude Code's Agent tool does not expose per-subagent dollar cost to the orchestrating session; not fabricated or estimated from public per-token pricing, marked unavailable in results.json instead.",
+  "ladder_rungs": {
+    "A": "frozen Phase 2 baseline, reused verbatim, not regenerated",
+    "B": "+ execute before claiming: orchestrator re-runs A's frozen candidate against buggy/ itself and computes the claim mechanically; zero new subagent calls (B's generation prompt would be byte-identical to A's)",
+    "C": "+ Evidence/Contract Sufficiency Gate: fresh one-shot generation with a mandatory execution report + structured EVIDENCE block; every exact contract the candidate's own code asserts is independently AST-detected and must be really grounded, regardless of how the agent labels anything",
+    "D": "+ bounded repair loop: reuses C's candidate; exactly one repair subagent call iff C's claim was not already VERIFIED_REPRODUCTION"
+  },
+  "new_subagent_calls_for_12_cases": {
+    "B": 0,
+    "C": 12,
+    "D": "<=12 (only C's non-VERIFIED_REPRODUCTION cases)"
+  },
+  "evidence_gate_is_llm_call": false,
+  "evidence_gate_note": "Deterministic checker in this module (check_evidence_grounding). The generating agent self-discloses evidence in its own response; nothing is re-asked of a second model. 'The goal is not to add more agents.'",
+  "repair_bound_per_case": 1,
+  "claim_states_by_variant": {
+    "B": [
+      "EXECUTION_FAILURE",
+      "VERIFIED_REPRODUCTION"
+    ],
+    "C": [
+      "EXECUTION_FAILURE",
+      "INSUFFICIENT_EVIDENCE",
+      "VERIFIED_REPRODUCTION"
+    ],
+    "D": [
+      "EXECUTION_FAILURE",
+      "INSUFFICIENT_EVIDENCE",
+      "VERIFIED_REPRODUCTION"
+    ]
+  },
+  "claim_states_note": "B has no gate step, so INSUFFICIENT_EVIDENCE is unreachable for B by construction -- two states only. This asymmetry is intentional, not a gap.",
+  "oracle_scoring_note": "evaluate() is run against every variant's final frozen candidate for every case, regardless of claim (including EXECUTION_FAILURE / INSUFFICIENT_EVIDENCE outcomes), for VRR measurement only -- as a separate, later, independent call, never the same call that fed the runtime decision.",
+  "contract_extraction_note": "Corrected design (see module docstring): KIND labels alone never exempt an asserted value from grounding. extract_expected_contracts() independently AST-detects every exact ==, !=, is/is not, and pytest.raises(...) contract in the candidate's own code; each one must be matched by a verified literal quote or a verified derived (safe-arithmetic) computation, or the claim is INSUFFICIENT_EVIDENCE regardless of how the agent labeled its evidence.",
+  "phase3_run_metadata": {
+    "corpus_reused_unmodified_from_phase0_1_2": true,
+    "model_override": "none -- same model/subagent_type as Phase 2 baseline (see model_family_note above)",
+    "evidence_gate_mechanism_history": {
+      "round_1_defect": "first design let KIND: qualitative structurally exempt an item from grounding by label alone -- an agent could dodge grounding entirely by mislabeling an invented exact value. Caught by independent review before any live subagent call.",
+      "round_1_fix": "extract_expected_contracts() independently AST-detects every exact ==, !=, is, is not, and pytest.raises(...) contract in the candidate, regardless of EVIDENCE labeling.",
+      "round_2_defect": "literal-only grounding had no path for legitimately DERIVED numeric values (e.g. setup numbers + a documented rate). Caught before Step 0.",
+      "round_2_fix": "KIND: derived, checked by a hand-rolled whitelist-only safe arithmetic evaluator -- never Python eval/exec/compile.",
+      "round_3_note": "mid-batch, before any candidate was scored: list/tuple-literal contracts (e.g. == [1, 2, 3]) were found to be silently invisible to the round-1 extractor (ast.List/ast.Tuple are not ast.Constant). Fixed via _resolve_value() before any live pipeline run; regression-tested (tests/test_advanced_gate.py::test_18)."
+    },
+    "known_scope_boundaries_disclosed_post_run": [
+      "EVIDENCE block format is fragile to honest stylistic variation (missing --- separators, field-name casing, evidence placed in trajectory.md instead of the final message) -- observed independently multiple times, see ablations/special_review.md",
+      "Comparisons against a computed (non-literal) expression, e.g. len(setup_list) or 1 + page_size, are invisible to the AST contract extractor entirely -- observed independently three times, see ablations/special_review.md"
+    ]
+  }
+}

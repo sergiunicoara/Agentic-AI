@@ -1,0 +1,6 @@
+case_id: ttl_cache_boundary
+difficulty: hard
+failure_family: boundary_off_by_one
+exception_type:
+message_pattern: False is True
+description: is_throttled() treats the cooldown window as an open interval (elapsed < window_seconds) instead of closed (elapsed <= window_seconds), so a request made at exactly the boundary tick is allowed one tick early instead of still being blocked.

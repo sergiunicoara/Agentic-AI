@@ -1,0 +1,122 @@
+{
+  "case_id": "discount_unit_mismatch",
+  "is_smoke_test_case": false,
+  "B": {
+    "note": "reuses frozen Phase 2 baseline candidate verbatim -- zero new subagent calls",
+    "execution_result": {
+      "status": "OK",
+      "reason": null
+    },
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "VALID",
+      "reason": null
+    },
+    "execution_gate_seconds": 0.844,
+    "oracle_evaluation_seconds": 1.671
+  },
+  "C": {
+    "prompt_sent": "You are a software engineer investigating a bug report against a small\nPython repository.\n\nYour working directory is:\n\n    C:\\Users\\Sergiu\\Desktop\\Projects\\Micro1 Frontier Engineering Claude\\evidence\\advanced\\workspaces\\C\\discount_unit_mismatch\n\nIt contains exactly two things:\n  - report.md   -- a bug report describing observed behavior\n  - buggy/      -- the current state of the relevant source code\n\nDo not look for, assume, or reference any files outside this working\ndirectory. There is nothing else relevant to this task anywhere else on\ndisk.\n\nYour task:\n\n1. Read report.md.\n2. Inspect whatever files under buggy/ you need to understand the code\n   well enough to reason about the reported behavior.\n3. Write ONE new pytest test file named candidate_test.py, saved directly\n   in the working directory shown above (as a sibling of report.md and\n   buggy/, not inside buggy/). It should reproduce the bug described in\n   report.md.\n4. Do not modify any file under buggy/. Its final state must be byte-for-\n   byte what you started with.\n5. Your candidate_test.py will be copied into the same directory as the\n   files currently under buggy/, and pytest will be run from there. Write\n   imports accordingly -- e.g. `from module_name import thing`, not\n   `from buggy.module_name import thing`.\n6. You MUST run your test file exactly ONCE before finalizing (this is\n   required, not optional): temporarily copy candidate_test.py into\n   buggy/, run it from there with pytest, record the actual observed\n   output, then remove the temporary copy from buggy/ (buggy/ must be\n   unmodified in its final state, per point 4) and keep your real\n   candidate_test.py only in the working directory shown above. Do not\n   iterate further after this one check. Report what you actually\n   observed (pass/fail, exception, message) in your final message and in\n   trajectory.md -- do not claim reproduction without having actually run\n   the test and seen it fail.\n7. Write a short trajectory.md in the working directory: what you read,\n   what you concluded, what happened when you ran your test, plus a\n   bulleted list titled \"Files read / commands run:\" (this is\n   self-reported by you, not independently re-verified by anything else).\n8. Immediately before your final claim, write a structured EVIDENCE block\n   disclosing, for every expected value or exception your test asserts,\n   where that expectation came from. There are three kinds of item:\n\n   KIND: literal -- the exact value appears verbatim somewhere in\n   report.md or a buggy/ file.\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: literal\n   VALUE: <the exact value or exception type your test asserts, exactly\n           as it appears in your code -- e.g. 0, None, \"missing\", KeyError>\n   QUOTE: \"<verbatim substring copied from the source file establishing\n            exactly that value>\"\n   SOURCE: report.md | buggy/<filename>\n   ---\n\n   KIND: derived -- the exact value is a straightforward arithmetic\n   consequence of numbers your own test already set up (e.g. quantities\n   you chose) plus a rule (e.g. a rate or formula) that IS stated in the\n   source. The final number itself need not appear anywhere -- what must\n   be grounded is the RULE, and the arithmetic that applies it is checked\n   by actually re-computing it.\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: derived\n   VALUE: <the exact numeric value your test asserts>\n   BASIS: <an arithmetic expression using ONLY plain numbers already in\n           your test's own setup, and +, -, *, /, parentheses -- no\n           variable names, no function calls -- that evaluates to VALUE,\n           e.g. \"(100 + 100) - (100 + 100) * 0.10\">\n   QUOTE: \"<verbatim substring from the source grounding the RULE this\n            arithmetic applies -- e.g. the discount rate -- not the final\n            number itself>\"\n   SOURCE: report.md | buggy/<filename>\n   ---\n\n   KIND: qualitative -- for expectations that are genuinely not encoded\n   as an exact comparison anywhere in your code at all (e.g. a bare \"does\n   not raise\" check with no == or is).\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: qualitative\n   NOTE: <one line: why this can't be pinned to a real quoted literal or\n          a simple grounded arithmetic derivation>\n   ---\n\n   End the block with END_EVIDENCE. If your test genuinely asserts no\n   specific expected value anywhere (rare), write one line\n   `NO_EVIDENCE_ITEMS_NEEDED: <reason>` between EVIDENCE: and END_EVIDENCE\n   instead of any ITEM entries -- but this claim is checked against your\n   actual code, so it only holds if that's actually true.\n\n   IMPORTANT: every exact value your test compares with ==, !=, is,\n   is not, or every exception type in pytest.raises(...), is\n   independently detected by reading your actual code -- not by trusting\n   this block. Labeling an exact value 'qualitative' instead of\n   'literal'/'derived', or omitting it, does not exempt it: any exact\n   comparison found in your code must have a matching item that\n   genuinely grounds it, or your claim becomes INSUFFICIENT_EVIDENCE\n   regardless of labeling. Use 'derived' only when the arithmetic is\n   genuinely simple and re-derivable, not to disguise a guess as a\n   computation. Use 'qualitative' only for expectations that are not\n   encoded as an exact comparison anywhere in your code at all.\n\n9. Finish with your final claim in exactly this format, as the last thing\n   you write:\n\n   CLAIM: VERIFIED_REPRODUCTION\n   or\n   CLAIM: INSUFFICIENT_EVIDENCE\n\n   followed by one paragraph explaining your reasoning. Use\n   INSUFFICIENT_EVIDENCE if you cannot honestly back every asserted\n   expectation per point 8 -- an honest INSUFFICIENT_EVIDENCE is far more\n   useful than an unsupported VERIFIED_REPRODUCTION.\n\nThis is a one-shot task: no feedback, no revision after this response.\n",
+    "agent_final_message": "I read `report.md` and `buggy/pricing.py`, wrote `candidate_test.py` at the working-directory root (importing `from pricing import apply_discount`), ran it once by temporarily copying it into `buggy/` and invoking pytest from there, and confirmed `buggy/` is unchanged afterward (only `pricing.py` remains, pycache/pytest cache artifacts removed).\n\nObserved test result: FAILED \u2014 `apply_discount(100, 20)` returned `-1900` instead of the expected `80` (`assert -1900 == 80`), which exactly matches the report's \"$100 item with a 20%-off code came out to a total of almost negative $1900 instead of $80.\"\n\nEVIDENCE:\nITEM: expected_total_80\nKIND: literal\nVALUE: 80\nQUOTE: \"instead of $80\"\nSOURCE: report.md\n---\nITEM: input_price_100\nKIND: literal\nVALUE: 100\nQUOTE: \"a $100 item\"\nSOURCE: report.md\n---\nITEM: input_percent_20\nKIND: literal\nVALUE: 20\nQUOTE: \"20%-off code\"\nSOURCE: report.md\n---\nITEM: discount_formula_rule\nKIND: derived\nVALUE: 80\nBASIS: \"100 - (100 * 0.20)\"\nQUOTE: \"return price - (price * percent_off)\"\nSOURCE: buggy/pricing.py\n---\nEND_EVIDENCE\n\nCLAIM: VERIFIED_REPRODUCTION\n\nThe test calls `apply_discount(100, 20)`, directly mirroring the report's own scenario (\"a $100 item with a 20%-off code\"), and asserts the result equals `80`, the exact expected total stated in report.md (\"instead of $80\"). The 80 figure is also independently derivable from the formula literally present in `buggy/pricing.py` (`price - (price * percent_off)`) applied with `percent_off` as the fraction `0.20` that \"20%\" denotes: `100 - (100 * 0.20) = 80`. When actually run (test copied into `buggy/`, executed with pytest, then removed), the test failed with `assert -1900 == 80` \u2014 the function returned `-1900`, matching the report's \"almost negative $1900\" verbatim. This confirms the test reproduces the exact reported bug behavior, and `buggy/` was left byte-for-byte unchanged afterward.\n",
+    "workspace_candidate_test_py": "from pricing import apply_discount\n\n\ndef test_apply_discount_20_percent_off_100_dollar_item():\n    \"\"\"\n    Reproduces the bug from report.md: a $100 item with a 20%-off code\n    should come out to a total of $80, but instead comes out to almost\n    negative $1900.\n\n    apply_discount treats `percent_off` as a fraction (e.g. 0.20 for\n    20%), but the checkout code path is evidently calling it with the\n    whole-number percent (20) instead, causing:\n        price - (price * percent_off) = 100 - (100 * 20) = -1900\n    instead of the expected:\n        100 - (100 * 0.20) = 80\n    \"\"\"\n    total = apply_discount(100, 20)\n    assert total == 80\n",
+    "workspace_trajectory_md": "# Trajectory\n\n## What I read\n\n- `report.md`: describes that checkout totals are wrong whenever a discount\n  code is applied. Specific example: a $100 item with a 20%-off code\n  produces a total of \"almost negative $1900\" instead of the expected $80.\n  Checkout without a discount code works fine. Bug has existed since the\n  discount-codes feature shipped.\n\n- `buggy/pricing.py`: the only file in `buggy/`. Contains a single function:\n\n  ```python\n  def apply_discount(price, percent_off):\n      \"\"\"Return the price after applying a percentage discount.\"\"\"\n      return price - (price * percent_off)\n  ```\n\n## What I concluded\n\n`apply_discount`'s formula (`price - price * percent_off`) is only correct\nif `percent_off` is passed in as a fraction (e.g. `0.20` for 20% off). The\nreport's numbers are a direct fingerprint of a unit mismatch: if the caller\ninstead passes the whole-number percent (`20` for \"20%\"), the function\ncomputes `100 - (100 * 20) = -1900`, which matches the report's \"almost\nnegative $1900\" exactly. With the correct fractional unit (`0.20`), the\nsame call would produce `100 - (100 * 0.20) = 80`, matching the report's\nexpected total. Since `pricing.py` is the only source file present, and its\ndocstring gives no indication of which unit is expected, the reproducible\nbug is that calling `apply_discount` with a whole-number percent (as a\n\"20%-off code\" naturally suggests) silently produces a wildly wrong,\nnegative total instead of either raising an error or returning the correct\ndiscounted price.\n\n## Test written\n\n`candidate_test.py` (in the working directory, sibling of `report.md` and\n`buggy/`) calls `apply_discount(100, 20)` and asserts the result equals\n`80`, mirroring the report's exact scenario (a $100 item, a 20%-off code,\nexpected total $80).\n\n## What happened when I ran it\n\nPer the required one-time check: I copied `candidate_test.py` into\n`buggy/`, ran `python -m pytest candidate_test.py -v` from inside `buggy/`,\nobserved the result, then deleted the copy (and the `__pycache__`/\n`.pytest_cache` directories the run created) from `buggy/`.\n\nObserved output:\n\n```\ncandidate_test.py::test_apply_discount_20_percent_off_100_dollar_item FAILED\n\n    total = apply_discount(100, 20)\n>   assert total == 80\nE   assert -1900 == 80\n\n1 failed in 1.17s\n```\n\nThe test fails with `assert -1900 == 80` \u2014 i.e., calling\n`apply_discount(100, 20)` actually returns `-1900`, exactly matching the\nreport's \"almost negative $1900\" for a $100 item with a 20%-off code,\ninstead of the expected $80. This reproduces the reported bug.\n\nAfter the run, `buggy/` was restored to contain only `pricing.py`\n(the temporary test copy and pytest cache artifacts were removed), leaving\nit byte-for-byte as it started.\n\n## Files read / commands run:\n\n- Read `report.md`\n- Read `buggy/pricing.py`\n- Wrote `candidate_test.py` in the working directory\n- Ran (bash): `cp candidate_test.py buggy/candidate_test.py`\n- Ran (bash): `cd buggy && python -m pytest candidate_test.py -v`\n- Ran (bash): `rm buggy/candidate_test.py`\n- Ran (bash): `rm -rf buggy/__pycache__` and `rm -rf .pytest_cache`\n- Ran (bash): `find buggy -type f` (to confirm `buggy/` contains only `pricing.py` afterward)\n",
+    "execution_result": {
+      "status": "OK",
+      "reason": null,
+      "detail": "1 failing testcase(s) observed on buggy/",
+      "buggy_tampering_detected": false,
+      "buggy_tampering_detail": "buggy/ byte-for-byte unchanged"
+    },
+    "execution_gate_seconds": 0.797,
+    "extracted_contracts": [
+      {
+        "kind": "equality",
+        "value": "80",
+        "lineno": 18,
+        "source_snippet": "assert total == 80"
+      }
+    ],
+    "evidence_block": {
+      "parse_ok": true,
+      "parse_error": "",
+      "items": [
+        {
+          "item_id": "expected_total_80",
+          "kind": "literal",
+          "value": "80",
+          "quote": "instead of $80",
+          "source": "report.md",
+          "basis": null,
+          "note": null
+        },
+        {
+          "item_id": "input_price_100",
+          "kind": "literal",
+          "value": "100",
+          "quote": "a $100 item",
+          "source": "report.md",
+          "basis": null,
+          "note": null
+        },
+        {
+          "item_id": "input_percent_20",
+          "kind": "literal",
+          "value": "20",
+          "quote": "20%-off code",
+          "source": "report.md",
+          "basis": null,
+          "note": null
+        },
+        {
+          "item_id": "discount_formula_rule",
+          "kind": "derived",
+          "value": "80",
+          "quote": "return price - (price * percent_off)",
+          "source": "buggy/pricing.py",
+          "basis": "100 - (100 * 0.20)",
+          "note": null
+        }
+      ],
+      "no_items_needed_reason": null
+    },
+    "grounding_result": {
+      "status": "SUPPORTED",
+      "contract_checks": [
+        {
+          "contract_kind": "equality",
+          "contract_value": "80",
+          "matched_item_id": "expected_total_80",
+          "grounded": true,
+          "reason": "grounded by literal item 'expected_total_80'"
+        }
+      ],
+      "mislabel_suspected": false,
+      "mislabel_detail": "",
+      "detail": "1/1 exact contract(s) grounded"
+    },
+    "grounding_gate_seconds": 0.0,
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "VALID",
+      "reason": null,
+      "detail": "all five conditions satisfied"
+    },
+    "oracle_evaluation_seconds": 1.469,
+    "difficulty": "medium",
+    "failure_family": "incorrect_returned_value",
+    "agent_call_seconds": 52.177,
+    "agent_call_tokens": 52399,
+    "agent_call_tool_uses": 6,
+    "is_smoke_test_case": false
+  },
+  "D": {
+    "repair_fired": false,
+    "note": "C already produced VERIFIED_REPRODUCTION; D = C unchanged, no repair call spent",
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "VALID",
+      "reason": null,
+      "detail": "all five conditions satisfied"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+I have written `candidate_test.py` and `trajectory.md` in the working directory, and confirmed `buggy/` is unmodified (only `cart.py` and `conftest.py` remain, matching the original listing).
+
+Test run result (captured verbatim above): 1 failed, 1 passed. The failing test (`test_coupon_applied_before_second_item_added_should_discount_whole_cart`) produced `AssertionError: expected the coupon to discount the whole cart to 80, but got 90.0` — exactly reproducing the reported symptom (item added after the coupon comes out at full price). The passing test mirrors the second customer's report (add everything first, then coupon) and correctly gets 80. The repo's own `conftest.py` instrumentation also independently printed `BUGPROOF_ORDER_DEPENDENT_COUPON_PATTERN_OBSERVED`, confirming the call sequence matched the structural pattern described in the bug report.
+
+EVIDENCE:
+ITEM: apply_coupon_formula
+KIND: literal
+VALUE: self.total * percent_off / 100
+QUOTE: "self.total = self.total - (self.total * percent_off / 100)"
+SOURCE: buggy/cart.py
+---
+ITEM: checkout_rounding
+KIND: literal
+VALUE: round(self.total, 2)
+QUOTE: "return round(self.total, 2)"
+SOURCE: buggy/cart.py
+---
+ITEM: expected_total_after_coupon_80
+KIND: derived
+VALUE: 80
+BASIS: (50 + 50) - (50 + 50) * 20 / 100
+QUOTE: "self.total = self.total - (self.total * percent_off / 100)"
+SOURCE: buggy/cart.py
+---
+ITEM: order_dependence_matches_report
+KIND: qualitative
+NOTE: The report's description ("added an item, applied the coupon, then adding a second item -- the second item came out at full price"; second customer "added everything to the cart before entering the coupon" and "it worked fine") is a narrative account of behavior, not a numeric literal — my two tests operationalize this as two orderings of the same operations and compare their computed totals rather than asserting a value copied from the report text itself.
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The buggy `apply_coupon` method computes a one-time discount off the current running total rather than storing the coupon to apply to the whole final order, so any item added after the coupon call is added at full price — this is exactly the customer complaint in report.md. My test reproduces this with concrete numbers (two $50 items, 20% coupon): when the coupon is applied between the two `add_item` calls, checkout returns 90.0 instead of the correctly-discounted 80 (derived directly from the coupon formula present in `cart.py`), and the assertion fails with that exact discrepancy when actually run against the buggy code. A second test confirms the "add everything first" ordering does produce the correct 80, matching the second customer's report that it "worked fine" in that order. I ran the test exactly once (copied into `buggy/`, executed with pytest, observed the failure and the repo's own independent order-detection marker firing, then removed the copy and pytest-generated caches, leaving `buggy/` byte-for-byte as it started).

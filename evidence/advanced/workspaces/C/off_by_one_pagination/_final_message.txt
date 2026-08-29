@@ -1,0 +1,19 @@
+EVIDENCE:
+ITEM: page1_expected_values
+KIND: literal
+VALUE: [1, 2, 3]
+QUOTE: "page 1 gives me\nitems 4, 5, 6 instead of 1, 2, 3"
+SOURCE: report.md
+---
+ITEM: page2_expected_values
+KIND: derived
+VALUE: [4, 5, 6]
+BASIS: 3
+QUOTE: "Return the slice of items for the given 1-indexed page."
+SOURCE: buggy/paginator.py
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The docstring of `get_page` states pagination is "1-indexed," but the implementation computes `start = page_number * page_size` instead of `(page_number - 1) * page_size`, shifting every page one page_size ahead of where it should start. I wrote `candidate_test.py` asserting `get_page([1..10], 1, 3) == [1, 2, 3]` (the exact values report.md says the user expected instead of the observed 4, 5, 6) and `get_page([1..10], 2, 3) == [4, 5, 6]` (the correct 1-indexed page-2 slice, derived arithmetically from the stated page size and the docstring's 1-indexed convention). I copied the test into `buggy/`, ran `python -m pytest candidate_test.py -v` from there, and observed both tests fail: page 1 returned `[4, 5, 6]` instead of `[1, 2, 3]`, and page 2 returned `[7, 8, 9]` instead of `[4, 5, 6]` — exactly the off-by-one-page shift described in the bug report. I then removed the temporary test copy and the `__pycache__`/`.pytest_cache` artifacts pytest created, leaving `buggy/paginator.py` as the sole, unmodified file in `buggy/`. `candidate_test.py` and `trajectory.md` are saved in the working directory alongside `report.md`.

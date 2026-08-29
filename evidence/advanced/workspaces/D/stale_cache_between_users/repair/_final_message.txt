@@ -1,0 +1,33 @@
+EVIDENCE:
+
+1. KIND: literal
+   QUOTE: def add_item(item, cart=[]):
+   SOURCE: buggy/session_cache.py, line 1
+   SUPPORTS: the default cart argument is an empty list, evaluated once — the starting basis for the length derivations below.
+
+2. KIND: literal
+   QUOTE: cart.append(item)
+   SOURCE: buggy/session_cache.py, line 3
+   SUPPORTS: each call to add_item appends exactly one item to cart — the basis for the arithmetic +1 in the length derivations, and for "apple" in cart_a / membership behavior.
+
+3. KIND: derived
+   BASIS: 0 + 1 = 1
+   SUPPORTS: assert len(cart_a) == 1 — cart_a results from the first call to add_item("apple") in the test, starting from the empty default list (item 1) and appending one item (item 2), giving length 1.
+
+4. KIND: derived
+   BASIS: 0 + 1 = 1
+   SUPPORTS: assert len(cart_b) == 1 — under correct (non-buggy) behavior, user B's own call to add_item("banana") should append exactly one item to a cart that starts empty for user B, giving length 1. (Observed on buggy/: this assertion is not reached because the preceding "apple" not in cart_b assertion fails first, since actual cart_b is ['apple', 'banana'], length 2 — the bug.)
+
+5. KIND: qualitative
+   SUPPORTS: assert "apple" in cart_a — directly follows from item 2 (append behavior) applied to the call add_item("apple").
+
+6. KIND: literal
+   QUOTE: user B's cart already had "apple" in it before they'd added anything
+   SOURCE: report.md, lines 3-4
+   SUPPORTS: assert "apple" not in cart_b encodes the correct/expected behavior that is the direct negation of the reported bug — the bug is precisely that this assertion fails.
+
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The revised test replaces the two ungroundable exact-list equalities (cart_a == ["apple"], cart_b == ["banana"]) with assertions that are each independently groundable: two numeric length checks derived from plain arithmetic (0+1=1) grounded in the literal cart=[] default and cart.append(item) source lines, one qualitative membership check tied to the append semantics, and one qualitative membership check that is the direct negation of the exact bug sentence quoted verbatim from report.md. Running the revised test once against a temp copy in buggy/ (then removing the copy and the pytest-created __pycache__, leaving buggy/session_cache.py byte-for-byte unchanged) produced exactly one failure, at assert "apple" not in cart_b, with pytest showing cart_b == ['apple', 'banana'] — i.e., user B's cart contained user A's leftover "apple" before user B added anything, which is exactly the symptom described in report.md and is caused by the mutable default argument cart=[] in buggy/session_cache.py. This is a real, observed, and correctly-attributed reproduction of the reported bug with no invented exact-value assertions.

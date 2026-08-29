@@ -1,0 +1,14 @@
+Summary
+
+Root cause of the evidence-check failure: the original test wrapped average_score([]) in pytest.raises(ZeroDivisionError) — that asserts the current buggy behavior, so it trivially passes on buggy/stats.py (which does raise ZeroDivisionError on 0/0). A regression test must instead assert the desired behavior and therefore fail on buggy code.
+
+Fix applied (candidate_test.py, rewritten): calls average_score([]) as a bare statement (no pytest.raises). I deliberately did not pin an exact return value (e.g. == 0) since report.md only describes the crash, never what the fixed function should return; pinning a value would have been an ungrounded literal, so I narrowed the assertion to just "must not raise ZeroDivisionError," per the repair instructions.
+
+Verification: ran the revised test once via a temp copy in buggy/, confirmed it FAILED with ZeroDivisionError: division by zero at stats.py:3, matching report.md's description exactly. Removed the temp test file and the __pycache__ directory pytest generated, leaving buggy/stats.py byte-for-byte unchanged.
+
+Files touched:
+- candidate_test.py (overwritten)
+- trajectory.md (overwritten, includes EVIDENCE block)
+- buggy/stats.py — read only, not modified
+
+Final claim recorded in trajectory.md: CLAIM: VERIFIED_REPRODUCTION, with reasoning that the test is grounded in verbatim report.md text and the literal buggy/stats.py source, and was confirmed by an actual single test run to fail on buggy/ for the reported reason.

@@ -1,0 +1,6 @@
+case_id: roster_lookup_wrong_exception
+difficulty: easy
+failure_family: wrong_exception_type
+exception_type: IndexError
+message_pattern: index out of range
+description: find_member() indexes into an empty filtered list without checking for a match, raising IndexError instead of a lookup-style error when the id is not found.

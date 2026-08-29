@@ -1,0 +1,98 @@
+{
+  "case_id": "reminder_lead_time_units",
+  "is_smoke_test_case": false,
+  "B": {
+    "note": "reuses frozen Phase 2 baseline candidate verbatim -- zero new subagent calls",
+    "execution_result": {
+      "status": "OK",
+      "reason": null
+    },
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "VALID",
+      "reason": null
+    },
+    "execution_gate_seconds": 0.828,
+    "oracle_evaluation_seconds": 1.5
+  },
+  "C": {
+    "prompt_sent": "You are a software engineer investigating a bug report against a small\nPython repository.\n\nYour working directory is:\n\n    C:\\Users\\Sergiu\\Desktop\\Projects\\Micro1 Frontier Engineering Claude\\evidence\\advanced\\workspaces\\C\\reminder_lead_time_units\n\nIt contains exactly two things:\n  - report.md   -- a bug report describing observed behavior\n  - buggy/      -- the current state of the relevant source code\n\nDo not look for, assume, or reference any files outside this working\ndirectory. There is nothing else relevant to this task anywhere else on\ndisk.\n\nYour task:\n\n1. Read report.md.\n2. Inspect whatever files under buggy/ you need to understand the code\n   well enough to reason about the reported behavior.\n3. Write ONE new pytest test file named candidate_test.py, saved directly\n   in the working directory shown above (as a sibling of report.md and\n   buggy/, not inside buggy/). It should reproduce the bug described in\n   report.md.\n4. Do not modify any file under buggy/. Its final state must be byte-for-\n   byte what you started with.\n5. Your candidate_test.py will be copied into the same directory as the\n   files currently under buggy/, and pytest will be run from there. Write\n   imports accordingly -- e.g. `from module_name import thing`, not\n   `from buggy.module_name import thing`.\n6. You MUST run your test file exactly ONCE before finalizing (this is\n   required, not optional): temporarily copy candidate_test.py into\n   buggy/, run it from there with pytest, record the actual observed\n   output, then remove the temporary copy from buggy/ (buggy/ must be\n   unmodified in its final state, per point 4) and keep your real\n   candidate_test.py only in the working directory shown above. Do not\n   iterate further after this one check. Report what you actually\n   observed (pass/fail, exception, message) in your final message and in\n   trajectory.md -- do not claim reproduction without having actually run\n   the test and seen it fail.\n7. Write a short trajectory.md in the working directory: what you read,\n   what you concluded, what happened when you ran your test, plus a\n   bulleted list titled \"Files read / commands run:\" (this is\n   self-reported by you, not independently re-verified by anything else).\n8. Immediately before your final claim, write a structured EVIDENCE block\n   disclosing, for every expected value or exception your test asserts,\n   where that expectation came from. There are three kinds of item:\n\n   KIND: literal -- the exact value appears verbatim somewhere in\n   report.md or a buggy/ file.\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: literal\n   VALUE: <the exact value or exception type your test asserts, exactly\n           as it appears in your code -- e.g. 0, None, \"missing\", KeyError>\n   QUOTE: \"<verbatim substring copied from the source file establishing\n            exactly that value>\"\n   SOURCE: report.md | buggy/<filename>\n   ---\n\n   KIND: derived -- the exact value is a straightforward arithmetic\n   consequence of numbers your own test already set up (e.g. quantities\n   you chose) plus a rule (e.g. a rate or formula) that IS stated in the\n   source. The final number itself need not appear anywhere -- what must\n   be grounded is the RULE, and the arithmetic that applies it is checked\n   by actually re-computing it.\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: derived\n   VALUE: <the exact numeric value your test asserts>\n   BASIS: <an arithmetic expression using ONLY plain numbers already in\n           your test's own setup, and +, -, *, /, parentheses -- no\n           variable names, no function calls -- that evaluates to VALUE,\n           e.g. \"(100 + 100) - (100 + 100) * 0.10\">\n   QUOTE: \"<verbatim substring from the source grounding the RULE this\n            arithmetic applies -- e.g. the discount rate -- not the final\n            number itself>\"\n   SOURCE: report.md | buggy/<filename>\n   ---\n\n   KIND: qualitative -- for expectations that are genuinely not encoded\n   as an exact comparison anywhere in your code at all (e.g. a bare \"does\n   not raise\" check with no == or is).\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: qualitative\n   NOTE: <one line: why this can't be pinned to a real quoted literal or\n          a simple grounded arithmetic derivation>\n   ---\n\n   End the block with END_EVIDENCE. If your test genuinely asserts no\n   specific expected value anywhere (rare), write one line\n   `NO_EVIDENCE_ITEMS_NEEDED: <reason>` between EVIDENCE: and END_EVIDENCE\n   instead of any ITEM entries -- but this claim is checked against your\n   actual code, so it only holds if that's actually true.\n\n   IMPORTANT: every exact value your test compares with ==, !=, is,\n   is not, or every exception type in pytest.raises(...), is\n   independently detected by reading your actual code -- not by trusting\n   this block. Labeling an exact value 'qualitative' instead of\n   'literal'/'derived', or omitting it, does not exempt it: any exact\n   comparison found in your code must have a matching item that\n   genuinely grounds it, or your claim becomes INSUFFICIENT_EVIDENCE\n   regardless of labeling. Use 'derived' only when the arithmetic is\n   genuinely simple and re-derivable, not to disguise a guess as a\n   computation. Use 'qualitative' only for expectations that are not\n   encoded as an exact comparison anywhere in your code at all.\n\n9. Finish with your final claim in exactly this format, as the last thing\n   you write:\n\n   CLAIM: VERIFIED_REPRODUCTION\n   or\n   CLAIM: INSUFFICIENT_EVIDENCE\n\n   followed by one paragraph explaining your reasoning. Use\n   INSUFFICIENT_EVIDENCE if you cannot honestly back every asserted\n   expectation per point 8 -- an honest INSUFFICIENT_EVIDENCE is far more\n   useful than an unsupported VERIFIED_REPRODUCTION.\n\nThis is a one-shot task: no feedback, no revision after this response.\n",
+    "agent_final_message": "I read report.md and both files in buggy/, wrote candidate_test.py in the working directory, ran it once (copied into buggy/, ran pytest, removed the copy and the generated __pycache__), and wrote trajectory.md.\n\nEVIDENCE:\nITEM: default_lead_minutes_value\nKIND: literal\nVALUE: 15\nQUOTE: \"DEFAULT_REMINDER_LEAD_MINUTES = 15\"\nSOURCE: buggy/config.py\n---\nITEM: default_expected_seconds\nKIND: derived\nVALUE: 999100\nBASIS: 1000000 - 15 * 60\nQUOTE: \"lead = lead_minutes if lead_minutes is not None else DEFAULT_REMINDER_LEAD_MINUTES\\n    return event_time_epoch - lead\"\nSOURCE: buggy/scheduler.py\n---\nITEM: custom_lead_expected_seconds\nKIND: derived\nVALUE: 1999400\nBASIS: 2000000 - 10 * 60\nQUOTE: \"def reminder_trigger_time(event_time_epoch, lead_minutes=None):\"\nSOURCE: buggy/scheduler.py\n---\nEND_EVIDENCE\n\nCLAIM: VERIFIED_REPRODUCTION\n\nThe `reminder_trigger_time` function subtracts `lead` (a value explicitly named/documented in minutes, sourced from `DEFAULT_REMINDER_LEAD_MINUTES` or a caller-supplied `lead_minutes`) directly from `event_time_epoch` (an epoch timestamp in seconds) without multiplying by 60, so a nominal \"15 minute\" lead only pushes the reminder back by 15 seconds. This matches the report's description of reminders firing \"only a few seconds before the event\" for both default and custom lead times. I ran the test file exactly once, temporarily inside `buggy/`, and observed both assertions fail with `assert 999985 == 999100` and `assert 1999990 == 1999400` \u2014 the buggy code returning event_time_epoch minus lead-in-seconds-mistaken-for-minutes rather than the expected minutes-converted-to-seconds value. `buggy/` was restored to its original two files (config.py, scheduler.py) after the run, and `candidate_test.py` / `trajectory.md` are in the working directory as required.\n",
+    "workspace_candidate_test_py": "from config import DEFAULT_REMINDER_LEAD_MINUTES\nfrom scheduler import reminder_trigger_time\n\n\ndef test_default_lead_time_is_minutes_before_event():\n    \"\"\"DEFAULT_REMINDER_LEAD_MINUTES is 15 minutes; the reminder should fire\n    15 minutes (900 seconds) before the event, not 15 seconds before.\"\"\"\n    event_time_epoch = 1_000_000\n    expected = event_time_epoch - DEFAULT_REMINDER_LEAD_MINUTES * 60\n\n    result = reminder_trigger_time(event_time_epoch)\n\n    assert result == expected\n\n\ndef test_custom_lead_time_is_minutes_before_event():\n    \"\"\"A custom lead_minutes value should also be converted to seconds\n    before being subtracted from the event time.\"\"\"\n    event_time_epoch = 2_000_000\n    custom_lead_minutes = 10\n    expected = event_time_epoch - custom_lead_minutes * 60\n\n    result = reminder_trigger_time(event_time_epoch, lead_minutes=custom_lead_minutes)\n\n    assert result == expected\n",
+    "workspace_trajectory_md": "# Trajectory\n\n## What I read\n\n- `report.md`: Users report that calendar reminders fire \"way too late\" \u2014\n  effectively right at event start instead of ahead of time. Default lead\n  time in settings is 15 minutes, but the notification appears only \"a few\n  seconds\" before the event. Custom lead times on individual events have\n  the same problem.\n\n- `buggy/config.py`:\n  ```\n  DEFAULT_REMINDER_LEAD_MINUTES = 15\n  ```\n  A single constant, named in minutes, set to 15.\n\n- `buggy/scheduler.py`:\n  ```python\n  from config import DEFAULT_REMINDER_LEAD_MINUTES\n\n\n  def reminder_trigger_time(event_time_epoch, lead_minutes=None):\n      \"\"\"Return the epoch timestamp at which a reminder should fire.\"\"\"\n      lead = lead_minutes if lead_minutes is not None else DEFAULT_REMINDER_LEAD_MINUTES\n      return event_time_epoch - lead\n  ```\n\n## What I concluded\n\n`event_time_epoch` is an epoch timestamp, whose units are seconds. `lead`\n(whether the default `DEFAULT_REMINDER_LEAD_MINUTES` or a caller-supplied\n`lead_minutes`) is explicitly named/documented in minutes. The function\nsubtracts `lead` directly from `event_time_epoch` without converting minutes\nto seconds (`lead * 60`). So a \"15 minute\" lead time only pushes the trigger\ntime back by 15 seconds, not 900 seconds \u2014 exactly matching the report's\ndescription of reminders firing \"only a few seconds before the event\"\ninstead of 15 minutes before, for both the default and any custom\n`lead_minutes` value.\n\n## Test written\n\n`candidate_test.py` (in the working directory, sibling of `report.md` and\n`buggy/`) contains two tests:\n\n1. `test_default_lead_time_is_minutes_before_event` \u2014 calls\n   `reminder_trigger_time(event_time_epoch)` with no explicit lead, and\n   asserts the result equals `event_time_epoch - DEFAULT_REMINDER_LEAD_MINUTES * 60`\n   (i.e. 900 seconds before the event, using the module's own default\n   constant).\n2. `test_custom_lead_time_is_minutes_before_event` \u2014 calls\n   `reminder_trigger_time(event_time_epoch, lead_minutes=10)` and asserts\n   the result equals `event_time_epoch - 10 * 60` (600 seconds before the\n   event).\n\nBoth encode \"lead_minutes means minutes, so convert to seconds before\nsubtracting from an epoch-seconds timestamp\" \u2014 the behavior the report says\nis missing.\n\n## What happened when I ran the test\n\nPer the task instructions, I copied `candidate_test.py` into `buggy/`,\nran `python -m pytest candidate_test.py -v` from inside `buggy/`, and then\ndeleted the copy (and the `__pycache__` directory pytest created) so that\n`buggy/` was restored to its original two files.\n\nObserved output: both tests **FAILED**.\n\n- `test_default_lead_time_is_minutes_before_event`: `assert 999985 == 999100`\n  (event_time_epoch=1,000,000; buggy code returned `1_000_000 - 15 = 999985`\n  instead of the expected `1_000_000 - 15*60 = 999100`).\n- `test_custom_lead_time_is_minutes_before_event`: `assert 1999990 == 1999400`\n  (event_time_epoch=2,000,000, lead_minutes=10; buggy code returned\n  `2_000_000 - 10 = 1999990` instead of the expected `2_000_000 - 10*60 = 1999400`).\n\nThis confirms the reported bug: reminders trigger only `lead_minutes`\n*seconds* before the event instead of `lead_minutes` *minutes* before, for\nboth the default and a custom lead time.\n\n## Files read / commands run:\n\n- Read `report.md`\n- Read `buggy/config.py`\n- Read `buggy/scheduler.py`\n- Wrote `candidate_test.py` in the working directory\n- `cp candidate_test.py buggy/candidate_test.py`\n- `cd buggy && python -m pytest candidate_test.py -v` (both tests FAILED, output captured above)\n- `rm buggy/candidate_test.py`\n- `rm -rf buggy/__pycache__` (cleanup of pytest-generated cache so `buggy/` matches its original state)\n- `ls -la buggy` (confirmed only `config.py` and `scheduler.py` remain, unmodified)\n",
+    "execution_result": {
+      "status": "OK",
+      "reason": null,
+      "detail": "2 failing testcase(s) observed on buggy/",
+      "buggy_tampering_detected": false,
+      "buggy_tampering_detail": "buggy/ byte-for-byte unchanged"
+    },
+    "execution_gate_seconds": 0.813,
+    "extracted_contracts": [],
+    "evidence_block": {
+      "parse_ok": true,
+      "parse_error": "",
+      "items": [
+        {
+          "item_id": "default_lead_minutes_value",
+          "kind": "literal",
+          "value": "15",
+          "quote": "DEFAULT_REMINDER_LEAD_MINUTES = 15",
+          "source": "buggy/config.py",
+          "basis": null,
+          "note": null
+        },
+        {
+          "item_id": "default_expected_seconds",
+          "kind": "derived",
+          "value": "999100",
+          "quote": "lead = lead_minutes if lead_minutes is not None else DEFAULT_REMINDER_LEAD_MINUTES\\n    return event_time_epoch - lead",
+          "source": "buggy/scheduler.py",
+          "basis": "1000000 - 15 * 60",
+          "note": null
+        },
+        {
+          "item_id": "custom_lead_expected_seconds",
+          "kind": "derived",
+          "value": "1999400",
+          "quote": "def reminder_trigger_time(event_time_epoch, lead_minutes=None):",
+          "source": "buggy/scheduler.py",
+          "basis": "2000000 - 10 * 60",
+          "note": null
+        }
+      ],
+      "no_items_needed_reason": null
+    },
+    "grounding_result": {
+      "status": "SUPPORTED",
+      "contract_checks": [],
+      "mislabel_suspected": false,
+      "mislabel_detail": "",
+      "detail": "no exact contracts to ground"
+    },
+    "grounding_gate_seconds": 0.0,
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "VALID",
+      "reason": null,
+      "detail": "all five conditions satisfied"
+    },
+    "oracle_evaluation_seconds": 1.5,
+    "difficulty": "hard",
+    "failure_family": "multi_module_interaction",
+    "agent_call_seconds": 52.519,
+    "agent_call_tokens": 53545,
+    "agent_call_tool_uses": 7,
+    "is_smoke_test_case": false
+  },
+  "D": {
+    "repair_fired": false,
+    "note": "C already produced VERIFIED_REPRODUCTION; D = C unchanged, no repair call spent",
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "VALID",
+      "reason": null,
+      "detail": "all five conditions satisfied"
+    }
+  }
+}

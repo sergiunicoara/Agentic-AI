@@ -1,0 +1,36 @@
+{
+  "variant": "D_exec",
+  "n": 12,
+  "claim_rate": {
+    "count": 5,
+    "total": 12,
+    "pct": 41.7
+  },
+  "vrr": {
+    "count": 10,
+    "total": 12,
+    "pct": 83.3
+  },
+  "fcrr": {
+    "count": 1,
+    "claimed_total": 5,
+    "pct": 20.0
+  },
+  "oracle_counts": {
+    "VALID": 10,
+    "WRONG_SYMPTOM": 2,
+    "PASSES_ON_BUGGY": 0,
+    "COLLECTION_ERROR": 0,
+    "FAILS_ON_FIXED": 0,
+    "SUITE_REGRESSION": 0,
+    "ORACLE_ERROR_TIMEOUT": 0
+  },
+  "repair_eligible_cases": [
+    "empty_list_average_crash",
+    "roster_lookup_wrong_exception"
+  ],
+  "cases_using_D_source": [
+    "empty_list_average_crash",
+    "roster_lookup_wrong_exception"
+  ]
+}

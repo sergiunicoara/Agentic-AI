@@ -1,0 +1,37 @@
+## Summary
+
+`buggy/stats.py` contains:
+```python
+def average_score(scores):
+    """Return the mean of a list of numeric scores."""
+    return sum(scores) / len(scores)
+```
+With an empty list, `sum([])` is `0` and `len([])` is `0`, so the division raises `ZeroDivisionError` — exactly matching report.md's description of a crash on "a new quiz" that "hadn't had anyone take it yet," with a stack trace into the stats helper and a `ZeroDivisionError`, guessed to be "trying to average scores before any exist."
+
+I wrote `candidate_test.py` (in the working directory, sibling to `report.md` and `buggy/`) with a flat `from stats import average_score` import, asserting `pytest.raises(ZeroDivisionError)` around `average_score([])`.
+
+I copied it into `buggy/`, ran `python -m pytest candidate_test.py -v` from `buggy/`, observed:
+```
+candidate_test.py::test_average_score_empty_list_raises_zero_division_error PASSED [100%]
+============================== 1 passed in 0.31s ==============================
+```
+then deleted the temporary copy plus the `__pycache__`/`.pytest_cache` directories pytest generated, restoring `buggy/` to containing only the original, untouched `stats.py`.
+
+EVIDENCE:
+ITEM: zero_division_error
+KIND: literal
+VALUE: ZeroDivisionError
+QUOTE: "ZeroDivisionError"
+SOURCE: report.md
+---
+ITEM: empty_list_scenario
+KIND: literal
+VALUE: average_score([])
+QUOTE: "return sum(scores) / len(scores)"
+SOURCE: buggy/stats.py
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The report describes a `ZeroDivisionError` in the stats helper when averaging scores for a quiz with no submissions yet, and `buggy/stats.py`'s `average_score` function divides `sum(scores)` by `len(scores)` with no guard for an empty list — so `average_score([])` computes `0 / 0`, which raises `ZeroDivisionError` in Python. My test asserts exactly that exception is raised for that exact input, I ran it once (temporarily copied into `buggy/`, executed with pytest, then removed, leaving `buggy/` byte-for-byte unchanged), and it passed, directly confirming the reproduction.

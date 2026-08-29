@@ -1,0 +1,6 @@
+case_id: csv_quoted_field_parsing
+difficulty: hard
+failure_family: malformed_input_parsing
+exception_type:
+message_pattern: hi to the customer
+description: parse_line() toggles quote state on every double-quote character without recognizing the CSV convention of a doubled quote ("") as an escaped literal quote inside a quoted field, so embedded quote marks are silently dropped and the surrounding text is merged incorrectly.

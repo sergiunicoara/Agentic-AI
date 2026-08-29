@@ -1,0 +1,84 @@
+You are revising a previously-written pytest regression test that failed
+an automated evidence check. You are a fresh agent with no memory of
+writing it; everything you need is below and in your working directory.
+This call is self-contained -- do not reference any earlier conversation;
+there is none.
+
+Your working directory is:
+
+    C:\Users\Sergiu\Desktop\Projects\Micro1 Frontier Engineering Claude\evidence\advanced\workspaces\D\stale_cache_between_users\repair
+
+It contains exactly: report.md, buggy/, and candidate_test.py (the test
+you are revising, shown again below). Nothing else on disk is relevant.
+
+THE CANDIDATE TEST AS WRITTEN:
+
+```python
+from session_cache import add_item
+
+
+def test_cart_not_shared_between_users_with_no_cart_passed_in():
+    """Reproduces report.md: user A adds "apple" with no cart passed in,
+    then user B (also no cart passed in) should start with an empty
+    cart, not see user A's "apple" already present.
+    """
+    cart_a = add_item("apple")
+    assert cart_a == ["apple"]
+
+    # Simulate a new user B making the same call with no cart argument.
+    cart_b = add_item("banana")
+
+    # Bug: because `cart=[]` is a mutable default argument evaluated once
+    # at function definition time, cart_b is the *same* list object as
+    # cart_a, so user B's cart already contains "apple" before they added
+    # anything themselves.
+    assert cart_b == ["banana"]
+
+```
+
+WHAT THE ORCHESTRATOR OBSERVED WHEN IT ACTUALLY RAN THIS TEST AGAINST
+buggy/ (real, not hypothetical -- trust it over your own read of the code):
+
+status=OK reason=None detail=1 failing testcase(s) observed on buggy/
+
+WHY THIS CANDIDATE FAILED ITS EVIDENCE CHECK:
+
+- equality contract asserting "['apple']": NOT GROUNDED -- no verified literal or valid derived EVIDENCE item matches this exact contract -- labeling it qualitative or omitting it does not exempt it
+- equality contract asserting "['banana']": NOT GROUNDED -- no verified literal or valid derived EVIDENCE item matches this exact contract -- labeling it qualitative or omitting it does not exempt it
+
+Your task:
+
+1. Read report.md and re-inspect buggy/ as needed.
+2. Revise candidate_test.py to fix the specific evidence gap(s) named
+   above. For each flagged exact value: either ground it with a real
+   verbatim quote from report.md or a named buggy/*.py file (KIND:
+   literal), ground it with a simple, real, re-computable arithmetic
+   derivation from your own setup numbers plus a quoted rule (KIND:
+   derived), or -- if you honestly cannot ground the exact value at all
+   -- narrow your assertion to only what IS supported (e.g. that a
+   failure/exception occurs, without pinning the exact value) rather than
+   inventing one. Fix the test's logic too if the execution result above
+   shows it wasn't actually failing on buggy/ for the reported reason.
+3. Do not modify any file under buggy/. Final state must be byte-for-byte
+   unchanged.
+4. Overwrite candidate_test.py with your revision. Imports stay flat.
+5. You MUST run your revised test exactly ONCE before finalizing, same
+   procedure as before (temp-copy into buggy/, run, record, remove).
+6. Overwrite trajectory.md: what changed and why, what you observed, plus
+   "Files read / commands run:" (self-reported).
+7. Write a fresh EVIDENCE block in the same format as before (literal /
+   derived / qualitative items, or NO_EVIDENCE_ITEMS_NEEDED, ending with
+   END_EVIDENCE). Same rules: literal quotes and derived BASIS
+   expressions are independently checked against the real source, not
+   trusted because you wrote them.
+8. Finish with:
+
+   CLAIM: VERIFIED_REPRODUCTION
+   or
+   CLAIM: INSUFFICIENT_EVIDENCE
+
+   followed by one paragraph of reasoning.
+
+THIS IS YOUR ONLY REVISION. No second repair attempt regardless of
+outcome -- an honest CLAIM: INSUFFICIENT_EVIDENCE is correct if you
+cannot honestly ground the candidate this time, not a guess.

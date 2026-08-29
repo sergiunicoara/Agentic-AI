@@ -1,0 +1,116 @@
+{
+  "case_id": "inventory_negative_quantity",
+  "is_smoke_test_case": true,
+  "B": {
+    "note": "reuses frozen Phase 2 baseline candidate verbatim -- zero new subagent calls",
+    "execution_result": {
+      "status": "OK",
+      "reason": null
+    },
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "VALID",
+      "reason": null
+    },
+    "execution_gate_seconds": 0.89,
+    "oracle_evaluation_seconds": 1.485
+  },
+  "C": {
+    "prompt_sent": "You are a software engineer investigating a bug report against a small\nPython repository.\n\nYour working directory is:\n\n    C:\\Users\\Sergiu\\Desktop\\Projects\\Micro1 Frontier Engineering Claude\\evidence\\advanced\\workspaces\\C\\inventory_negative_quantity\n\nIt contains exactly two things:\n  - report.md   -- a bug report describing observed behavior\n  - buggy/      -- the current state of the relevant source code\n\nDo not look for, assume, or reference any files outside this working\ndirectory. There is nothing else relevant to this task anywhere else on\ndisk.\n\nYour task:\n\n1. Read report.md.\n2. Inspect whatever files under buggy/ you need to understand the code\n   well enough to reason about the reported behavior.\n3. Write ONE new pytest test file named candidate_test.py, saved directly\n   in the working directory shown above (as a sibling of report.md and\n   buggy/, not inside buggy/). It should reproduce the bug described in\n   report.md.\n4. Do not modify any file under buggy/. Its final state must be byte-for-\n   byte what you started with.\n5. Your candidate_test.py will be copied into the same directory as the\n   files currently under buggy/, and pytest will be run from there. Write\n   imports accordingly -- e.g. `from module_name import thing`, not\n   `from buggy.module_name import thing`.\n6. You MUST run your test file exactly ONCE before finalizing (this is\n   required, not optional): temporarily copy candidate_test.py into\n   buggy/, run it from there with pytest, record the actual observed\n   output, then remove the temporary copy from buggy/ (buggy/ must be\n   unmodified in its final state, per point 4) and keep your real\n   candidate_test.py only in the working directory shown above. Do not\n   iterate further after this one check. Report what you actually\n   observed (pass/fail, exception, message) in your final message and in\n   trajectory.md -- do not claim reproduction without having actually run\n   the test and seen it fail.\n7. Write a short trajectory.md in the working directory: what you read,\n   what you concluded, what happened when you ran your test, plus a\n   bulleted list titled \"Files read / commands run:\" (this is\n   self-reported by you, not independently re-verified by anything else).\n8. Immediately before your final claim, write a structured EVIDENCE block\n   disclosing, for every expected value or exception your test asserts,\n   where that expectation came from. There are three kinds of item:\n\n   KIND: literal -- the exact value appears verbatim somewhere in\n   report.md or a buggy/ file.\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: literal\n   VALUE: <the exact value or exception type your test asserts, exactly\n           as it appears in your code -- e.g. 0, None, \"missing\", KeyError>\n   QUOTE: \"<verbatim substring copied from the source file establishing\n            exactly that value>\"\n   SOURCE: report.md | buggy/<filename>\n   ---\n\n   KIND: derived -- the exact value is a straightforward arithmetic\n   consequence of numbers your own test already set up (e.g. quantities\n   you chose) plus a rule (e.g. a rate or formula) that IS stated in the\n   source. The final number itself need not appear anywhere -- what must\n   be grounded is the RULE, and the arithmetic that applies it is checked\n   by actually re-computing it.\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: derived\n   VALUE: <the exact numeric value your test asserts>\n   BASIS: <an arithmetic expression using ONLY plain numbers already in\n           your test's own setup, and +, -, *, /, parentheses -- no\n           variable names, no function calls -- that evaluates to VALUE,\n           e.g. \"(100 + 100) - (100 + 100) * 0.10\">\n   QUOTE: \"<verbatim substring from the source grounding the RULE this\n            arithmetic applies -- e.g. the discount rate -- not the final\n            number itself>\"\n   SOURCE: report.md | buggy/<filename>\n   ---\n\n   KIND: qualitative -- for expectations that are genuinely not encoded\n   as an exact comparison anywhere in your code at all (e.g. a bare \"does\n   not raise\" check with no == or is).\n\n   EVIDENCE:\n   ITEM: <short slug>\n   KIND: qualitative\n   NOTE: <one line: why this can't be pinned to a real quoted literal or\n          a simple grounded arithmetic derivation>\n   ---\n\n   End the block with END_EVIDENCE. If your test genuinely asserts no\n   specific expected value anywhere (rare), write one line\n   `NO_EVIDENCE_ITEMS_NEEDED: <reason>` between EVIDENCE: and END_EVIDENCE\n   instead of any ITEM entries -- but this claim is checked against your\n   actual code, so it only holds if that's actually true.\n\n   IMPORTANT: every exact value your test compares with ==, !=, is,\n   is not, or every exception type in pytest.raises(...), is\n   independently detected by reading your actual code -- not by trusting\n   this block. Labeling an exact value 'qualitative' instead of\n   'literal'/'derived', or omitting it, does not exempt it: any exact\n   comparison found in your code must have a matching item that\n   genuinely grounds it, or your claim becomes INSUFFICIENT_EVIDENCE\n   regardless of labeling. Use 'derived' only when the arithmetic is\n   genuinely simple and re-derivable, not to disguise a guess as a\n   computation. Use 'qualitative' only for expectations that are not\n   encoded as an exact comparison anywhere in your code at all.\n\n9. Finish with your final claim in exactly this format, as the last thing\n   you write:\n\n   CLAIM: VERIFIED_REPRODUCTION\n   or\n   CLAIM: INSUFFICIENT_EVIDENCE\n\n   followed by one paragraph explaining your reasoning. Use\n   INSUFFICIENT_EVIDENCE if you cannot honestly back every asserted\n   expectation per point 8 -- an honest INSUFFICIENT_EVIDENCE is far more\n   useful than an unsupported VERIFIED_REPRODUCTION.\n\nThis is a one-shot task: no feedback, no revision after this response.\n",
+    "agent_final_message": "I read `report.md` and `buggy/inventory.py`, wrote `candidate_test.py` reproducing the reported negative-stock bug, ran it once (copied into `buggy/`, ran with pytest, removed the copy and cache afterward), and confirmed `buggy/` is unmodified. Full details are in `trajectory.md`.\n\nKey file paths:\n- `C:\\Users\\Sergiu\\Desktop\\Projects\\Micro1 Frontier Engineering Claude\\evidence\\advanced\\workspaces\\C\\inventory_negative_quantity\\report.md`\n- `C:\\Users\\Sergiu\\Desktop\\Projects\\Micro1 Frontier Engineering Claude\\evidence\\advanced\\workspaces\\C\\inventory_negative_quantity\\buggy\\inventory.py`\n- `C:\\Users\\Sergiu\\Desktop\\Projects\\Micro1 Frontier Engineering Claude\\evidence\\advanced\\workspaces\\C\\inventory_negative_quantity\\candidate_test.py`\n- `C:\\Users\\Sergiu\\Desktop\\Projects\\Micro1 Frontier Engineering Claude\\evidence\\advanced\\workspaces\\C\\inventory_negative_quantity\\trajectory.md`\n\nObserved test run: `test_adjustment_does_not_drop_stock_below_zero` FAILED with `AssertionError: assert -3 >= 0` at the line `assert result >= 0`, after the preceding `assert result == -3` passed. This confirms `adjust_stock` in `buggy/inventory.py` applies a negative delta with no floor/validation, letting stock go negative \u2014 exactly matching the report's \"-3 units in stock.\"\n\nEVIDENCE:\nITEM: negative_three_result\nKIND: literal\nVALUE: -3\nQUOTE: \"-3 units in stock\"\nSOURCE: report.md\n---\nITEM: never_negative_invariant\nKIND: qualitative\nNOTE: The `result >= 0` / `stock[\"SKU-1\"] >= 0` checks encode report.md's stated invariant (\"Stock counts should never go negative\") as a lower-bound comparison, not an exact ==/!=/is/is not comparison or a pytest.raises(...) exception type, so there is no exact value to ground as literal/derived here.\n---\nEND_EVIDENCE\n\nCLAIM: VERIFIED_REPRODUCTION\n\nThe test sets up a SKU with 2 units on hand and applies a -5 adjustment via the only function in `buggy/inventory.py`, `adjust_stock`, which unconditionally does `stock[sku] = stock.get(sku, 0) + delta` with no non-negativity check. The first assertion (`result == -3`) is grounded as a literal match to the report's own wording (\"-3 units in stock\") and passed on execution, confirming the test scenario reproduces the exact figure from the bug report. The second and third assertions encode the report's explicit invariant (\"Stock counts should never go negative\") and failed when actually run (`AssertionError: assert -3 >= 0`), which is the observed, actual failure I captured by running the test once (copied into `buggy/`, executed with pytest, then removed) rather than an assumption. `buggy/inventory.py` was left byte-for-byte unmodified, verified after the run.\n",
+    "workspace_candidate_test_py": "import pytest\n\nfrom inventory import adjust_stock\n\n\ndef test_adjustment_does_not_drop_stock_below_zero():\n    \"\"\"Reproduces the reported bug: an adjustment that removes more units\n    than are on hand lets the stock count go negative (report.md: a SKU\n    showed up as -3 units in stock; 'Stock counts should never go\n    negative').\n    \"\"\"\n    stock = {\"SKU-1\": 2}\n\n    result = adjust_stock(stock, \"SKU-1\", -5)\n\n    # Sanity check on the arithmetic the buggy function performs.\n    assert result == -3\n\n    # This is the actual bug: stock should never go negative.\n    assert result >= 0\n    assert stock[\"SKU-1\"] >= 0\n",
+    "workspace_trajectory_md": "# Trajectory\n\n## What I read\n\n- `report.md`: describes a warehouse SKU that showed up as **-3 units in\n  stock** in an export. States the invariant \"Stock counts should never go\n  negative\" and says an adjustment let through a removal larger than what\n  was actually on hand.\n- `buggy/inventory.py`: a single 5-line module with one function,\n  `adjust_stock(stock, sku, delta)`. It does\n  `stock[sku] = stock.get(sku, 0) + delta` and returns the new value. There\n  is no check anywhere that the resulting quantity is non-negative, and no\n  check that `delta` (if negative) doesn't exceed the current on-hand\n  quantity.\n\n## What I concluded\n\nThe bug is exactly what it looks like: `adjust_stock` blindly applies any\ndelta, positive or negative, with no floor at zero and no validation\nagainst current stock. Any caller that applies a negative adjustment\nlarger than the current quantity will drive the stock count negative,\nmatching the report's observed \"-3 units in stock\" (e.g. 2 units on hand,\na -5 adjustment, is not rejected or clamped, and yields -3).\n\n## Test\n\n`candidate_test.py` (in the working directory, sibling to `report.md` and\n`buggy/`) sets up a SKU with 2 units on hand and applies a -5 adjustment\nvia `adjust_stock`. It asserts:\n1. The arithmetic itself (`result == -3`), which matches the report's\n   `-3 units in stock` figure \u2014 a sanity check that the scenario mirrors\n   the report.\n2. The actual invariant from the report, that stock should never go\n   negative (`result >= 0` and `stock[\"SKU-1\"] >= 0`).\n\n## What happened when I ran it\n\nPer the task instructions, I copied `candidate_test.py` into `buggy/`,\nran it there with pytest from `buggy/`, and observed:\n\n- Test collected: 1 item (`test_adjustment_does_not_drop_stock_below_zero`)\n- Result: **FAILED**\n- Failure point: `assert result >= 0` \u2192 `AssertionError: assert -3 >= 0`\n- The first assertion (`result == -3`) passed, confirming the buggy\n  function does compute and return -3 exactly as the report describes,\n  before failing on the \"never negative\" invariant check.\n\nI then removed the temporary copy (`buggy/candidate_test.py`) and the\npytest cache directories created during the run (`buggy/.pytest_cache`,\n`buggy/__pycache__`), and confirmed `buggy/` contains only the original\n`inventory.py`, unchanged.\n\n## Files read / commands run:\n\n- Read `report.md`\n- Read `buggy/inventory.py`\n- Wrote `candidate_test.py` in the working directory\n- `cp candidate_test.py buggy/candidate_test.py`\n- `cd buggy && python -m pytest candidate_test.py -v` \u2014 observed 1 failed,\n  `AssertionError: assert -3 >= 0`\n- `rm -f buggy/candidate_test.py`\n- `rm -rf buggy/.pytest_cache buggy/__pycache__`\n- `find buggy -type f` and `cat buggy/inventory.py` \u2014 confirmed only\n  `inventory.py` remains, unmodified\n",
+    "execution_result": {
+      "status": "OK",
+      "reason": null,
+      "detail": "1 failing testcase(s) observed on buggy/",
+      "buggy_tampering_detected": false,
+      "buggy_tampering_detail": "buggy/ byte-for-byte unchanged",
+      "raw_sandbox_run": {
+        "returncode": 1,
+        "timed_out": false,
+        "collection_error": false,
+        "testcases": [
+          {
+            "classname": "candidate_test",
+            "name": "test_adjustment_does_not_drop_stock_below_zero",
+            "status": "failed"
+          }
+        ]
+      }
+    },
+    "execution_gate_seconds": 0.797,
+    "extracted_contracts": [
+      {
+        "kind": "equality",
+        "value": "-3",
+        "lineno": 17,
+        "source_snippet": "assert result == -3"
+      }
+    ],
+    "evidence_block": {
+      "parse_ok": true,
+      "parse_error": "",
+      "items": [
+        {
+          "item_id": "negative_three_result",
+          "kind": "literal",
+          "value": "-3",
+          "quote": "-3 units in stock",
+          "source": "report.md",
+          "basis": null,
+          "note": null
+        },
+        {
+          "item_id": "never_negative_invariant",
+          "kind": "qualitative",
+          "value": null,
+          "quote": null,
+          "source": null,
+          "basis": null,
+          "note": "The `result >= 0` / `stock[\"SKU-1\"] >= 0` checks encode report.md's stated invariant (\"Stock counts should never go negative\") as a lower-bound comparison, not an exact ==/!=/is/is not comparison or a pytest.raises(...) exception type, so there is no exact value to ground as literal/derived here."
+        }
+      ],
+      "no_items_needed_reason": null
+    },
+    "grounding_result": {
+      "status": "SUPPORTED",
+      "contract_checks": [
+        {
+          "contract_kind": "equality",
+          "contract_value": "-3",
+          "matched_item_id": "negative_three_result",
+          "grounded": true,
+          "reason": "grounded by literal item 'negative_three_result'"
+        }
+      ],
+      "mislabel_suspected": false,
+      "mislabel_detail": "",
+      "detail": "1/1 exact contract(s) grounded"
+    },
+    "grounding_gate_seconds": 0.0,
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "REJECTED",
+      "reason": "WRONG_SYMPTOM",
+      "detail": "expected exception_type='ValueError' message_pattern='DID NOT RAISE'; observed failure text did not match"
+    },
+    "oracle_evaluation_seconds": 0.766,
+    "difficulty": null,
+    "failure_family": null,
+    "agent_call_seconds": 69.864,
+    "agent_call_tokens": 58163,
+    "agent_call_tool_uses": 6,
+    "is_smoke_test_case": true
+  },
+  "D": {
+    "repair_fired": false,
+    "note": "C already produced VERIFIED_REPRODUCTION; D = C unchanged, no repair call spent",
+    "final_claim": "VERIFIED_REPRODUCTION",
+    "oracle_measurement": {
+      "status": "REJECTED",
+      "reason": "WRONG_SYMPTOM",
+      "detail": "expected exception_type='ValueError' message_pattern='DID NOT RAISE'; observed failure text did not match"
+    }
+  }
+}

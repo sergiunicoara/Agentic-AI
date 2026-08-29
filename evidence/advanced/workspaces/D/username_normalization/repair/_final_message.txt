@@ -1,0 +1,30 @@
+Both files updated and the revised test run once against buggy/ as required (temp-copied in, executed, temp copy and pytest cache removed; buggy/handles.py untouched — confirmed only handles.py remains in buggy/).
+
+Fix applied: both flagged equality contracts (result == "jane_doe") were replaced with assert "__" not in result, since "jane_doe" (the desired single-underscore form) is never quoted verbatim in report.md and can't be arithmetically derived (it's a string, not a number). The narrowed assertion is directly supported by report.md's own qualitative description of correct handles ("the usual single-underscore style"). Verified by running once against buggy/: both tests fail as expected ('__' not in 'jane__doe' and '__' not in 'jane___doe'), reproducing the bug.
+
+EVIDENCE:
+
+1. KIND: literal
+   SOURCE: report.md, line 2
+   QUOTE: "jane___doe"
+   CONTRACT: grounds that normalize_handle("Jane   Doe") producing a string containing "jane___doe" (triple underscore) on buggy/ is the exact symptom the report describes — confirmed by test run, buggy output for the triple-space case is character-for-character jane___doe.
+
+2. KIND: literal
+   SOURCE: report.md, lines 2-3
+   QUOTE: "the usual single-underscore style everyone else has"
+   CONTRACT: grounds the assertion "__" not in result in both tests — the desired/correct form is qualitatively described as single-underscore style, i.e. no run of two-or-more underscores, without pinning an unquoted exact string.
+
+3. KIND: literal
+   SOURCE: buggy/handles.py, line 3
+   QUOTE: return raw.strip().lower().replace(" ", "_")
+   CONTRACT: grounds the docstring's mechanism explanation (each individual space character is replaced by its own underscore, so consecutive spaces yield consecutive underscores) that motivates why "Jane  Doe" / "Jane   Doe" fail the no-double-underscore check on buggy/.
+
+4. KIND: qualitative
+   SOURCE: report.md, lines 3-4 ("Seems to happen when someone's display name has extra spaces between words when they sign up -- typing 'Jane  Doe' with two spaces instead of one")
+   CONTRACT: grounds the choice of test inputs "Jane  Doe" and "Jane   Doe" as the reported trigger condition.
+
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+Both revised assertions are now grounded in real, quoted material from report.md (the triple-underscore example is a verbatim match, and the single-underscore requirement is directly supported by the report's qualitative description) rather than an invented exact literal, and no arithmetic/derived claim was used for a string value. Running the revised test exactly once against buggy/ (temp-copied in, executed, temp copy and pytest cache removed afterward, buggy/handles.py left byte-for-byte unchanged) showed both tests failing with AssertionError: assert '__' not in 'jane__doe' and AssertionError: assert '__' not in 'jane___doe' respectively — consistent with the orchestrator's prior observation of 2 failing testcases and directly traceable to the .replace(" ", "_") mechanism in buggy/handles.py, so the test honestly reproduces the reported bug.

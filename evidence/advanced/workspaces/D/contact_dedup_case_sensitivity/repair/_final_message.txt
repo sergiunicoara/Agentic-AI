@@ -1,0 +1,34 @@
+Now the final response with the EVIDENCE block and claim.
+
+Summary
+
+Root cause of the evidence-check failure: the assertion len(result) == 1 used a bare literal 1 that wasn't grounded — not quoted from report.md/buggy/contacts.py, not a setup constant, and not tied to any valid arithmetic derivation. The test's logic was fine (it did fail against buggy/ for the right reason — case-sensitive dedup never collapses jane.doe@example.com / Jane.Doe@example.com), so no behavioral fix was needed, only a grounding fix.
+
+Fix: replaced the bare 1 with a value computed from the test's own setup literals (expected_unique_count = len({entry["email"].lower() for entry in entries})), which is pure re-computable arithmetic over the two literal email strings already in the test (never calls unique_emails), paired with a quoted rule from report.md establishing that case-differing copies count as one email. The email-identity assertion was already grounded and left unchanged.
+
+Verified: ran the revised test once (temp-copied into buggy/, executed, removed) — it fails with assert 2 == 1, correctly reproducing the reported bug. Confirmed buggy/ is byte-for-byte back to just contacts.py.
+
+EVIDENCE:
+
+ITEM 1
+KIND: literal
+ID: kept-email-is-first-occurrence
+QUOTE: "keeping the first occurrence" (verbatim, from buggy/contacts.py line 2 docstring)
+SETUP_CONSTANT: entries[0]["email"] = "jane.doe@example.com" (literal in candidate_test.py's own setup)
+SUPPORTS: assert result[0]["email"] == "jane.doe@example.com"
+REASONING: buggy/contacts.py's docstring states the function returns entries "keeping the first occurrence." Since entries[0]["email"] is never excluded ahead of itself (nothing precedes it), whatever survives at result[0] must be entries[0], whose literal email value — assigned directly in the test's own setup — is "jane.doe@example.com".
+
+ITEM 2
+KIND: derived
+ID: expected-unique-count-is-case-fold-of-setup
+BASIS: expected_unique_count = len({"jane.doe@example.com".lower(), "Jane.Doe@example.com".lower()}) = len({"jane.doe@example.com", "jane.doe@example.com"}) = len({"jane.doe@example.com"}) = 1
+SETUP_CONSTANTS: entries[0]["email"] = "jane.doe@example.com", entries[1]["email"] = "Jane.Doe@example.com" (both literal, in candidate_test.py's own setup)
+QUOTE: "[s]ame person, same email address, just typed with different capitalization" and "catch that and only keep one of them" (report.md, lines 2-4)
+SUPPORTS: assert len(result) == expected_unique_count
+REASONING: The arithmetic (.lower() + set-dedup on the two literal setup strings) is self-contained and re-computable without invoking unique_emails, yielding 1. The quoted text from report.md licenses treating the two case-variant strings as the same email and expecting the cleanup step to "only keep one of them" — i.e., that the correct count is exactly this derived value, not a separately-invented literal.
+
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+Both assertions in the revised test are now grounded: the first via a verbatim quote from buggy/contacts.py's own docstring plus a literal value from the test's own setup, and the second via a re-computable arithmetic derivation over the test's own setup literals plus a verbatim quote from report.md establishing the case-insensitive-duplicate rule. I re-ran the revised test exactly once against an unmodified buggy/contacts.py (temp-copied in, executed, then removed along with all run artifacts) and observed it fail with assert 2 == 1, confirming it reproduces the reported bug (case-sensitive dedup fails to collapse jane.doe@example.com and Jane.Doe@example.com) for the correct, evidenced reason rather than an invented expectation.

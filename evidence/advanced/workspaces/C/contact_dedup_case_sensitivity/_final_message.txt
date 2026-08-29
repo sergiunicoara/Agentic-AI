@@ -1,0 +1,31 @@
+EVIDENCE:
+ITEM: dedup-keeps-first-occurrence
+KIND: literal
+VALUE: "Return entries with duplicate emails removed, keeping the first occurrence."
+QUOTE: "Return entries with duplicate emails removed, keeping the first occurrence."
+SOURCE: buggy/contacts.py
+---
+ITEM: case-sensitive-comparison
+KIND: literal
+VALUE: email not in seen
+QUOTE: "if email not in seen:"
+SOURCE: buggy/contacts.py
+---
+ITEM: expected-count-one
+KIND: derived
+VALUE: 1
+BASIS: "2 - 1"
+QUOTE: "Return entries with duplicate emails removed, keeping the first occurrence."
+SOURCE: buggy/contacts.py
+---
+ITEM: kept-email-is-lowercase-first-entry
+KIND: literal
+VALUE: "jane.doe@example.com"
+QUOTE: "keeping the first occurrence"
+SOURCE: buggy/contacts.py
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The bug is a case-sensitive email comparison in `unique_emails` (`buggy/contacts.py`), which uses a plain `set()` membership check (`if email not in seen`) with no `.lower()`/`.casefold()` normalization before comparing or storing emails, despite the function's own docstring promising "duplicate emails removed, keeping the first occurrence." This exactly matches report.md's description: two records for the same person with the same email differing only in capitalization survive the cleanup step as separate entries. I wrote `candidate_test.py` with two entries sharing the same email in different cases, copied it into `buggy/`, ran `python -m pytest candidate_test.py -v` from inside `buggy/`, and observed it fail with `AssertionError: assert 2 == 1` — both entries were retained instead of being deduplicated to one. I then removed the temporary copy and the pytest-generated `__pycache__`/`.pytest_cache` directories, leaving `buggy/` containing only the original, byte-for-byte unmodified `contacts.py`. The real `candidate_test.py` and `trajectory.md` remain in the working directory as required.

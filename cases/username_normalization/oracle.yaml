@@ -1,0 +1,6 @@
+case_id: username_normalization
+difficulty: medium
+failure_family: transformation_normalization_error
+exception_type:
+message_pattern: ___
+description: normalize_handle() replaces each individual space with an underscore instead of collapsing runs of whitespace first, so multiple consecutive spaces produce multiple consecutive underscores.

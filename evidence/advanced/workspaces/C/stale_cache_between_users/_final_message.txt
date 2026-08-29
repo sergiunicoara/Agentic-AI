@@ -1,0 +1,34 @@
+EVIDENCE:
+ITEM: default_cart_is_mutable_empty_list
+KIND: literal
+VALUE: cart=[]
+QUOTE: "def add_item(item, cart=[]):"
+SOURCE: buggy/session_cache.py
+---
+ITEM: append_and_return_behavior
+KIND: literal
+VALUE: cart.append(item); return cart
+QUOTE: "cart.append(item)
+    return cart"
+SOURCE: buggy/session_cache.py
+---
+ITEM: cart_a_expected_value
+KIND: derived
+VALUE: ["apple"]
+BASIS: the source's default cart starts as the empty list [] (grounded by the "cart=[]" quote) and add_item appends whatever item is passed and returns the same list (grounded by the "cart.append(item)" / "return cart" quote); applying that rule to my test's own chosen input "apple" on an empty starting list yields a list containing exactly that one appended item.
+QUOTE: "cart.append(item)
+    return cart"
+SOURCE: buggy/session_cache.py
+---
+ITEM: cart_b_expected_value_absent_stale_apple
+KIND: derived
+VALUE: ["banana"]
+BASIS: applying the same append rule to a correctly-isolated fresh empty cart for user B and my test's own chosen input "banana" yields a cart containing only what user B themselves added, with no leftover item from user A.
+QUOTE: "user B's cart already had "apple" in it before they'd added anything"
+SOURCE: report.md
+---
+END_EVIDENCE
+
+CLAIM: VERIFIED_REPRODUCTION
+
+The bug is a classic Python mutable-default-argument defect: add_item(item, cart=[]) in buggy/session_cache.py evaluates the [] default exactly once at function-definition time, so every call made without an explicit cart argument shares and mutates the same underlying list object. My test candidate_test.py mirrors the report's exact scenario — user A calls add_item("apple") with no cart, then user B calls add_item("banana") with no cart — and asserts user B's returned cart is ["banana"] (only their own item). I copied the test into buggy/, ran python -m pytest candidate_test.py -v from inside buggy/, and observed it fail with AssertionError: assert ['apple', 'banana'] == ['banana'], i.e. user B's cart already contained user A's "apple" before user B added anything — precisely the symptom described in report.md. I then deleted the temporary copy and the pytest-generated __pycache__/.pytest_cache directories from buggy/, leaving it byte-for-byte as it started (only session_cache.py present).

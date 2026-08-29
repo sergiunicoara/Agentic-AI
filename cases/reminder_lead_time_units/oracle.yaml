@@ -1,0 +1,6 @@
+case_id: reminder_lead_time_units
+difficulty: hard
+failure_family: multi_module_interaction
+exception_type:
+message_pattern: 999985
+description: config.py's DEFAULT_REMINDER_LEAD_MINUTES is named and documented as minutes, but scheduler.py subtracts it directly from an epoch-seconds timestamp without converting to seconds, so the reminder fires 15 seconds early instead of 15 minutes early. Neither file is wrong in isolation -- the bug is only visible by cross-checking what unit each side assumes.
