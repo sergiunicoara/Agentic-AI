@@ -115,6 +115,12 @@ def call_mcp_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
     if name == "cv_rag_query":
         question = arguments.get("question", "")
+        if not str(question).strip():
+            # A missing/empty question used to fall through to retrieval and
+            # come back as a confident-sounding "I couldn't find this in the
+            # CV" — indistinguishable from a real no-match. Fail loudly
+            # instead so a caller with a typo'd param name sees an error.
+            return {"error": "Missing required argument: 'question' (non-empty string)."}
         rag = get_cv_rag()
         answer = rag.query(question)
         return {"answer": str(answer)}
