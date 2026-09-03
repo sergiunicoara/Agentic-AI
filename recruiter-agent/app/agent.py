@@ -129,34 +129,82 @@ def remember(state: State, kind: str, payload: Dict[str, Any]) -> None:
 # CV Q&A helpers (RAG questions)
 # ------------------------------------------------------------
 
+# Matched with WORD BOUNDARIES (see _CV_KEYWORD_RE), never as raw substrings.
+# Substring matching here used to fire on "capa(city) planning",
+# "cloud-(based) infrastructure", "(address) technical debt" and
+# "(contact) center" — hijacking criteria collection into CV Q&A and
+# stranding the conversation. Keep every entry safe under \b...\b:
+#   - no bare "based"  (hyphen is a word boundary → "cloud-based" matches)
+#   - no bare "contact" (→ "contact center")
+#   - no bare "address" (almost always the verb in this domain)
 CV_QUERY_KEYWORDS = [
     "phone",
-    "phone number",
-    "contact",
+    "contact details",
+    "contact info",
+    "contact number",
     "email",
+    "e-mail",
     "certification",
     "certifications",
     "certificate",
-    "degree",
+    "certified",
     "education",
+    "educational",
     "university",
-    "location",
-    "city",
-    "country",
-    "based",
-    "address",
+    # NOTE: "location", "city", "country" and "degree" are deliberately NOT
+    # keywords. Even word-bounded they fire on ordinary recruiter/JD prose
+    # ("location-based services", "to a degree, yes"). Real questions about
+    # them always carry a candidate reference ("what is his location?",
+    # "where is he based?", "what degree does he have?") and are caught by
+    # _CV_QUESTION_SHAPES instead.
+    "based in",
     "years of experience",
     "how many years",
+    "training",
     "trainings",
-    "previous trainings",
     "skillset",
-    "technologies",
     "tech stack",
+    "technologies",
     "his skills",
     "his experience",
     "his background",
     "cv",
     "resume",
+]
+
+_CV_KEYWORD_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(k) for k in CV_QUERY_KEYWORDS) + r")\b",
+    re.IGNORECASE,
+)
+
+# How the recruiter refers to the candidate.
+_CANDIDATE_REF = r"(?:he|him|his|sergiu|the candidate|this candidate)"
+
+# Natural question shapes about the candidate. The keyword list alone missed
+# a whole class of ordinary phrasings — "Does he have experience with
+# Kubernetes?", "Has he worked with RAG?", "Where did he study?" — which
+# then fell through to role extraction and answered "I didn't catch the
+# job role".
+_CV_QUESTION_SHAPES = [
+    # "does/has/can/is ... he ..."
+    re.compile(
+        r"\b(?:does|do|did|has|have|had|is|was|are|were|can|could|will|would|should)\s+"
+        + _CANDIDATE_REF + r"\b",
+        re.IGNORECASE,
+    ),
+    # "where/what/how ... he/his ..."
+    re.compile(
+        r"\b(?:where|what|when|which|how|who|why)\b[^?]*\b" + _CANDIDATE_REF + r"\b",
+        re.IGNORECASE,
+    ),
+    # "tell me about him / his background"
+    re.compile(r"\btell me about\s+" + _CANDIDATE_REF + r"\b", re.IGNORECASE),
+    # "his <cv-ish noun>"
+    re.compile(
+        r"\b" + _CANDIDATE_REF + r"\s+(?:experience|background|skills?|education|"
+        r"certifications?|degree|stack|role|roles|job|jobs)\b",
+        re.IGNORECASE,
+    ),
 ]
 
 # If the message contains any of these it is a hiring request,
@@ -179,21 +227,53 @@ _HIRING_MARKERS = [
 ]
 
 
+def _explicit_candidate_question(msg: str) -> bool:
+    """
+    True only for an actual interrogative *about the candidate*.
+
+    Deliberately strict — it is used both to override the hiring-marker
+    block and to decide whether a CV question may interrupt criteria
+    collection, so a JD sentence like "must have 5 years of experience"
+    must NOT qualify (no question mark, no candidate reference).
+    """
+    low = msg.lower()
+    interrogative = (
+        "?" in low
+        or re.match(r"^\s*(?:what|where|when|which|how|who|why|does|do|did|is|was|has|have|can|could)\b", low)
+        is not None
+    )
+    if not interrogative:
+        return False
+    return re.search(r"\b(?:he|him|his|sergiu)\b", low) is not None
+
+
 def _looks_like_cv_question(msg: str) -> bool:
     """
     Heuristic to decide if the recruiter is asking something
     that should be answered from the CV (via RAG).
 
     Hiring requests like "I'm hiring a Senior ML Engineer with RAG experience"
-    are explicitly excluded even if they contain CV keywords like "experience".
+    are excluded even if they contain CV keywords — UNLESS the same message
+    also carries an explicit question about the candidate
+    ("I'm hiring an ML engineer - what is his phone number?"), which used to
+    be silently refused.
     """
     low = msg.lower()
 
-    # Hiring requests take priority — never route these to CV RAG
-    if any(m in low for m in _HIRING_MARKERS):
+    # Hiring requests take priority — never route these to CV RAG,
+    # unless the message explicitly asks something about the candidate.
+    if any(m in low for m in _HIRING_MARKERS) and not _explicit_candidate_question(low):
         return False
 
-    return any(k in low for k in CV_QUERY_KEYWORDS)
+    if _CV_KEYWORD_RE.search(low):
+        return True
+
+    return any(p.search(low) for p in _CV_QUESTION_SHAPES)
+
+
+def _awaiting_criteria(state: State) -> bool:
+    """The agent has a role and has just asked for evaluation criteria."""
+    return bool(state.role) and not state.criteria
 
 
 def answer_from_cv(state: State, user_message: str) -> Optional[Dict[str, Any]]:
@@ -632,9 +712,15 @@ def agent_turn(state: State, user_message: str) -> Dict[str, Any]:
         }
 
     # --------------------------------------------------------
-    # CV Q&A (RAG) — available ANYTIME
+    # CV Q&A (RAG) — available ANYTIME, except that it must not swallow
+    # the recruiter's answer to a question the agent just asked. While
+    # awaiting criteria, only an explicit question about the candidate
+    # may interrupt; plain criteria text ("cloud-based architecture,
+    # ownership") is handled by the criteria stage below.
     # --------------------------------------------------------
-    if _looks_like_cv_question(msg):
+    if _looks_like_cv_question(msg) and not (
+        _awaiting_criteria(state) and not _explicit_candidate_question(msg)
+    ):
         rag_result = answer_from_cv(state, msg)
         if rag_result is not None:
             return rag_result
@@ -987,7 +1073,11 @@ async def agent_turn_stream(
     msg = user_message.strip()
 
     # ── CV RAG streaming path ────────────────────────────────────────────────
-    if _looks_like_cv_question(msg):
+    # Same context guard as agent_turn(): don't let a CV keyword swallow the
+    # recruiter's answer to the criteria question the agent just asked.
+    if _looks_like_cv_question(msg) and not (
+        _awaiting_criteria(state) and not _explicit_candidate_question(msg)
+    ):
         rag = get_cv_rag()
         if hasattr(rag, "query_stream"):
             # Prefix matches the synchronous answer_from_cv() framing

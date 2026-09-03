@@ -70,6 +70,19 @@ def _try_configure_client() -> bool:
         return False
 
 
+def _any_word(text: str, words: List[str]) -> bool:
+    """Word-boundary membership test.
+
+    Plain `w in text` matched substrings inside unrelated words — "city"
+    inside "capacity planning", "based" inside "cloud-based" — which routed
+    unrelated recruiter input into the wrong direct-fact branch.
+    """
+    return any(
+        re.search(r"\b" + re.escape(w) + r"\b", text, re.IGNORECASE)
+        for w in words
+    )
+
+
 def _embed_model_name() -> str:
     """Resolve the embedding model resource name for whichever backend
     _try_configure_client() actually landed on."""
@@ -529,21 +542,25 @@ class CVRAG:
         q = question.lower()
 
         # Phone / contact
-        if any(w in q for w in ["phone", "phone number", "contact number"]):
+        if _any_word(q, ["phone", "contact number", "contact details"]):
             phone = _extract_phone(self.cv_text)
             if phone:
                 return f"Sergiu's phone number is {phone}."
             return "I couldn't find a phone number in Sergiu's CV."
 
         # Email
-        if any(w in q for w in ["email", "e-mail"]):
+        if _any_word(q, ["email", "e-mail"]):
             email = _extract_email(self.cv_text)
             if email:
                 return f"Sergiu's email is {email}."
             return "I couldn't find an email address in Sergiu's CV."
 
-        # Location / where based
-        if any(w in q for w in ["location", "based", "city", "country"]):
+        # Location / where based. Word-bounded: a bare "city" substring used
+        # to match "capa(city) planning" and a bare "based" matched
+        # "cloud-based", answering an unrelated question with the
+        # candidate's home city.
+        if _any_word(q, ["location", "city", "country", "based in"]) or \
+                re.search(r"\bwhere\b.*\b(?:based|live|lives|located|from)\b", q):
             loc = _extract_location(self.cv_text)
             if loc:
                 return f"Sergiu is based in {loc}."
@@ -560,7 +577,7 @@ class CVRAG:
             return None  # no explicit figure in the CV — let retrieval try
 
         # Education
-        if "education" in q or "degree" in q or "university" in q:
+        if _any_word(q, ["education", "educational", "degree", "university", "studied"]):
             edu = _extract_education(self.cv_text)
             if edu:
                 bullets = "\n".join(f"- {e}" for e in edu)
@@ -570,7 +587,7 @@ class CVRAG:
         # Skills / tech stack — narrow triggers only. "technical" alone used
         # to also match "what technical challenges has he solved?" and dump
         # the raw skills list instead of answering the actual question.
-        if any(w in q for w in ["skill", "skills", "tech stack", "technologies", "technical skills"]):
+        if _any_word(q, ["skill", "skills", "skillset", "tech stack", "technologies", "technical skills"]):
             skills = _extract_skills(self.cv_text)
             if skills:
                 bullets = "\n".join(f"- {s}" for s in skills)
@@ -578,7 +595,7 @@ class CVRAG:
             return "I couldn't find technical skills information in Sergiu's CV."
 
         # Certifications
-        if "certification" in q or "certifications" in q or "certificate" in q:
+        if _any_word(q, ["certification", "certifications", "certificate", "certified"]):
             certs = _extract_certifications(self.cv_text)
             if certs:
                 bullets = "\n".join(f"- {c}" for c in certs)
