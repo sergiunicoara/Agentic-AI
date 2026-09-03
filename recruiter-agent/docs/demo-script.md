@@ -248,18 +248,23 @@ story of how it *got* green, which builds more trust than the checkmarks.
 
 **Expected output:**
 ```
-............                                                             [100%]
-12 passed, 8 warnings in 49s
+.................................................................       [100%]
+67 passed, 13 warnings in 17s
 ```
 
-**V.O.:** "Twelve for twelve — but the interesting part is how it got there.
-Seven of these tests cover voice interruption, the feature you saw in scene
-three; writing them caught a real race where an already-synthesized sentence
-could get dropped mid-interrupt. And two tests here used to *fail* — chasing
-those failures exposed an actual routing bug where every GET endpoint,
-including the health check, silently returned the web page instead of JSON.
-The failing tests weren't noise; they were the map to the bug. Fixed, and
-now there's a regression test standing guard so it can't come back."
+**V.O.:** "Sixty-seven for sixty-seven — but the interesting part is how it
+got there. Seven of these tests cover voice interruption, the feature you saw
+in scene three; writing them caught a real race where an already-synthesized
+sentence could get dropped mid-interrupt. A routing bug used to hide every
+GET endpoint, including the health check, behind the web page instead of
+JSON — there's a regression test standing guard so it can't come back. And
+the newest forty-eight cover something an audit found last week: the CV
+question router used to match 'city' inside the word 'capacity' and 'based'
+inside 'cloud-based' — so a recruiter answering the agent's own question with
+'cloud-based architecture, ownership' got their answer swallowed and the
+conversation looped forever. Fixed, and now there's a test for every one of
+those exact phrasings. The failing tests weren't noise; they were the map to
+the bug."
 
 ---
 
@@ -280,16 +285,16 @@ right now — link's below. Ask it something hard."
 
 | Metric | Value | Source |
 |---|---|---|
-| Agent turn latency (p50) | 321ms | `benchmark_voice.py` Stage 2, live Cloud Run |
-| First-audio latency (p50) | 428ms | `benchmark_voice.py` Stage 4, live Cloud Run |
-| Full E2E voice turn (est.) | ~628ms | Stage 4 p50 + 200ms Deepgram streaming estimate |
+| Agent turn latency (p50) | 390ms | `benchmark_voice.py` Stage 2, live Cloud Run |
+| First-audio latency (p50) | 241ms | `benchmark_voice.py` Stage 4 WebSocket, live Cloud Run |
+| Full E2E voice turn (est.) | ~441ms | Stage 4 p50 + 200ms Deepgram streaming estimate |
 | Golden eval pass rate | 100% (15/15) | `run_eval.py` / `eval_results.json` |
 | Golden eval avg score | 5.0 / 5.0 | `run_eval.py` / `eval_results.json` |
 | Eval pass threshold | ≥ 3.5 / 5.0 | `app/critic_agent.py` |
 | Session store (no `REDIS_URL`) | SQLite fallback | `app/session_store.py` |
 | Session store (with `REDIS_URL`) | Redis, 24h TTL | `app/session_store.py` |
 | API routes exposed | 24 | `app/server.py` (`grep -c "@app\."`) |
-| Test suite result | 12 passed / 0 failed | `pytest tests/ -q` — 7 barge-in tests + 5 API tests (incl. route-shadowing regressions) |
+| Test suite result | 67 passed / 0 failed | `pytest tests/ -q` — 48 CV-routing regression tests (from a live audit) + 7 barge-in tests + 5 API tests + others |
 | Total runtime | ~4:30 | Act I (S01–S04) + Act II (S05–S09) |
 
 ---

@@ -1145,7 +1145,7 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
     </section>
 
     <!-- S08 -->
-    <section class="slide" data-title="S08 — Test suite" data-vo="Twelve for twelve — but the interesting part is how it got there. Seven tests cover barge-in, the exact feature from act one; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. Two tests used to fail — chasing them exposed a routing bug where every GET endpoint silently returned the web page instead of JSON.">
+    <section class="slide" data-title="S08 — Test suite" data-vo="Sixty-seven for sixty-seven — but the interesting part is how it got there. Seven tests cover barge-in, the exact feature from act one. A routing bug used to hide every GET endpoint behind the web page instead of JSON. And forty-eight of these tests exist because a live audit found the CV question router matching city inside capacity and based inside cloud-based — swallowing a recruiter's answer and looping the conversation forever.">
       <div class="slide-inner">
         <div class="scene-head"><span class="scene-tag">S08</span><h2>The tests that caught real bugs</h2></div>
         <p class="shot"><span class="shot-label">Shot</span>Terminal. A fully green suite — the V.O. tells the story of how it <i>got</i> green, which builds more trust than the checkmarks.</p>
@@ -1153,13 +1153,13 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
           <div class="term">
             <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">bash — recruiter-agent</span></div>
             <pre class="term-body"><span class="prompt">python -m pytest tests/ -q</span>
-<span class="out-pass">............                                               [100%]
-12 passed, 8 warnings in 49s</span></pre>
+<span class="out-pass">.................................................................  [100%]
+67 passed, 13 warnings in 17s</span></pre>
           </div>
           <div class="vo-wrap">
             <div class="vo-label">V.O.</div>
-            <blockquote class="vo">Twelve for twelve — but the interesting part is how it got there. Seven tests cover barge-in, the exact feature you saw in act one; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. And two tests used to <i>fail</i> — chasing them exposed a routing bug where every GET endpoint, health check included, silently returned the web page instead of JSON.</blockquote>
-            <div class="note-amber"><span class="mark">note</span><span>The old failing tests weren't deleted to make the suite green — they were chased to the real bug (a route-ordering issue in <span class="mono">server.py</span>), fixed, and replaced with regression tests that guard against it coming back.</span></div>
+            <blockquote class="vo">Sixty-seven for sixty-seven — but the interesting part is how it got there. Seven tests cover barge-in, the exact feature you saw in act one; writing them caught a real race where an already-synthesized sentence could get dropped mid-interrupt. A routing bug used to hide every GET endpoint, health check included, behind the web page instead of JSON. And forty-eight of these tests are the newest — they exist because a live audit found the CV question router matching <span class="mono">"city"</span> inside <span class="mono">capacity</span> and <span class="mono">"based"</span> inside <span class="mono">cloud-based</span>, which meant a recruiter answering the agent's own criteria question got swallowed into CV Q&A and the conversation looped forever.</blockquote>
+            <div class="note-amber"><span class="mark">note</span><span>None of these bugs were fixed by deleting the failing test. Each one was chased to its real cause — a route-ordering issue in <span class="mono">server.py</span>, a substring-matching gate in <span class="mono">agent.py</span> — fixed, and backed by a regression test that guards against it coming back.</span></div>
           </div>
         </div>
       </div>
@@ -1221,7 +1221,7 @@ Stage 4: E2E WebSocket — agent + TTS (Deepgram excluded)
               <tr><td class="metric">Session store, no REDIS_URL</td><td class="value">SQLite fallback</td><td class="source">app/session_store.py</td></tr>
               <tr><td class="metric">Session store, with REDIS_URL</td><td class="value">Redis, 24h TTL</td><td class="source">app/session_store.py</td></tr>
               <tr><td class="metric">API routes exposed</td><td class="value">24</td><td class="source">app/server.py</td></tr>
-              <tr><td class="metric">Test suite result</td><td class="value">12 passed / 0 failed</td><td class="source">pytest tests/ -q — 7 barge-in tests + 5 API tests (incl. route-shadowing regressions)</td></tr>
+              <tr><td class="metric">Test suite result</td><td class="value">67 passed / 0 failed</td><td class="source">pytest tests/ -q — 48 CV-routing regression tests (from a live audit) + 7 barge-in tests + 5 API tests + others</td></tr>
               <tr><td class="metric">Total runtime</td><td class="value">~4:30</td><td class="source">Act I (S01–S04, the UI) + Act II (S05–S09, the proof)</td></tr>
             </tbody>
           </table>
