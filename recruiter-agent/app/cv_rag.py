@@ -13,7 +13,11 @@ import numpy as np
 from google import genai
 from google.genai import types
 
-EMBED_MODEL = "models/text-embedding-004"
+# Embedding model resource name differs by backend: AI Studio requires the
+# "models/" prefix, Vertex AI 404s on it and needs the bare name. Resolved
+# per-client in _embed_model_name() once the active backend is known.
+_EMBED_MODEL_AI_STUDIO = "models/text-embedding-004"
+_EMBED_MODEL_VERTEX = "text-embedding-004"
 GEN_MODEL = "gemini-2.5-flash"          # works for both AI Studio and Vertex AI
 
 # Single source of truth for the "not found" sentinel — streaming and
@@ -64,6 +68,14 @@ def _try_configure_client() -> bool:
         return True
     except Exception:
         return False
+
+
+def _embed_model_name() -> str:
+    """Resolve the embedding model resource name for whichever backend
+    _try_configure_client() actually landed on."""
+    if _client is not None and getattr(_client, "vertexai", False):
+        return _EMBED_MODEL_VERTEX
+    return _EMBED_MODEL_AI_STUDIO
 
 
 # ------------------------------------------------------------
@@ -348,7 +360,7 @@ def _embed_texts(texts: List[str]) -> Optional[np.ndarray]:
 
     try:
         response = _client.models.embed_content(  # type: ignore[union-attr]
-            model=EMBED_MODEL,
+            model=_embed_model_name(),
             contents=texts,
             config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
         )
@@ -368,7 +380,7 @@ def _embed_text(text: str, task_type: str = "retrieval_query") -> Optional[np.nd
 
     try:
         response = _client.models.embed_content(  # type: ignore[union-attr]
-            model=EMBED_MODEL,
+            model=_embed_model_name(),
             contents=text,
             config=types.EmbedContentConfig(task_type=task_type.upper()),
         )
