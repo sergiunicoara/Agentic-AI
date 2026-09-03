@@ -10,7 +10,7 @@ AI Recruiter is an autonomous voice-first agent that represents a candidate's po
 ## Core Capabilities
 
 - **Deterministic orchestrator** — role extraction → criteria parsing → project ranking → CV Q&A with no LLM in the routing loop (routing logic itself runs in low single-digit ms; see Latency section)
-- **Real-time voice pipeline** — Deepgram nova-2 STT over WebSocket → agent → Google Neural2-D TTS with sentence-level streaming. Barge-in via RMS VAD. ~430ms measured agent+TTS first-audio (~600–730ms full voice turn incl. STT endpointing, see Latency section).
+- **Real-time voice pipeline** — Deepgram nova-2 STT over WebSocket → agent → Google Neural2-D TTS with sentence-level streaming. Barge-in via RMS VAD. ~241ms measured agent+TTS combined (~441ms full voice turn est. incl. STT endpointing, see Latency section).
 - **Streaming LLM→TTS** — Gemini-backed replies (CV RAG) stream token chunks; TTS fires per sentence *as text arrives*, before the full reply is assembled
 - **PSTN/SIP telephony** — Twilio Media Streams bridge (`/phone/twiml` + `/phone/stream`): mulaw 8kHz full-duplex, barge-in via Deepgram SpeechStarted + Twilio `clear`
 - **WebRTC** — direct browser peer connections via aiortc (`/webrtc/offer`): SDP/ICE negotiation, opus audio, TTS over RTCDataChannel
@@ -21,7 +21,7 @@ AI Recruiter is an autonomous voice-first agent that represents a candidate's po
 - **ATS outputs** — role-matched project deep dives, ATS-style summaries, recruiter email drafts
 - **Post-call summaries** — structured interview summary per session (`role_fit_score`, strengths, concerns, recommendation) via `GET /session/{id}/summary`
 - **Guardrails** — PII redaction (email/phone/SSN/card) on the logging path + topic enforcement that deflects off-topic messages before they reach the agent
-- **LLM-as-Judge** — multi-metric eval per turn: faithfulness, relevancy, factuality (0.0–1.0 each). 6 golden test cases, 100% pass rate, 5.0/5 avg score.
+- **LLM-as-Judge** — multi-metric eval per turn: faithfulness, relevancy, factuality (0.0–1.0 each). See Evaluation Results below for the three separate test/eval layers and their current counts.
 - **Critic Agent (A2A)** — autonomous critic calls the judge via MCP tool interface, issues PASS/FAIL verdicts, tracks session-level quality
 - **MCP tool registry** — standard JSON-RPC MCP methods at `/mcp` (`initialize`, `tools/list`, `tools/call`), with protected legacy discovery/dispatch endpoints
 - **Langfuse tracing** — every agent turn and judge call traced with input/output/scores in Langfuse dashboard
@@ -102,7 +102,8 @@ Browser (index.html)
 │                                                                      │
 │  judge.py          faithfulness / relevancy / factuality 0.0–1.0   │
 │  critic_agent.py   A2A → judge via MCP, PASS/FAIL + session agg.   │
-│  eval/run_eval_table.py   6 golden cases → 100% pass, 5.0/5 avg    │
+│  run_eval.py        15 golden cases → 15/15 pass, 5.0/5 avg        │
+│  pytest tests/      67 unit + regression tests                    │
 │                                                                      │
 │  Langfuse: @observe(as_type="generation") on judge calls            │
 │            scores logged per trace (faithfulness/relevancy/factual) │
@@ -139,11 +140,10 @@ Browser (index.html)
 
 | Stage | p50 | range |
 |---|---|---|
-| Agent turn (`POST /chat`, full HTTP round trip) | 321ms | 318 – 589ms |
-| Agent + TTS first-audio (`/voice/bench`, Google Neural2-D, Deepgram excluded) | 428ms | 236 – 474ms |
-| Agent + TTS full stream complete | 444ms | 327 – 479ms |
+| Agent turn (`POST /chat`, full HTTP round trip) | 390ms | 371 – 397ms |
+| Agent + TTS combined (`/voice/bench` WebSocket, Google Neural2-D, Deepgram excluded) | 241ms | 208 – 262ms |
 
-Deepgram nova-2 streaming endpointing isn't included above (requires `DEEPGRAM_API_KEY` to benchmark); Deepgram's published nova-2 streaming latency is ~150–300ms, putting a full voice-turn estimate (STT + agent + TTS first-audio) at roughly **580–730ms**.
+Deepgram nova-2 streaming endpointing isn't included above (requires `DEEPGRAM_API_KEY` to benchmark); Deepgram's published nova-2 streaming latency is ~150–300ms, putting a full voice-turn estimate (STT + agent + TTS combined) at roughly **~441ms** (using the ~200ms midpoint of that range).
 
 The deterministic orchestrator itself (role extraction → criteria parsing → project ranking — regex/keyword matching, no LLM call) runs in low single-digit milliseconds in-process. The 300ms+ `/chat` round trip above is dominated by network + Cloud Run request overhead, not the routing logic.
 
@@ -152,6 +152,16 @@ Re-run: `python benchmark_voice.py <cloud-run-url>` (writes `benchmark_voice_res
 ---
 
 ## Evaluation Results
+
+Three separate test/eval layers, each with its own live-runnable script:
+
+| Layer | Script | Count | Result |
+|---|---|---|---|
+| Unit + regression tests | `pytest tests/` | 67 tests | 67 passed |
+| Golden routing/RAG eval | `python run_eval.py <url>` | 15 cases | 15/15 pass, 5.0/5 avg score |
+| A2A judge table (`/a2a/validate`) | `python eval/run_eval_table.py` | 6 cases | not re-verified this pass — see note below |
+
+The middle row (`run_eval.py` / `ops/eval_data.json`) is the one this session actually fixed and re-verified live: the judge client had no Vertex AI ADC fallback, so on Cloud Run every non-trivial judge call 400'd and every score collapsed to a hardcoded 3.0/mixed default — visible as 0% pass rate before the fix, 15/15 with a 5.0 avg after.
 
 ```
 LLM-as-a-Judge Evaluation  |  Recruiter Agent  |  Golden Dataset
@@ -170,9 +180,13 @@ AVERAGE                        5.0/5   1.00      1.00      1.00                 
 Model: Gemini 2.5 Flash  ·  6 test cases  ·  metrics: faithfulness / relevancy / factuality
 ```
 
+> **Note:** this table's numbers predate this session's judge/RAG fixes and could not be re-run to confirm — `/a2a/validate` (which `eval/run_eval_table.py` calls) is gated by `require_internal_access` and `INTERNAL_API_KEY` isn't currently set on the Cloud Run deployment, so the request 503s before reaching the judge. Set that secret to re-verify this specific table; the routing/RAG bugs this table would have caught are independently confirmed fixed via the `run_eval.py` row above, which hits `/chat` and `/mcp/call` directly and needs no internal key.
+
 Run yourself:
 ```bash
-python eval/run_eval_table.py
+python eval/run_eval_table.py   # needs INTERNAL_API_KEY set on the target deployment
+python run_eval.py <cloud-run-url>
+python -m pytest tests/ -q
 ```
 
 ---
@@ -185,8 +199,8 @@ python eval/run_eval_table.py
 | **Voice STT** | Deepgram nova-2 (WebSocket streaming, 150ms endpointing) |
 | **Voice TTS** | Google Cloud Neural2-D (sentence-level streaming, free tier) |
 | **LLM** | Gemini 2.5 Flash (`google-genai`) |
-| **Embeddings** | `models/text-embedding-004` |
-| **Evaluation** | LLM-as-Judge + 6 golden cases, 100% pass rate |
+| **Embeddings** | `text-embedding-004` (AI Studio or Vertex AI ADC fallback) |
+| **Evaluation** | LLM-as-Judge + 15 golden cases (15/15 pass) + 67 pytest tests |
 | **LLM Observability** | Langfuse (traces, scores, generations) |
 | **Infra Observability** | OpenTelemetry → Cloud Trace + structured logs |
 | **A2A / MCP** | Critic Agent + MCP tool registry (4 named tools) |
