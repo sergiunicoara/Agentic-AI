@@ -1,0 +1,16 @@
+{
+  "runs": [
+    {
+      "date": "2026-09-04T10:43:59.806896+00:00",
+      "input_tokens": 82104,
+      "output_tokens": 0,
+      "files": 114,
+      "note": "82,104 is chunk-1 measured usage only. chunk 2 (9 files: CLAUDE.md, DEMO.md, README.md, ADR-002, ADR-004, scaling.md, video-script, docker-compose.yml, values.yaml) errored after writing its output but before reporting usage — its token cost is unmeasured, not zero. Prior run of this file incorrectly recorded 0/0 for both chunks."
+    }
+  ],
+  "total_input_tokens": 82104,
+  "total_output_tokens": 0,
+  "unmeasured_chunks": [
+    "chunk 2 (9 files: CLAUDE.md, DEMO.md, README.md, ADR-002, ADR-004, scaling.md, video-script, docker-compose.yml, values.yaml) errored after writing its output but before reporting usage — its token cost is unmeasured, not zero"
+  ]
+}
