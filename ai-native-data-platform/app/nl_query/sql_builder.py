@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from app.nl_query.intent import ALLOWED_SCHEMA, QueryIntent
 
+# Must match app/nl_query/validator.py::_ALLOWED_AGGREGATIONS. Duplicated
+# on purpose as a second, independent gate: aggregation is a raw SQL keyword
+# interpolated straight into the SELECT clause below, so build_sql() must
+# never trust that validate_intent() was actually called first.
+_ALLOWED_AGGREGATIONS = {"COUNT", "SUM", "AVG", "MIN", "MAX"}
+
 
 def build_sql(intent: QueryIntent, workspace_id: str) -> tuple[str, dict]:
     """Build a parameterized SELECT statement from a validated QueryIntent.
@@ -18,6 +24,8 @@ def build_sql(intent: QueryIntent, workspace_id: str) -> tuple[str, dict]:
     # --- SELECT clause ---
     if intent.aggregation:
         agg = intent.aggregation.upper()
+        if agg not in _ALLOWED_AGGREGATIONS:
+            raise ValueError(f"Aggregation '{intent.aggregation}' is not allowed")
         if agg == "COUNT" and not intent.aggregation_column:
             agg_expr = "COUNT(*)"
         else:

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.observability import emit_event
 from app.data.db import read_session_scope, write_session_scope
 
 
@@ -36,7 +37,12 @@ def _table_exists(db) -> bool:
             )
         ).first()
         return bool(r)
-    except Exception:
+    except Exception as e:
+        # This is on the retrieval hot path (get_index_state below) — a bare
+        # swallow here is indistinguishable from "table genuinely doesn't
+        # exist yet" (normal on first boot) vs. a real DB connectivity
+        # problem, which would otherwise be invisible.
+        emit_event("index_state_table_check_failed", {"error": str(e)})
         return False
 
 

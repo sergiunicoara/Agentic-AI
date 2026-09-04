@@ -232,12 +232,13 @@ Prometheus scrapes `/metrics` every 10 seconds. Alertmanager rules are in `ops/p
 pytest tests/ -v
 ```
 
-189 tests covering:
+213 tests covering:
 - **OpenSearch**: client singleton + availability re-probe, index management, idempotent ingest (deterministic doc ids), BM25/vector/hybrid retrievers, RRF fusion, post-commit batched dual-write
 - **Safety**: prompt injection (5 taxonomies), PII redaction (6 types), toxicity filtering
 - **NL normalization**: table aliases, column aliases, operator aliases, SELECT * expansion, COUNT(*), idempotency
-- **SQL builder**: workspace scoping, all filter operators, ORDER BY, LIMIT, full query shapes
-- **Reliability**: SLO contracts, rolling window p95/error/unknown rates, token bucket rate limiter, citation groundedness
+- **SQL builder / validator**: workspace scoping, all filter operators, ORDER BY, LIMIT, full query shapes, aggregation-function whitelist (SQL injection regression)
+- **Reliability**: SLO contracts, rolling window p95/error/unknown rates, token bucket rate limiter, citation groundedness, remediation-controller hysteresis and auto-clear
+- **Retrieval cache**: index-epoch cache-key invalidation, cache-hit latency contract
 - **Chaos**: safe degradation on provider failure, cache miss fallback
 
 No database or OpenSearch instance required — `tests/conftest.py` injects mocks before any import.

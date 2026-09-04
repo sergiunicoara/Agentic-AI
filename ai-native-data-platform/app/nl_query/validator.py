@@ -11,6 +11,11 @@ _DANGEROUS = re.compile(
     re.IGNORECASE,
 )
 
+# aggregation is interpolated directly into the SELECT clause by build_sql()
+# (it's a SQL keyword, not an identifier, so it can't be parameterized) — it
+# MUST be restricted to this exact set or it's a straight SQL injection vector.
+_ALLOWED_AGGREGATIONS = {"COUNT", "SUM", "AVG", "MIN", "MAX"}
+
 
 @dataclass
 class ValidationResult:
@@ -24,6 +29,10 @@ def validate_intent(intent: QueryIntent) -> ValidationResult:
         return ValidationResult(ok=False, error=f"Table '{intent.table}' is not allowed")
 
     allowed = set(ALLOWED_SCHEMA[intent.table])
+
+    # aggregation — interpolated as a raw keyword into SQL, must be whitelisted
+    if intent.aggregation is not None and intent.aggregation.upper() not in _ALLOWED_AGGREGATIONS:
+        return ValidationResult(ok=False, error=f"Aggregation '{intent.aggregation}' is not allowed")
 
     # select_columns
     for col in intent.select_columns:

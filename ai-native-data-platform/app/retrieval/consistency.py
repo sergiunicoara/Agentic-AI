@@ -12,6 +12,7 @@ from typing import Iterable
 
 from sqlalchemy import text
 
+from app.core.observability import emit_event
 from app.data.db import session_scope
 
 
@@ -28,7 +29,12 @@ def fetch_shard_epochs(shard_dsns: Iterable[str]) -> list[ShardConsistency]:
             with session_scope(dsn) as db:
                 row = db.execute(text("SELECT index_epoch::text FROM shard_state LIMIT 1")).fetchone()
             out.append(ShardConsistency(dsn=dsn, index_epoch=row[0] if row else None))
-        except Exception:
+        except Exception as e:
+            # A probe failure (shard down/unreachable) is collapsed into the
+            # same "unknown epoch" shape as a shard that's simply missing a
+            # shard_state row — distinguish it here so an outage doesn't read
+            # as a routine epoch mismatch in downstream logs.
+            emit_event("shard_epoch_probe_failed", {"dsn": dsn, "error": str(e)})
             out.append(ShardConsistency(dsn=dsn, index_epoch=None))
     return out
 

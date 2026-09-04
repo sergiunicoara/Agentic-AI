@@ -162,6 +162,10 @@ class Settings(BaseSettings):
         default=False,
         description="When true, dense retrieval queries both document_chunk and image_chunk tables.",
     )
+    max_image_upload_bytes: int = Field(
+        default=20_000_000,
+        description="Max accepted size (bytes) for a single /ingest/image upload — guards against memory exhaustion from oversized files or PDF page-bomb expansion.",
+    )
 
     # --- OpenSearch (alternative retrieval backend)
     opensearch_url: str = Field(

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
+from pathlib import Path
 
 from app.indexing import build_manifest, run_manifest
 
@@ -38,7 +40,6 @@ def main() -> None:
     out = args.out
     if not out:
         Path("reports").mkdir(parents=True, exist_ok=True)
-        import time
         out = f"reports/bulk_index_{args.workspace}_{int(time.time())}.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)

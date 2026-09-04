@@ -1,6 +1,6 @@
 # AI-Native Data Platform — Demo Script
 
-**Runtime:** ~4 min | **Stack:** FastAPI · pgvector · OpenSearch · Grafana · DSPy | **Tests:** 190 passing
+**Runtime:** ~4 min | **Stack:** FastAPI · pgvector · OpenSearch · Grafana · DSPy | **Tests:** 213 passing
 
 > **Terminal note:** Two syntaxes below — pick the one matching your shell.
 > - **PowerShell 5.1:** commands use `curl.exe --%` (stop-parsing token prevents PS from mangling args)
@@ -225,20 +225,20 @@ pytest tests/ -q
 ```
 
 ```
-................................ [ 16%]
-................................ [ 33%]
-................................ [ 50%]
-................................ [ 66%]
-................................ [ 83%]
-.......................ss        [ 99%]
-.                               [100%]
+................................ [ 14%]
+................................ [ 29%]
+................................ [ 44%]
+................................ [ 59%]
+................................ [ 74%]
+................................ [ 89%]
+.....................ss          [100%]
 
-190 passed, 2 skipped in 14.7s
+213 passed, 2 skipped in 8.75s
 ```
 
-**PAUSE ON** "190 passed" — hold 2 seconds before cutting.
+**PAUSE ON** "213 passed" — hold 2 seconds before cutting.
 
-**V.O.:** *"190 tests. No live database or OpenSearch required — mocks injected at import time. Coverage: OpenSearch idempotency, prompt injection in five taxonomies, PII redaction, DSPy normalization edge cases, SQL builder for every filter operator, reliability contracts, rolling SLO, token bucket, and chaos degradation when providers fail."*
+**V.O.:** *"213 tests. No live database or OpenSearch required — mocks injected at import time. Coverage: OpenSearch idempotency, prompt injection in five taxonomies, PII redaction, DSPy normalization edge cases, SQL builder for every filter operator, reliability contracts, rolling SLO, token bucket, chaos degradation when providers fail, remediation hysteresis, and the retrieval cache's index-epoch invalidation."*
 
 ---
 
@@ -258,4 +258,4 @@ Open **`graphify-out/graph.html`** in a browser. Zoom out to show the full graph
 
 | Services | Retrieval Modes | Tests | Graph Nodes | Hallucinations |
 |---|---|---|---|---|
-| 8 | 8 | 190 | 895 | 0 |
+| 8 | 8 | 213 | 895 | 0 |

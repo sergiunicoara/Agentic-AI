@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import time
 import uuid
 import asyncio
@@ -63,7 +64,7 @@ async def metrics_middleware(request, call_next):
     async with _semaphore:
         # Rate-limit per workspace if header is present.
         ws = request.headers.get("X-Workspace-Id", "")
-        if ws and route in ("/ask", "/ingest/transcript", "/query/natural-language"):
+        if ws and route in ("/ask", "/ingest/transcript", "/query/natural-language", "/ingest/image"):
             if not rate_limiter.allow(ws):
                 HTTP_REQUESTS.labels(route=route, method=method, status="429").inc()
                 return Response(content="Rate limit exceeded", status_code=429)
@@ -139,7 +140,21 @@ async def ingest_image(
     configured vision model (GPT-4o / Gemini Vision / mock), embedded, and
     stored in image_chunk for unified retrieval alongside text chunks.
     """
-    content = await file.read()
+    # Read in bounded chunks so an oversized upload is rejected before it's
+    # fully buffered, not after (FastAPI's UploadFile.read() with no size arg
+    # would happily pull the entire body into memory first).
+    max_bytes = settings.max_image_upload_bytes
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1_048_576)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(413, f"Upload exceeds max size of {max_bytes} bytes")
+        chunks.append(chunk)
+    content = b"".join(chunks)
     mime = file.content_type or "image/png"
 
     if mime == "application/pdf" or (file.filename or "").lower().endswith(".pdf"):
@@ -200,7 +215,7 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
     embedding_override = None
     if settings.allow_embedding_override:
         req_token = request.headers.get("X-Admin-Token", "")
-        if settings.admin_token and req_token == settings.admin_token:
+        if settings.admin_token and hmac.compare_digest(req_token, settings.admin_token):
             embedding_override = request.headers.get("X-Embedding-Version-Override")
 
     try:
@@ -270,6 +285,27 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
             elif moderation.redacted is not None:
                 emit_event("output_pii_redacted", {"workspace_id": workspace_id, "flags": moderation.flags})
                 answer = moderation.redacted
+
+        if not unknown and citations:
+            # Citation snippets are raw excerpts from retrieved content and can
+            # carry the same PII the answer redaction above just handled — the
+            # answer being clean doesn't mean the quoted source text is.
+            safe_citations: list[Citation] = []
+            citation_redacted = False
+            for c in citations:
+                cmod = moderate_output(c.snippet)
+                if not cmod.safe:
+                    # Drop the individual toxic citation rather than discarding
+                    # the whole (already-verified, grounded) answer over it.
+                    continue
+                if cmod.redacted is not None:
+                    citation_redacted = True
+                    safe_citations.append(c.model_copy(update={"snippet": cmod.redacted}))
+                else:
+                    safe_citations.append(c)
+            if citation_redacted:
+                emit_event("citation_pii_redacted", {"workspace_id": workspace_id})
+            citations = safe_citations
 
     latency_ms = int((time.time() - t0) * 1000)
     try:

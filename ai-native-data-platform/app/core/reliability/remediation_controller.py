@@ -9,15 +9,62 @@ the closed-loop mitigation.
 
 import threading
 import time
+from dataclasses import dataclass
 
 from app.core.config import settings
 from app.core.observability import emit_event
 from app.core.reliability.leader import LeaderLock, release, try_acquire
-from app.core.reliability.remediation import _write_override
+from app.core.reliability.remediation import _write_override, clear_override, has_override
 from app.core.reliability.slo_window import rolling_slo
 
 
 DEFAULT_LOCK_KEY = 914_002_777  # stable constant for this demo repo
+
+
+@dataclass(frozen=True)
+class TickDecision:
+    violated: int
+    override_applied: bool
+    action: str  # "none" | "wait_for_samples" | "applied" | "cleared"
+    bad: bool | None = None
+
+
+def evaluate_tick(
+    snap: dict,
+    *,
+    violated: int,
+    override_applied: bool,
+    min_samples: int,
+    error_rate_threshold: float,
+    unknown_rate_threshold: float,
+    max_request_latency_ms: float,
+) -> TickDecision:
+    """Pure hysteresis decision — no I/O, so it's directly unit-testable.
+
+    Given the current rolling-SLO snapshot and controller state, decides
+    whether to (a) wait for more samples, (b) do nothing this tick, (c) apply
+    the remediation override, or (d) clear a previously-applied override now
+    that the SLO has recovered. The caller (_loop below) is responsible for
+    actually performing the DB writes this decision implies.
+    """
+    if int(snap.get("samples", 0)) < int(min_samples):
+        return TickDecision(violated=violated, override_applied=override_applied, action="wait_for_samples")
+
+    bad = (
+        snap["error_rate"] >= float(error_rate_threshold)
+        or snap["unknown_rate"] >= float(unknown_rate_threshold)
+        or snap["p95_latency_ms"] >= float(max_request_latency_ms)
+    )
+    violated = violated + 1 if bad else max(0, violated - 1)
+
+    if violated >= 3:
+        return TickDecision(violated=violated, override_applied=True, action="applied", bad=bad)
+    if violated == 0 and override_applied:
+        # Fully recovered (hysteresis counter back to zero) after having
+        # forced traffic to the safe experiment — reverse it automatically
+        # instead of requiring a human to find and delete the override row.
+        return TickDecision(violated=violated, override_applied=False, action="cleared", bad=bad)
+    return TickDecision(violated=violated, override_applied=override_applied, action="none", bad=bad)
 
 
 def start_controller(
@@ -42,6 +89,12 @@ def start_controller(
     def _loop() -> None:
         is_leader = False
         violated = 0
+        # Tracks whether *this* leader session believes an override is
+        # currently applied, so it knows when to auto-clear it on recovery.
+        # Seeded from the actual DB row on leader acquisition (not assumed
+        # False) so a leadership handoff mid-remediation doesn't strand an
+        # override that the new leader doesn't know exists.
+        override_applied = False
         last_leader_check = 0.0
 
         while True:
@@ -57,11 +110,22 @@ def start_controller(
 
                 if acquired and not is_leader:
                     is_leader = True
-                    emit_event("remediation_leader_acquired", {"lock_key": lock_key})
+                    try:
+                        override_applied = has_override()
+                    except Exception:
+                        override_applied = False
+                    emit_event("remediation_leader_acquired", {"lock_key": lock_key, "override_already_applied": override_applied})
                 elif not acquired and is_leader:
-                    # Lost leadership.
+                    # Lost leadership — release our local handle so a stale
+                    # connection object doesn't make a future try_acquire()
+                    # short-circuit to "still leader" against a lock we no
+                    # longer hold.
                     is_leader = False
                     violated = 0
+                    try:
+                        release(lock)
+                    except Exception:
+                        pass
                     emit_event("remediation_leader_lost", {"lock_key": lock_key})
 
             if not is_leader:
@@ -70,19 +134,22 @@ def start_controller(
 
             try:
                 snap = rolling_slo.snapshot()
-                if int(snap.get("samples", 0)) < int(min_samples):
+                decision = evaluate_tick(
+                    snap,
+                    violated=violated,
+                    override_applied=override_applied,
+                    min_samples=min_samples,
+                    error_rate_threshold=error_rate_threshold,
+                    unknown_rate_threshold=unknown_rate_threshold,
+                    max_request_latency_ms=max_request_latency_ms,
+                )
+                violated = decision.violated
+                override_applied = decision.override_applied
+
+                if decision.action == "wait_for_samples":
                     time.sleep(check_every_s)
                     continue
-
-                bad = (
-                    snap["error_rate"] >= float(error_rate_threshold)
-                    or snap["unknown_rate"] >= float(unknown_rate_threshold)
-                    or snap["p95_latency_ms"] >= float(max_request_latency_ms)
-                )
-
-                violated = violated + 1 if bad else max(0, violated - 1)
-
-                if violated >= 3:
+                elif decision.action == "applied":
                     _write_override(force_experiment)
                     emit_event(
                         "remediation_applied",
@@ -96,17 +163,14 @@ def start_controller(
                             },
                         },
                     )
+                elif decision.action == "cleared":
+                    clear_override()
+                    emit_event("remediation_cleared", {"force_experiment": force_experiment, "snapshot": snap})
 
             except Exception as e:
                 emit_event("remediation_error", {"error": str(e)})
 
             time.sleep(check_every_s)
-
-    def _cleanup() -> None:
-        try:
-            release(lock)
-        except Exception:
-            pass
 
     t = threading.Thread(target=_loop, daemon=True)
     t.start()

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.observability import emit_event
 from app.data.db import read_session_scope
 
 
@@ -37,8 +38,11 @@ def choose_experiment(workspace_id: str, requested: str | None = None) -> Experi
             ).mappings().first()
         if row and row.get("experiment"):
             return ExperimentAssignment(name=str(row["experiment"]), reason="remediation_override")
-    except Exception:
-        pass
+    except Exception as e:
+        # This sits in the reliability system's own hot path: a swallowed
+        # failure here is indistinguishable from "no override configured,"
+        # which is exactly the wrong thing to hide during a DB outage.
+        emit_event("experiment_override_read_failed", {"workspace_id": workspace_id, "error": str(e)})
 
     if requested:
         return ExperimentAssignment(name=requested, reason="header")

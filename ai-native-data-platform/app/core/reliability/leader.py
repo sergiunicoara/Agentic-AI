@@ -24,10 +24,25 @@ class LeaderLock:
 
 
 def try_acquire(lock: LeaderLock) -> bool:
-    """Try to acquire the leader lock. Returns True if acquired."""
+    """Try to acquire the leader lock. Returns True if acquired (or already held)."""
 
     if lock.connection is not None:
-        return True
+        # Re-verify the held connection is actually still alive rather than
+        # trusting local state unconditionally. Session-scoped advisory locks
+        # are released by Postgres the moment the backing connection dies
+        # (network blip, idle-connection reap, failover) — if we don't detect
+        # that here, this process keeps believing it's leader indefinitely
+        # while another replica may have legitimately acquired the lock.
+        try:
+            lock.connection.execute(text("SELECT 1"))
+            return True
+        except Exception:
+            try:
+                lock.connection.close()
+            except Exception:
+                pass
+            lock.connection = None
+            # Fall through and try to acquire fresh below.
     connection = engine.connect()
     try:
         row = connection.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": int(lock.key)}).fetchone()

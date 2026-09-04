@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.observability import INGEST_JOBS, INGEST_LATENCY, emit_event, timer
 from app.data.db import workspace_session_scope
 from app.chunking import chunk_text
-from app.providers.embeddings import embed
+from app.providers.embeddings import embed_batch
 
 def _opensearch_dual_write_batch(chunk_payloads: list[dict]) -> None:
     """Best-effort batched dual-write to OpenSearch.
@@ -29,7 +29,19 @@ def _opensearch_dual_write_batch(chunk_payloads: list[dict]) -> None:
         from app.opensearch.ingest import bulk_upsert
         if not is_available():
             return
-        bulk_upsert(chunk_payloads)
+        result = bulk_upsert(chunk_payloads)
+        # bulk_upsert uses raise_on_error=False, so a partial-batch failure
+        # (some chunks indexed, some not) never raises — surface it explicitly
+        # or it's indistinguishable from complete success anywhere downstream.
+        if result.get("errors", 0) > 0:
+            emit_event(
+                "opensearch_dual_write_partial_failure",
+                {
+                    "chunks": len(chunk_payloads),
+                    "indexed": result.get("indexed", 0),
+                    "errors": result["errors"],
+                },
+            )
     except Exception as e:
         emit_event(
             "opensearch_dual_write_failed",
@@ -108,32 +120,55 @@ def process_document(document_id: str, workspace_id: str) -> None:
 
     with timer(INGEST_LATENCY):
         try:
-            os_payloads: list[dict] = []
+            # Fetch on the write path (not a replica) since this document may
+            # have been inserted moments ago by the same request and might
+            # not have replicated yet.
             with workspace_session_scope(workspace_id, write=True) as db:
                 doc = db.execute(
                     text("SELECT id::text, workspace_id, source_name, text FROM document WHERE id=CAST(:id AS uuid)"),
                     {"id": document_id},
                 ).mappings().first()
-                if not doc:
-                    raise ValueError("document not found")
+            if not doc:
+                raise ValueError("document not found")
 
-                chunks = chunk_text(doc["text"])
+            chunks = chunk_text(doc["text"])
+            ws = str(doc.get("workspace_id"))
+            source = str(doc.get("source_name") or "upload")
 
-                ws = str(doc.get("workspace_id"))
-                source = str(doc.get("source_name") or "upload")
-                for idx, ch in enumerate(chunks):
+            # Embed all chunks BEFORE opening the write transaction below.
+            # embed_batch() is a network round trip to the embedding provider
+            # per call; holding a pooled DB connection open across N of these
+            # (one per chunk, serially) risks pool exhaustion under concurrent
+            # ingestion load. This mirrors the dual-write-after-commit design
+            # already used for OpenSearch in this same function — external
+            # calls don't get to hold a transaction open.
+            vecs = embed_batch(chunks) if chunks else []
+
+            os_payloads: list[dict] = []
+            with workspace_session_scope(workspace_id, write=True) as db:
+                for idx, (ch, v) in enumerate(zip(chunks, vecs, strict=True)):
                     chash = _hash_text(ch)
-                    v = embed(ch)
-                    # RETURNING tells us whether this row was actually inserted.
-                    # On conflict (re-ingestion) Postgres keeps the existing row
-                    # and its existing id — we must NOT push a new id to
-                    # OpenSearch, or the two stores diverge.
+                    # RETURNING tells us whether this row changed: a brand-new
+                    # chunk inserts normally; on conflict (re-ingestion), we
+                    # only overwrite when chunk_hash actually differs (the
+                    # source document's text changed since last ingest) —
+                    # otherwise the WHERE clause makes DO UPDATE a no-op and
+                    # RETURNING yields nothing, so unchanged chunks generate
+                    # no OpenSearch traffic. When content DID change, the
+                    # UPDATE keeps the row's original id (not the :id of the
+                    # failed insert), so the chunk_id pushed to OpenSearch
+                    # below is always the stable, pre-existing one — the two
+                    # stores never diverge on identity.
                     inserted = db.execute(
                         text(
                             """
                             INSERT INTO document_chunk (id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding, embedding_version)
                             VALUES (:id, :document_id, :workspace_id, :chunk_index, :chunk_text, :chunk_hash, CAST(:embedding AS vector), :embedding_version)
-                            ON CONFLICT (document_id, chunk_index, embedding_version) DO NOTHING
+                            ON CONFLICT (document_id, chunk_index, embedding_version)
+                            DO UPDATE SET chunk_text = EXCLUDED.chunk_text,
+                                          chunk_hash = EXCLUDED.chunk_hash,
+                                          embedding = EXCLUDED.embedding
+                            WHERE document_chunk.chunk_hash IS DISTINCT FROM EXCLUDED.chunk_hash
                             RETURNING id::text
                             """
                         ),

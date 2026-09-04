@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass
 
 from app.core.observability import emit_event
-from app.indexing.index_state import promote_target_to_active, set_target_embedding_version
+from app.indexing.index_state import get_index_state, promote_target_to_active, set_target_embedding_version
 from app.indexing.pipeline import IndexingConfig, build_manifest, run_manifest
 
 
@@ -41,24 +40,29 @@ def reindex_embeddings(
     """
     cfg = cfg or IndexingConfig()
 
+    # Capture the pre-reindex active version for the result — run_manifest()
+    # now correctly echoes back the *target* version it was called with (see
+    # below), so it can no longer double as "the old version" the way it did
+    # by accident when the embedding_version override was silently ignored.
+    old_active_version = get_index_state(workspace_id).active_embedding_version
+
     # Persist the target for auditability and for multi-run resumability.
     set_target_embedding_version(workspace_id, target_embedding_version)
     emit_event("reindex_target_set", {"workspace_id": workspace_id, "target_embedding_version": target_embedding_version})
 
-    # Override embedding version for the duration of the job.
-    # We keep the override local to this process to avoid global impact.
-    old = os.environ.get("EMBEDDING_VERSION")
-    os.environ["EMBEDDING_VERSION"] = target_embedding_version
-
     t0 = time.time()
-    try:
-        manifest = build_manifest(workspace_id=workspace_id, limit=limit)
-        stats = run_manifest(str(manifest), workspace_id=workspace_id, cfg=cfg)
-    finally:
-        if old is None:
-            os.environ.pop("EMBEDDING_VERSION", None)
-        else:
-            os.environ["EMBEDDING_VERSION"] = old
+    # `settings` (pydantic BaseSettings) is constructed once at import time —
+    # mutating os.environ after that has no effect on the already-materialized
+    # settings.embedding_version, so run_manifest() must be told the target
+    # version explicitly. The previous os.environ dance here was a no-op:
+    # run_manifest fell back to settings.embedding_version (the CURRENT
+    # active version), backfilling under a conflict key that already existed
+    # for every chunk (ON CONFLICT DO NOTHING silently made the whole job a
+    # no-op), and the subsequent promote_target_to_active() then cut over to
+    # a target_embedding_version with zero chunks — an immediate, complete
+    # retrieval outage for the workspace.
+    manifest = build_manifest(workspace_id=workspace_id, limit=limit)
+    stats = run_manifest(str(manifest), workspace_id=workspace_id, cfg=cfg, embedding_version=target_embedding_version)
 
     # Cutover.
     promote_target_to_active(workspace_id)
@@ -66,7 +70,7 @@ def reindex_embeddings(
 
     return ReindexResult(
         workspace_id=workspace_id,
-        old_active_version=stats.get("embedding_version", ""),
+        old_active_version=old_active_version,
         new_active_version=target_embedding_version,
         indexed_docs=int(stats.get("indexed_docs") or 0),
         indexed_chunks=int(stats.get("indexed_chunks") or 0),

@@ -6,6 +6,7 @@ from collections import OrderedDict
 from typing import Any, Optional
 
 from app.core.config import settings
+from app.core.observability import emit_event
 
 try:
     import redis  # type: ignore
@@ -57,8 +58,9 @@ class Cache:
                 self._redis = redis.Redis.from_url(settings.redis_url, decode_responses=True)
                 # ping to validate
                 self._redis.ping()
-            except Exception:
+            except Exception as e:
                 self._redis = None
+                emit_event("cache_redis_unavailable", {"stage": "init", "error": str(e)})
 
     def get_json(self, key: str) -> Optional[Any]:
         try:
@@ -67,7 +69,11 @@ class Cache:
                 if raw is None:
                     return None
                 return json.loads(raw)
-        except Exception:
+        except Exception as e:
+            # Degrade to a cache miss (never fail the caller's request), but
+            # make the degradation visible — otherwise a Redis outage looks
+            # identical to "cache hit rate legitimately dropped."
+            emit_event("cache_redis_unavailable", {"stage": "get", "error": str(e)})
             return None
 
         return self._mem.get(key)
@@ -77,8 +83,8 @@ class Cache:
             if self._redis is not None:
                 self._redis.setex(key, ttl_s or settings.cache_ttl_s, json.dumps(value))
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            emit_event("cache_redis_unavailable", {"stage": "set", "error": str(e)})
 
         self._mem.set(key, value)
 

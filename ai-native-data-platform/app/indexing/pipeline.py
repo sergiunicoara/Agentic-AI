@@ -15,6 +15,7 @@ from app.chunking import chunk_text
 from app.core.config import settings
 from app.core.observability import emit_event
 from app.data.db import workspace_session_scope
+from app.indexing.index_state import bump_index_epoch
 from app.providers.embeddings import embed_batch
 
 
@@ -24,6 +25,41 @@ def _vec_literal(vec: list[float]) -> str:
 
 def _hash_text(t: str) -> str:
     return hashlib.sha256(t.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _opensearch_dual_write_batch(chunk_payloads: list[dict]) -> None:
+    """Best-effort dual-write to OpenSearch for the bulk/reindex path.
+
+    Mirrors app/ingestion/pipeline.py::_opensearch_dual_write_batch (the
+    online-path equivalent) — the bulk path previously never wrote to
+    OpenSearch at all, so a workspace reindexed/backfilled through here would
+    have pgvector fully populated but an empty OpenSearch index for any
+    OpenSearch-backed retrieval mode, with no error and no signal.
+    """
+    if not chunk_payloads:
+        return
+    if not settings.opensearch_dual_write or not settings.opensearch_url:
+        return
+    try:
+        from app.opensearch.client import is_available
+        from app.opensearch.ingest import bulk_upsert
+        if not is_available():
+            return
+        result = bulk_upsert(chunk_payloads)
+        if result.get("errors", 0) > 0:
+            emit_event(
+                "opensearch_dual_write_partial_failure",
+                {
+                    "chunks": len(chunk_payloads),
+                    "indexed": result.get("indexed", 0),
+                    "errors": result["errors"],
+                },
+            )
+    except Exception as e:
+        emit_event(
+            "opensearch_dual_write_failed",
+            {"chunks": len(chunk_payloads), "error": str(e)},
+        )
 
 
 @dataclass(frozen=True)
@@ -44,7 +80,7 @@ class IndexingConfig:
     # Failure injection + retries (for soak/backfill hardening)
     fault_injection_rate: float = 0.0  # 0..1 probability of injected failure per doc
     max_retries: int = 3
-    retry_backoff_ms: int = 250
+    max_backoff_ms: int = 250
 
 
 def build_manifest(*, workspace_id: str, limit: int | None = None) -> Path:
@@ -97,7 +133,7 @@ def run_manifest(
     indexed_chunks = 0
     skipped_docs = 0
 
-    def _flush_chunk_batch(chunk_rows: list[dict]) -> int:
+    def _flush_chunk_batch(chunk_rows: list[dict], os_rows: list[dict]) -> int:
         if not chunk_rows:
             return 0
 
@@ -125,7 +161,7 @@ def run_manifest(
                         ),
                         chunk_rows,
                     )
-                return len(chunk_rows)
+                break
             except Exception:
                 attempt += 1
                 if attempt > int(cfg.max_retries):
@@ -133,6 +169,15 @@ def run_manifest(
                 # Exponential backoff with jitter
                 backoff_ms = min(int(cfg.max_backoff_ms), int((2 ** (attempt - 1)) * 100))
                 time.sleep((backoff_ms / 1000.0) + random.random() * 0.05)
+
+        # Dual-write only after the Postgres transaction has committed — same
+        # ordering guarantee as the online ingestion path. bulk_upsert's _id
+        # is deterministic (document_id:chunk_index:embedding_version), so
+        # writing every row here regardless of whether the Postgres INSERT
+        # was a fresh row or hit ON CONFLICT DO NOTHING is safe and avoids
+        # needing RETURNING against a multi-row executemany insert.
+        _opensearch_dual_write_batch(os_rows)
+        return len(chunk_rows)
 
 
     with path.open("r", encoding="utf-8") as f:
@@ -151,7 +196,7 @@ def run_manifest(
             rows = db.execute(
                 text(
                     """
-                    SELECT id::text AS id, text
+                    SELECT id::text AS id, text, source_name
                     FROM document
                     WHERE workspace_id=:ws AND id = ANY(:ids)
                     """
@@ -160,21 +205,24 @@ def run_manifest(
             ).mappings().all()
 
         docs = {r["id"]: (r.get("text") or "") for r in rows}
+        doc_sources = {r["id"]: str(r.get("source_name") or "upload") for r in rows}
 
         # Produce chunk rows and embed in batches.
         pending_chunk_rows: list[dict] = []
+        pending_os_rows: list[dict] = []
         pending_chunk_texts: list[str] = []
         pending_chunk_meta: list[tuple[str, int, str]] = []  # (doc_id, idx, text)
 
         def _embed_and_stage() -> None:
-            nonlocal pending_chunk_rows, pending_chunk_texts, pending_chunk_meta, indexed_chunks
+            nonlocal pending_chunk_rows, pending_os_rows, pending_chunk_texts, pending_chunk_meta, indexed_chunks
             if not pending_chunk_texts:
                 return
             vecs = embed_batch(pending_chunk_texts)
             for (doc_id, chunk_idx, ch_text), vec in zip(pending_chunk_meta, vecs, strict=False):
+                chunk_id = str(uuid.uuid4())
                 pending_chunk_rows.append(
                     {
-                        "id": str(uuid.uuid4()),
+                        "id": chunk_id,
                         "document_id": doc_id,
                         "workspace_id": workspace_id,
                         "chunk_index": int(chunk_idx),
@@ -184,13 +232,26 @@ def run_manifest(
                         "embedding_version": embedding_version,
                     }
                 )
+                pending_os_rows.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "document_id": doc_id,
+                        "workspace_id": workspace_id,
+                        "chunk_index": int(chunk_idx),
+                        "content": ch_text,
+                        "embedding": vec,
+                        "source": doc_sources.get(doc_id, "upload"),
+                        "embedding_version": embedding_version,
+                    }
+                )
 
             pending_chunk_texts = []
             pending_chunk_meta = []
 
             if len(pending_chunk_rows) >= cfg.batch_size_chunks:
-                indexed_chunks += _flush_chunk_batch(pending_chunk_rows)
+                indexed_chunks += _flush_chunk_batch(pending_chunk_rows, pending_os_rows)
                 pending_chunk_rows = []
+                pending_os_rows = []
 
         for doc_id in batch:
             text_body = docs.get(doc_id)
@@ -207,7 +268,7 @@ def run_manifest(
 
         # Flush tail
         _embed_and_stage()
-        indexed_chunks += _flush_chunk_batch(pending_chunk_rows)
+        indexed_chunks += _flush_chunk_batch(pending_chunk_rows, pending_os_rows)
 
         emit_event(
             "bulk_index_progress",
@@ -218,6 +279,18 @@ def run_manifest(
                 "docs_skipped": skipped_docs,
             },
         )
+
+    # Bump epoch so the retrieval cache is invalidated for this workspace.
+    # Callers that follow this with promote_target_to_active() (the
+    # zero-downtime reindex flow) will bump it again there — harmless, epoch
+    # only needs to *change*, not land on a specific value. But a caller that
+    # invokes run_manifest() directly for a plain bulk backfill (no promote
+    # step at all — e.g. scripts/run_bulk_index.py) previously left the
+    # in-flight Redis retrieval cache pointed at the pre-backfill epoch
+    # indefinitely: the exact stale-cache bug this whole mechanism exists to
+    # prevent, reintroduced via this second write path.
+    if indexed_chunks > 0:
+        bump_index_epoch(workspace_id)
 
     return {
         "workspace_id": workspace_id,
