@@ -7,7 +7,7 @@
  * The generated JS proto stubs (src/proto/) are created by protoc-gen-grpc-web
  * at build time. See scripts/gen_proto.js.
  *
- * At runtime this connects to Envoy (:8080) which transcodes gRPC-Web → gRPC
+ * At runtime this connects to Envoy (:8080) which transcodes gRPC-Web -> gRPC
  * and forwards to the backend (:50051).
  */
 
@@ -40,18 +40,28 @@ export interface SubscribeOptions {
   onEnd?: () => void;
 }
 
+interface CancellableStream {
+  on: (event: string, handler: (arg: any) => void) => void;
+  cancel: () => void;
+}
+
 /**
  * Subscribe to the live event stream.
- * Returns a cancel function.
+ * Returns a cancel function that tears down the underlying stream, not just a
+ * local flag - otherwise every token change leaks an open connection.
  *
  * NOTE: The actual gRPC-Web method descriptors come from the generated
  * proto JS files (src/proto/). Until those are generated (npm run gen:proto),
- * this module exports a stub that uses a WebSocket fallback for dev convenience.
+ * this module falls back to REST polling.
  */
 export function subscribeEvents(opts: SubscribeOptions): () => void {
-  // Attempt to import the generated proto descriptors dynamically.
-  // Falls back to a no-op when not yet generated.
   let cancelled = false;
+  let stream: CancellableStream | null = null;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const registerPollTimer = (t: ReturnType<typeof setTimeout>) => {
+    pollTimer = t;
+  };
 
   (async () => {
     try {
@@ -65,15 +75,27 @@ export function subscribeEvents(opts: SubscribeOptions): () => void {
       if (opts.filterTraceId) req.setFilterTraceId(opts.filterTraceId);
 
       const client = new AgentEventService(ENVOY_URL);
-      const stream = client.subscribeEvents(req, {
+      const active: CancellableStream = client.subscribeEvents(req, {
         authorization: `Bearer ${opts.sessionToken}`,
       });
 
-      stream.on("data", (msg: any) => {
+      if (cancelled) {
+        active.cancel();
+        return;
+      }
+      stream = active;
+
+      active.on("data", (msg: any) => {
         if (cancelled) return;
+
+        // Keepalive frames carry no span_id (see backend/app/grpc_server.py).
+        // They exist to hold the connection open and are not observable data.
+        const spanId = msg.getSpanId();
+        if (!spanId) return;
+
         opts.onEvent({
           traceId: msg.getTraceId(),
-          spanId: msg.getSpanId(),
+          spanId,
           parentSpanId: msg.getParentSpanId(),
           agentName: msg.getAgentName(),
           eventType: msg.getEventType(),
@@ -90,24 +112,38 @@ export function subscribeEvents(opts: SubscribeOptions): () => void {
         });
       });
 
-      stream.on("error", (err: Error) => opts.onError?.(err));
-      stream.on("end", () => opts.onEnd?.());
+      active.on("error", (err: Error) => {
+        if (!cancelled) opts.onError?.(err);
+      });
+      active.on("end", () => {
+        if (!cancelled) opts.onEnd?.();
+      });
     } catch {
-      // Proto stubs not yet generated — fall back to polling REST
+      // Proto stubs not yet generated - fall back to polling REST
       console.warn(
         "[grpcClient] Proto stubs not found. Run `npm run gen:proto`. Falling back to REST polling."
       );
-      startRestPolling(opts, () => cancelled);
+      startRestPolling(opts, () => cancelled, registerPollTimer);
     }
   })();
 
   return () => {
     cancelled = true;
+    stream?.cancel();
+    stream = null;
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
   };
 }
 
 /** Fallback: poll /api/v1/traces every 3s, then fetch span detail for each new trace. */
-function startRestPolling(opts: SubscribeOptions, isCancelled: () => boolean) {
+function startRestPolling(
+  opts: SubscribeOptions,
+  isCancelled: () => boolean,
+  registerTimer: (t: ReturnType<typeof setTimeout>) => void
+) {
   const token = opts.sessionToken;
   const base = `${ENVOY_URL}/api/v1`;
   const headers = { Authorization: `Bearer ${token}` };
@@ -148,14 +184,14 @@ function startRestPolling(opts: SubscribeOptions, isCancelled: () => boolean) {
               }
             }
           } catch {
-            // detail fetch failed — skip this trace
+            // detail fetch failed - skip this trace
           }
         }
       }
     } catch (err) {
       opts.onError?.(err as Error);
     }
-    if (!isCancelled()) setTimeout(poll, 3000);
+    if (!isCancelled()) registerTimer(setTimeout(poll, 3000));
   };
 
   poll();

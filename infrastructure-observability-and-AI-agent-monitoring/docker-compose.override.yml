@@ -1,0 +1,19 @@
+# Development-only port publications.
+#
+# Compose loads this file automatically for `docker compose up`, and does NOT
+# load it for the production invocation
+# (`-f docker-compose.yml -f deploy/docker-compose.production.yml`).
+#
+# That is the whole point: Compose merges sequence fields by appending, so a
+# `ports: []` entry in the production overlay does not unpublish anything. The
+# publications have to be absent from the base file instead.
+
+services:
+  backend:
+    ports:
+      # Local SDK development only. Production agents use the mTLS gateway.
+      - "127.0.0.1:50051:50051"
+
+  frontend:
+    ports:
+      - "5173:80"

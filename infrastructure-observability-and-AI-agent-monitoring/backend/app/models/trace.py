@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+from app.models.time import utcnow
 
 
 class AgentTrace(Base):
@@ -14,9 +15,9 @@ class AgentTrace(Base):
     agent_name: Mapped[str] = mapped_column(String(128), index=True)
     task_id: Mapped[str] = mapped_column(String(128), index=True, nullable=True)
     outcome: Mapped[str] = mapped_column(String(32), default="pending")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utcnow, onupdate=utcnow
     )
 
     spans: Mapped[list["Span"]] = relationship(

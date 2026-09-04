@@ -15,7 +15,9 @@ alembic==1.14.0
 redis[hiredis]==5.2.1
 
 # Auth (OIDC — password hashing removed with the custom login)
-python-jose[cryptography]==3.3.0
+# >=3.4.0 required: 3.3.0 is affected by CVE-2024-33663 (algorithm confusion)
+# and CVE-2024-33664 (JWE decompression DoS).
+python-jose[cryptography]==3.5.0
 cryptography==44.0.0
 python-multipart==0.0.20
 

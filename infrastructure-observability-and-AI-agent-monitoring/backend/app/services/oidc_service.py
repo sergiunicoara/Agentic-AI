@@ -6,27 +6,32 @@ import hashlib
 import secrets
 import time
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlencode
 
 import httpx
 from jose import JWTError, jwt
 
 from app.config import settings
 
-_JWKS_TTL_SECONDS = 3600  # providers rotate keys; never cache forever
+_JWKS_TTL_SECONDS = 3600       # providers rotate keys; never cache forever
+_DISCOVERY_TTL_SECONDS = 3600  # endpoints move too; same reasoning
 
 _discovery_cache: Optional[Dict[str, Any]] = None
+_discovery_fetched_at: float = 0.0
 _jwks_cache: Optional[Dict[str, Any]] = None
 _jwks_fetched_at: float = 0.0
 
 
 async def _discovery() -> Dict[str, Any]:
-    global _discovery_cache
-    if _discovery_cache is None:
+    global _discovery_cache, _discovery_fetched_at
+    expired = (time.monotonic() - _discovery_fetched_at) > _DISCOVERY_TTL_SECONDS
+    if _discovery_cache is None or expired:
         url = f"{settings.oidc_issuer_url.rstrip('/')}/.well-known/openid-configuration"
         async with httpx.AsyncClient() as client:
             r = await client.get(url, follow_redirects=True)
             r.raise_for_status()
             _discovery_cache = r.json()
+            _discovery_fetched_at = time.monotonic()
     return _discovery_cache
 
 
@@ -62,8 +67,9 @@ async def get_authorization_url(state: str, code_challenge: str) -> str:
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
     }
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{doc['authorization_endpoint']}?{query}"
+    # urlencode, never f-string concatenation: code_challenge is caller-supplied
+    # and a raw '&' in it would inject extra authorization parameters.
+    return f"{doc['authorization_endpoint']}?{urlencode(params)}"
 
 
 async def exchange_code(code: str, code_verifier: str) -> Dict[str, Any]:

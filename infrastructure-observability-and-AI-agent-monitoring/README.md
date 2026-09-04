@@ -242,6 +242,12 @@ python scripts/issue_agent_cert.py --agent my-agent
 docker compose -f docker-compose.yml -f deploy/docker-compose.production.yml up --build -d
 ```
 
+Host ports are published in `docker-compose.override.yml`, which Compose loads
+automatically for a plain `docker compose up` and never for the explicit `-f`
+invocation above. That is deliberate: Compose merges sequence fields by
+appending, so a `ports: []` entry in the production overlay would leave the
+development publications in place. In production only Caddy binds to the host.
+
 The production collector forwards telemetry to `OTEL_UPSTREAM_ENDPOINT` and
 keeps a local recovery copy in the `otel_data` volume. Rotate the OIDC client
 secret at the identity provider before first production deployment; this
@@ -269,18 +275,23 @@ docker compose up postgres redis otel-collector -d
 
 # Backend (apply migrations before starting)
 cd backend
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 alembic upgrade head
 python scripts/generate_proto.py  # from repo root
-python -m app.main
+TRUSTED_PROXY_HOPS=0 python -m app.main   # no nginx/Envoy in front
 
 # Frontend
 cd frontend
-npm install
+npm ci
 npm run dev
 
-# Tests
+# Tests — no Postgres or Redis required
 cd ../backend
-pip install -r requirements-dev.txt
+uv pip install -r requirements-dev.txt
 pytest
 ```
+
+The suite covers the REST dependencies, ABAC span filtering, the gRPC emit and
+subscribe paths, the proxy-header handling and the trace upsert. Every check
+that guards an access-control decision has a test; see `tasks/lessons.md` for
+why.

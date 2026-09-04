@@ -6,6 +6,7 @@ SubscribeEvents → called by the frontend to receive a live stream (session
 """
 
 import asyncio
+import logging
 
 import grpc
 from grpc import aio as grpc_aio
@@ -17,6 +18,8 @@ from app.services.auth_service import decode_token, is_revoked, is_user_active
 from app.services.event_bus import event_bus
 from app.services.ingest_auth import valid_emit_key
 from app.services.trace_service import handle_event
+
+logger = logging.getLogger(__name__)
 
 
 class AgentEventServicer(agent_events_pb2_grpc.AgentEventServiceServicer):
@@ -42,9 +45,13 @@ class AgentEventServicer(agent_events_pb2_grpc.AgentEventServiceServicer):
 
         try:
             await handle_event(request)
-            return agent_events_pb2.EmitResponse(accepted=True)
-        except Exception as exc:
-            await context.abort(grpc.StatusCode.INTERNAL, str(exc))
+        except Exception:
+            # Never echo the underlying exception: ingest clients would receive
+            # raw driver/SQL detail.
+            logger.exception("Failed to handle event for agent %s", request.agent_name)
+            await context.abort(grpc.StatusCode.INTERNAL, "Failed to persist event")
+            return
+        return agent_events_pb2.EmitResponse(accepted=True)
 
     async def SubscribeEvents(
         self,
@@ -54,17 +61,29 @@ class AgentEventServicer(agent_events_pb2_grpc.AgentEventServiceServicer):
         # Authenticate via session_token in the request (frontend passes the
         # internal session JWT here; gRPC-Web can't set arbitrary metadata
         # reliably through every proxy).
+        # Each abort() raises AbortError, so it must sit *outside* the try that
+        # guards the call before it — otherwise the abort is swallowed and
+        # re-raised as a second, wrong abort on an already-aborted context.
         token = request.session_token
         try:
             payload = decode_token(token)
-            if await is_revoked(payload.get("jti", "")):
-                await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Token revoked")
-                return
-            if not await is_user_active(str(payload.get("sub", ""))):
-                await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Account inactive")
-                return
         except Exception:
             await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Invalid token")
+            return
+
+        try:
+            revoked = await is_revoked(payload.get("jti", ""))
+            active = await is_user_active(str(payload.get("sub", "")))
+        except Exception:
+            logger.exception("Session verification backend unavailable")
+            await context.abort(grpc.StatusCode.UNAVAILABLE, "Session verification unavailable")
+            return
+
+        if revoked:
+            await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Token revoked")
+            return
+        if not active:
+            await context.abort(grpc.StatusCode.UNAUTHENTICATED, "Account inactive")
             return
 
         # ABAC subject — same attributes the REST layer uses, so the live
@@ -84,7 +103,9 @@ class AgentEventServicer(agent_events_pb2_grpc.AgentEventServiceServicer):
                         queue.get(), timeout=30.0
                     )
                 except asyncio.TimeoutError:
-                    # Send a keepalive (empty event) so the connection stays alive
+                    # Keepalive: an event with no span_id. Clients must skip it
+                    # (see frontend/src/api/grpcClient.ts) — it carries no data
+                    # and exists only to keep proxies from closing the stream.
                     yield agent_events_pb2.AgentEvent()
                     continue
 
@@ -129,5 +150,5 @@ async def start_grpc_server(port: int = 50051) -> grpc_aio.Server:
     )
     server.add_insecure_port(f"[::]:{port}")
     await server.start()
-    print(f"gRPC server listening on :{port}")
+    logger.info("gRPC server listening on :%s", port)
     return server

@@ -12,6 +12,10 @@ static_resources:
                 "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
                 codec_type: AUTO
                 stat_prefix: ingress_http
+                # Append the downstream address to X-Forwarded-For so the
+                # backend sees "<browser>, <nginx>" and can count the client
+                # from the right-hand side (see TRUSTED_PROXY_HOPS).
+                use_remote_address: true
                 access_log:
                   - name: envoy.access_loggers.stdout
                     typed_config:
@@ -36,6 +40,9 @@ static_resources:
                             cluster: rest_backend
                             timeout: 30s
 
+                      # Only used by the Vite dev server (npm run dev talks to
+                      # Envoy directly). In Docker the dashboard and the RPCs
+                      # share one origin behind nginx, so CORS never applies.
                       cors:
                         allow_origin_string_match:
                           - exact: "http://localhost:5173"
@@ -87,8 +94,10 @@ static_resources:
                       address: backend
                       port_value: 8000
 
+# Loopback only: the admin interface exposes stats, config dump and a
+# quit endpoint, and must never be reachable from the Compose network.
 admin:
   address:
     socket_address:
-      address: 0.0.0.0
+      address: 127.0.0.1
       port_value: 9901

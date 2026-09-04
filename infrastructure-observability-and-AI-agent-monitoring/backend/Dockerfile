@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Build context is the repo root (set in docker-compose.yml)
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uv \
+ && uv pip install --system --no-cache -r requirements.txt
 
 # Copy backend source and proto definitions
 COPY backend/ .
@@ -24,6 +25,11 @@ RUN python -m grpc_tools.protoc \
     /proto/v1/agent_events.proto \
  && sed -i 's/^import agent_events_pb2/from app.generated import agent_events_pb2/' \
     app/generated/agent_events_pb2_grpc.py
+
+# Drop privileges: nothing past this point needs to write outside /app.
+RUN useradd --system --create-home --uid 10001 appuser \
+ && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 8000 50051
 

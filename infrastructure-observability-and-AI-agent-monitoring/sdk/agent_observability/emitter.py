@@ -6,11 +6,12 @@ from typing import Optional
 
 import grpc
 
-# Allow running from the sdk/ directory without installing the package
-_SDK_ROOT = Path(__file__).parent.parent.parent
-_BACKEND_GENERATED = _SDK_ROOT / "backend" / "app" / "generated"
-if str(_BACKEND_GENERATED) not in sys.path:
-    sys.path.insert(0, str(_BACKEND_GENERATED.parent.parent))  # adds backend/
+# Allow running from a source checkout without installing the package: the
+# generated stubs live under backend/ and are imported as app.generated.*
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_BACKEND_ROOT = _REPO_ROOT / "backend"
+if _BACKEND_ROOT.is_dir() and str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
 
 try:
     from app.generated import agent_events_pb2, agent_events_pb2_grpc

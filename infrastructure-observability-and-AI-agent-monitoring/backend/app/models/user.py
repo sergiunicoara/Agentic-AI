@@ -5,6 +5,7 @@ from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
+from app.models.time import utcnow
 
 
 class User(Base):
@@ -12,10 +13,9 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     email: Mapped[str] = mapped_column(String(256), unique=True, index=True)
-    hashed_password: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     role: Mapped[str] = mapped_column(String(32), default="viewer")  # admin | developer | viewer
     is_active: Mapped[bool] = mapped_column(default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     # OIDC + ABAC fields
     oidc_sub: Mapped[Optional[str]] = mapped_column(String(256), nullable=True, index=True)
@@ -33,4 +33,4 @@ class AuditLog(Base):
     status_code: Mapped[int] = mapped_column()
     ip_address: Mapped[str] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

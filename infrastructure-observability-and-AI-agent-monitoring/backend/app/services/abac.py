@@ -16,7 +16,12 @@ def _effective_clearance(subject: Dict[str, Any]) -> int:
     """Use explicit clearance_level when set; otherwise derive from role."""
     explicit = subject.get("clearance_level")
     if explicit is not None:
-        return int(explicit)
+        try:
+            return int(explicit)
+        except (TypeError, ValueError):
+            # Malformed claim: fall back to the role's clearance (never grant
+            # more than the role allows) instead of raising a 500.
+            pass
     return _ROLE_CLEARANCE.get(subject.get("role", "viewer"), 0)
 
 

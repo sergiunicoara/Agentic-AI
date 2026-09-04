@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # CORS — exact frontend origin (no wildcard with credentials)
     frontend_origin: str = "http://localhost:5173"
 
+    # Proxies in front of this app that append to X-Forwarded-For
+    # (nginx sets the browser address, Envoy appends nginx's). Set to 0 to stop
+    # trusting the header entirely when running without that chain.
+    trusted_proxy_hops: int = 2
+
     # OTel
     otel_endpoint: str = "http://localhost:4317"
     otel_service_name: str = "agent-observability-backend"

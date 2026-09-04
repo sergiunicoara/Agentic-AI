@@ -45,9 +45,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://obs:obs@postgres:5432/observability
       REDIS_URL: redis://redis:6379/0
       OTEL_ENDPOINT: http://otel-collector:4317
-    ports:
-      # Local SDK development only. Production agents should use an mTLS gateway.
-      - "127.0.0.1:50051:50051"
+    # Ports are published in docker-compose.override.yml (development only).
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,8 +75,8 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    ports:
-      - "5173:80"
+    # Ports are published in docker-compose.override.yml (development only).
+    # In production Caddy is the only thing bound to the host.
     depends_on:
       - envoy
 

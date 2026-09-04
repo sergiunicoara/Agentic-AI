@@ -39,7 +39,30 @@ touching auth, gRPC, or Docker config.
   cache breaks all logins until restart. TTL the cache and retry once with a
   forced refresh on signature failure.
 
+- **Never build a redirect URL by concatenation.** `"&".join(f"{k}={v}")` on the
+  authorize parameters let a caller put `&redirect_uri=...` inside
+  `code_challenge` and append a second redirect to the URL handed to the IdP.
+  Use `urlencode`, and validate caller-supplied values against the RFC shape
+  before they reach a URL.
+
+- **`context.abort()` raises, so it cannot live inside a broad `except`.** The
+  gRPC abort for "Token revoked" was swallowed by the enclosing
+  `except Exception`, which then aborted a second time with "Invalid token".
+  Aborts belong outside the try that guards the call before them.
+
+- **Count X-Forwarded-For from the right.** Reading `split(",")[0]` takes the
+  attacker-controlled end of the header: per-IP rate limits were bypassable by
+  rotating a header value. The client sits `<number of trusted proxies>` entries
+  from the right; anything shorter than that chain did not come through it.
+
 ## Docker / environment
+
+- **`ports: []` in an override file unpublishes nothing.** Compose merges
+  sequence fields by *appending*, so the production overlay left the development
+  publications (`5173`, `50051`) bound to the host behind Caddy. Port
+  publications have to be absent from the base file and added by a
+  development-only `docker-compose.override.yml`. Verify with
+  `docker compose -f ... config`, never by reading the overlay.
 
 - **`docker compose restart` does not reload `env_file`.** Env vars are fixed at
   container creation. Use `docker compose up -d` (recreates) after env changes.

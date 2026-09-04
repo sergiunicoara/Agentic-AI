@@ -11,6 +11,9 @@ from app.services.trace_service import get_trace_with_spans, get_traces
 
 router = APIRouter(prefix="/traces", tags=["traces"])
 
+# Bounds the forward scan in list_traces when most rows are unreadable.
+_MAX_SCAN_PAGES = 10
+
 
 class SpanOut(BaseModel):
     id: str
@@ -45,13 +48,27 @@ class TraceDetailOut(TraceOut):
     spans: list[SpanOut] = []
 
 
-def _span_resource(span) -> dict:
+def _span_resource(span, agent_name: str = "") -> dict:
     attrs = span.attributes if isinstance(span.attributes, dict) else {}
     return {
         "data_sensitivity": attrs.get("data_sensitivity", "internal"),
         "owner_email": attrs.get("owner_email", ""),
-        "agent_name": getattr(span, "event_type", ""),
+        "agent_name": agent_name,
     }
+
+
+def _trace_is_readable(subject: dict, trace) -> bool:
+    """A trace is listable when it has at least one readable span.
+
+    Traces with no spans at all carry no protected content, so their metadata
+    stays visible (see README — trace metadata is public, span bodies are not).
+    """
+    if not trace.spans:
+        return True
+    return any(
+        check_span_access(subject, _span_resource(span, trace.agent_name), "read")
+        for span in trace.spans
+    )
 
 
 @router.get("", response_model=list[TraceOut])
@@ -62,24 +79,34 @@ async def list_traces(
     db: AsyncSession = Depends(get_db),
     subject: dict = Depends(verified_payload),
 ):
-    traces = await get_traces(db, agent_name=agent_name, limit=limit, offset=offset)
-    # Only expose metadata for traces with at least one readable span. This
-    # prevents the list endpoint from becoming a side-channel for confidential
-    # agent names, task IDs, and outcomes.
-    visible = []
-    for t in traces:
-        if not t.spans or any(
-            check_span_access(subject, _span_resource(span), "read") for span in t.spans
-        ):
-            visible.append(
-                TraceOut(
-                    id=t.id,
-                    agent_name=t.agent_name,
-                    task_id=t.task_id,
-                    outcome=t.outcome,
-                    created_at=t.created_at.isoformat(),
+    # ABAC is evaluated in Python (one policy, shared with the gRPC stream), so
+    # it cannot be pushed into the LIMIT. Scan forward until a full page of
+    # readable traces is collected, so a page is not silently short just because
+    # the caller lacks clearance for some rows. `offset` indexes source rows.
+    visible: list[TraceOut] = []
+    scan_offset = offset
+    for _ in range(_MAX_SCAN_PAGES):
+        traces = await get_traces(db, agent_name=agent_name, limit=limit, offset=scan_offset)
+        if not traces:
+            break
+        scan_offset += len(traces)
+
+        for t in traces:
+            if _trace_is_readable(subject, t):
+                visible.append(
+                    TraceOut(
+                        id=t.id,
+                        agent_name=t.agent_name,
+                        task_id=t.task_id,
+                        outcome=t.outcome,
+                        created_at=t.created_at.isoformat(),
+                    )
                 )
-            )
+                if len(visible) >= limit:
+                    return visible
+
+        if len(traces) < limit:      # source exhausted
+            break
     return visible
 
 
@@ -97,7 +124,7 @@ async def get_trace(
     permitted_spans = [
         SpanOut.model_validate(s)
         for s in trace.spans
-        if check_span_access(subject, _span_resource(s), "read")
+        if check_span_access(subject, _span_resource(s, trace.agent_name), "read")
     ]
 
     if not permitted_spans and trace.spans:

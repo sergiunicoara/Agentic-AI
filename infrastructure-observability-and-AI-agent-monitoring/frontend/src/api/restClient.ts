@@ -6,6 +6,9 @@ export const restClient = axios.create({
   baseURL: `${ENVOY_BASE}/api/v1`,
 });
 
+/** Fired when the backend rejects the stored session token. */
+export const SESSION_EXPIRED_EVENT = "auth:session-expired";
+
 // Keep the session scoped to the current browser tab. gRPC-Web carries the
 // token in its request body, so an httpOnly cookie cannot be used here.
 restClient.interceptors.request.use((config) => {
@@ -15,6 +18,19 @@ restClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// A token can be revoked or expire mid-session. Without this, every request
+// just fails and the UI renders empty panels instead of asking for a login.
+restClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      sessionStorage.removeItem("access_token");
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
+    return Promise.reject(error);
+  }
+);
 
 // --- OIDC PKCE helpers ---
 
@@ -47,9 +63,16 @@ export async function initiateOIDCLogin(): Promise<void> {
 }
 
 export async function exchangeOIDCCode(code: string, state: string): Promise<string> {
+  const expectedState = sessionStorage.getItem("oidc_state");
   const verifier = sessionStorage.getItem(`pkce_verifier:${state}`) ?? "";
   sessionStorage.removeItem(`pkce_verifier:${state}`);
   sessionStorage.removeItem("oidc_state");
+
+  // The backend only checks that the state it minted is unused. Binding it to
+  // this browser is what makes a login CSRF fail here rather than downstream.
+  if (!expectedState || expectedState !== state || !verifier) {
+    throw new Error("OIDC state does not match the value this browser started with");
+  }
 
   const { data } = await restClient.post<{ access_token: string }>("/auth/callback", {
     code,

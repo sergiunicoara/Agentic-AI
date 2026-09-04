@@ -36,3 +36,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Claude Code worktrees (never part of the project tree)
+.claude/worktrees/

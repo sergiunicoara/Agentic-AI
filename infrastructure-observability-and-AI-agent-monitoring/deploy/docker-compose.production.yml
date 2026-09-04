@@ -1,10 +1,8 @@
 services:
-  backend:
-    ports: []
-
-  frontend:
-    ports: []
-
+  # backend and frontend publish no host ports here: the base compose file
+  # leaves them unpublished and docker-compose.override.yml (development only)
+  # is not loaded by this invocation. Compose appends to sequence fields, so
+  # `ports: []` would not have removed anything.
   otel-collector:
     env_file: ${PRODUCTION_ENV_FILE:-.env.production}
     volumes:

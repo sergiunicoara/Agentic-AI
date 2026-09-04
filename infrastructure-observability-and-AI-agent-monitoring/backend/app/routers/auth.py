@@ -9,6 +9,7 @@ POST /auth/logout             → revoke session token
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import uuid
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +35,7 @@ from app.services.oidc_service import (
     get_authorization_url,
     validate_id_token,
 )
+from app.services.request_context import client_ip
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer()
@@ -40,12 +43,14 @@ bearer = HTTPBearer()
 _PKCE_TTL = 300          # seconds — PKCE verifier validity window
 _AUTHORIZE_RATE = 10     # max /authorize calls per IP per minute
 
+# RFC 7636 §4.1: code_challenge is base64url of a SHA-256 digest. Anything else
+# is rejected here rather than concatenated into the provider's authorize URL.
+_CODE_CHALLENGE_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
+
 
 async def _rate_limit(request: Request, bucket: str, limit: int) -> None:
     """Fixed-window per-IP rate limit backed by Redis."""
-    ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
-        request.client.host if request.client else "unknown"
-    )
+    ip = client_ip(request) or "unknown"
     r = get_redis()
     key = f"rl:{bucket}:{ip}"
     count = await r.incr(key)
@@ -76,6 +81,11 @@ async def authorize(code_challenge: str, request: Request):
     the verifier and sends it back in /callback.
     """
     await _rate_limit(request, "authorize", _AUTHORIZE_RATE)
+    if not _CODE_CHALLENGE_RE.match(code_challenge):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="code_challenge must be a base64url-encoded S256 challenge",
+        )
     state = secrets.token_urlsafe(16)
     r = get_redis()
     await r.set(f"state:{state}", "valid", ex=_PKCE_TTL)
@@ -165,6 +175,15 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
     try:
         payload = decode_token(credentials.credentials)
         await revoke_token(payload["jti"])
-    except Exception:
+    except JWTError:
+        # Already-invalid token: nothing to revoke, logout is still a success.
         pass
+    except Exception:
+        # Revocation genuinely failed (e.g. Redis down) — the session is still
+        # live, so say so instead of reporting a logout that did not happen.
+        logger.exception("Failed to revoke session token on logout")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not revoke session, try again",
+        )
     return {"detail": "Logged out"}
