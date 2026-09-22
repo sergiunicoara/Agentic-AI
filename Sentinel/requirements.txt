@@ -12,8 +12,14 @@ mcp==1.23.3
 fastapi
 uvicorn
 aiofiles
+httpx
+redis
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
 bandit
 ruff
 pip-audit
 semgrep==1.168.0
 pytest
+fakeredis

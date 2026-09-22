@@ -123,7 +123,7 @@ SentinelOrchestrator (ADK Agent, Gemini 2.5 Flash) ── routes user intent to 
 - `confused-deputy-iam` — credential forwarding, hardcoded secrets
 - `supply-chain-integrity` — dependency vulnerabilities
 
-**A2A** — Sentinel publishes an agent card at `/.well-known/agent-card.json` and exposes a task-based HTTP API for remote agent-to-agent review requests. Bearer-token auth is opt-in (`SENTINEL_A2A_TOKEN`); completed tasks are purged after `SENTINEL_TASK_TTL_SECONDS` (default 1h).
+**A2A** — Sentinel implements the [Agent2Agent protocol](https://a2a-protocol.org/latest/specification/): a signed-in-spec discovery card at `/.well-known/agent-card.json`, a JSON-RPC 2.0 task endpoint (`message/send`, `message/stream`, `tasks/get`, `tasks/cancel`, `tasks/resubscribe`), and SSE streaming with cancellation and idempotent resubmission. Task state is Redis-backed when configured, in-memory otherwise. Bearer-token auth is opt-in (`SENTINEL_A2A_TOKEN`). See "A2A Protocol" below for the full reference — this is not a claim of exhaustive spec conformance; see that section's Limitations.
 
 **CI integration** — `python -m sentinel.pipeline <target> --sarif report.sarif.json --fail-on fail` runs headless and exits non-zero on a failing verdict, for wiring into a CI security gate.
 
@@ -143,7 +143,7 @@ The rubric requires demonstrating **at least 3** of these. Sentinel demonstrates
 
 > **Antigravity:** demonstrated in the video if used to build the project — *not claimed here unless it's genuinely part of the build story.* Sentinel already meets the 3-concept bar with the four code concepts above, so this is optional, not load-bearing.
 
-**Bonus beyond the required concepts:** A2A agent card + HTTP endpoint (optional bearer auth), HITL gate, static **and** sandboxed-live trajectory evaluation, SARIF/CI-gate integration.
+**Bonus beyond the required concepts:** A2A protocol implementation (JSON-RPC 2.0, SSE streaming, Redis-backed task persistence, optional bearer auth), HITL gate, static **and** sandboxed-live trajectory evaluation, SARIF/CI-gate integration.
 
 ---
 
@@ -260,17 +260,99 @@ Exits non-zero when the verdict meets `--fail-on` (default `fail`) — wire this
 python -m sentinel.a2a.server
 ```
 
-Agent card: `http://localhost:8080/.well-known/agent-card.json`
-
 **Live dashboard (local dev):**
 ```bash
 cd sentinel/dashboard && npm install && npm run dev
 # → open http://localhost:5173
 ```
 
-The dashboard connects via WebSocket (`/ws/scan`) and streams every pipeline stage in real time — evidence collected, candidates proposed per auditor, and each gate decision (SURVIVED / DROPPED) as it happens. When deployed, the React build is served from the same container at `/ui`.
+The dashboard connects via WebSocket (`/ws/scan`) and streams every pipeline stage in real time — evidence collected, candidates proposed per auditor, and each gate decision (SURVIVED / DROPPED) as it happens. When deployed, the React build is served from the same container at `/ui`. This channel is independent of the A2A protocol below and unaffected by it.
 
-Set `SENTINEL_A2A_TOKEN` to require `Authorization: Bearer <token>` on review endpoints (unset by default for local demo use).
+---
+
+## A2A Protocol
+
+Sentinel implements the [Agent2Agent (A2A) protocol](https://a2a-protocol.org/latest/specification/) v0.3.0: any A2A-compatible client can discover Sentinel, submit a security review as a task, poll or stream its progress, and cancel it.
+
+### Discovery
+
+```
+GET /.well-known/agent-card.json   # canonical per the current A2A spec
+GET /.well-known/agent.json        # compatibility alias for older A2A drafts
+```
+
+Both return the same Agent Card (name, skills, `capabilities`, `securitySchemes` when a token is configured, etc.). Note: earlier A2A drafts used `/.well-known/agent.json` as the canonical path; the spec has since standardized on `agent-card.json` (RFC 8615-style well-known registration), which is why that's the primary path here.
+
+### JSON-RPC 2.0 endpoint
+
+```
+POST /a2a
+Content-Type: application/json
+```
+
+| Method | Purpose |
+|---|---|
+| `message/send` | Submit a review task. Primary method (current spec). |
+| `tasks/send` | Deprecated alias for `message/send`, kept for older clients. |
+| `message/stream` | Submit a task and stream its lifecycle over SSE. |
+| `tasks/sendSubscribe` | Deprecated alias for `message/stream`. |
+| `tasks/get` | Fetch a task's current state (and history/artifacts). |
+| `tasks/cancel` | Cancel a non-terminal task. |
+| `tasks/resubscribe` | Re-attach an SSE stream to an in-progress or finished task. |
+| `tasks/pushNotificationConfig/*` | Not supported — returns `PushNotificationNotSupportedError` (`capabilities.pushNotifications` is `false`). |
+
+**Submit a task:**
+```bash
+curl -X POST http://localhost:8080/a2a \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0", "id": 1, "method": "message/send",
+    "params": {"metadata": {"target_path": "targets/c1_clean", "include_red_team": false}}
+  }'
+```
+
+Pass an explicit `"id"` in `params` to control the task id — resubmitting the same id returns the existing task (`metadata.idempotentReplay: true`) instead of starting a second scan. That id **is** the idempotency key.
+
+**Poll it:**
+```bash
+curl -X POST http://localhost:8080/a2a -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tasks/get","params":{"id":"<task_id>"}}'
+```
+
+**Cancel it:**
+```bash
+curl -X POST http://localhost:8080/a2a -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tasks/cancel","params":{"id":"<task_id>"}}'
+```
+A canceled task's state sticks — the executing pipeline notices at its next progress checkpoint (reading the task's own stored state, so this works even across instances under a shared Redis) and stops without overwriting the cancellation.
+
+### SSE streaming
+
+```bash
+curl -N -X POST http://localhost:8080/a2a \
+  -H "Content-Type: application/json" -H "Accept: text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"message/stream","params":{"metadata":{"target_path":"targets/c1_clean"}}}'
+```
+
+Emits one `data:` frame per state transition and pipeline-stage progress event, a comment-line heartbeat (`: heartbeat`) on any gap over 10s (so idle proxies/Cloud Run don't close the connection), and a final frame with `"final": true` that closes the stream. `tasks/resubscribe` re-attaches to a task already in flight, or immediately replays just the final event for a finished one (use `tasks/get` for full history).
+
+### Authentication
+
+Set `SENTINEL_A2A_TOKEN` to require `Authorization: Bearer <token>` on `/a2a` (JSON-RPC + SSE) and the legacy `/a2a/review*` routes. Unset (the default) leaves them open, for local/demo use. Discovery, `/health`, and `/ws/scan` are always open. The comparison is constant-time (`hmac.compare_digest`).
+
+### Redis-backed persistence
+
+Set `SENTINEL_REDIS_URL` (e.g. `redis://localhost:6379/0`) to back task state with Redis instead of an in-process dict — required for task retrieval to survive a restart, and for correctness across multiple instances (e.g. several Cloud Run replicas). Unset, Sentinel falls back to an in-memory store, which is fine for local development and is what the test suite uses (via a fake Redis, so no live Redis is needed to run the tests). Tasks expire `SENTINEL_TASK_TTL_SECONDS` after their last write (default 1h) either way.
+
+**Limitation:** SSE fan-out itself is per-process, not Redis-backed — if a task's execution and a `tasks/resubscribe` call land on different instances, the resubscribing instance has no in-flight events to relay until the task reaches a terminal state. `tasks/get` is always authoritative regardless of which instance serves it, since it reads the durable store directly.
+
+### Legacy REST endpoints (deprecated)
+
+`POST /a2a/review` and `GET /a2a/review/{task_id}` — the original custom REST API — still work, as thin wrappers over the same task service (translated back to their original flat JSON shape and status vocabulary: `pending`/`running`/`completed`/`failed`). New integrations should use the JSON-RPC endpoint above; these remain only for existing callers.
+
+### Conformance notes
+
+This implementation covers the core task lifecycle (submit/get/cancel), SSE streaming, and discovery. It does **not** implement: push notifications/webhooks, Agent Card cryptographic signing (JWS), or multi-turn context continuation (`contextId`/`sessionId` are accepted and stored but Sentinel tasks are single-shot). The specific numeric JSON-RPC error codes used for A2A-specific errors (`TaskNotFoundError` etc., in the `-32001`..`-32004` range) are Sentinel's own assignment within the range JSON-RPC 2.0 reserves for implementation-defined server errors — not independently verified against another implementation's numbering.
 
 ---
 
@@ -286,11 +368,11 @@ Sentinel/
 │   ├── models/             # Pydantic schemas (Evidence, Finding, Attestation, pillar taxonomy)
 │   ├── skills/             # 3 SKILL.md domain expertise modules
 │   ├── redteam/            # 8-payload corpus + static runner + sandboxed live runner
-│   ├── a2a/                # Agent card, A2A server (optional auth + TTL eviction), A2A client
+│   ├── a2a/                # Agent card, JSON-RPC server, task service, Redis/in-memory store, SSE, client
 │   ├── dashboard/          # React/Vite live dashboard — WebSocket feed of gate decisions
 │   └── eval/               # Eval runner + metrics + SARIF export + LLM gate report
 ├── targets/                # Planted-bug corpus (T1–T6, C1, C2 — T6 is bandit's blind spot)
-├── tests/                  # 75 tests across all components
+├── tests/                  # 108 tests across all components
 ├── deploy/                 # Multi-stage Dockerfile (Node → Python) + Cloud Run deploy script
 ├── requirements.txt
 ├── pyproject.toml
@@ -323,7 +405,7 @@ gcloud run deploy sentinel \
   --allow-unauthenticated
 ```
 
-> For anything beyond a demo, set `SENTINEL_A2A_TOKEN` on the service and drop `--allow-unauthenticated`, or the review endpoints are open to the internet.
+> For anything beyond a demo, set `SENTINEL_A2A_TOKEN` on the service and drop `--allow-unauthenticated`, or the review/JSON-RPC endpoints are open to the internet. For task state to survive restarts or to run correctly behind multiple replicas, also provision Redis (e.g. Cloud Memorystore, reachable over a VPC connector) and set `SENTINEL_REDIS_URL` — `deploy/deploy.sh` does not provision this for you.
 
 ---
 
