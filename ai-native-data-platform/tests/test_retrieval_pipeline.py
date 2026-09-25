@@ -97,3 +97,65 @@ class TestCacheHitLatency:
 
         assert latency_ms == 0
         assert len(hits) == 2
+
+
+class _StubRetriever:
+    """Always returns one hit; used to exercise the retriever fan-out loop
+    (an empty retrievers list never even reaches budget.expired())."""
+
+    def retrieve(self, workspace_id, query, k, *, query_vec=None, database_url=None, embedding_version=None):
+        return [RetrievedChunk(id="c1", document_id="d1", chunk_index=0, text="t", score=1.0)]
+
+
+class TestDegradedRunsAreNotCached:
+    """A run cut short by the retrieval latency budget (a stage skipped, or
+    reranking skipped) must not be cached — the cache key doesn't encode
+    "how much budget was left," so caching a degraded result would turn a
+    one-off latency blip into every subsequent request for cache_ttl_s (5
+    min default) getting that same worse, incomplete result instead of a
+    fresh attempt with its own full budget.
+    """
+
+    def test_budget_expired_before_any_retriever_runs_skips_cache(self, monkeypatch):
+        import app.retrieval.pipeline as pipeline_mod
+
+        monkeypatch.setattr(pipeline_mod.cache, "get_json", lambda key: None)
+        set_calls = []
+        monkeypatch.setattr(pipeline_mod.cache, "set_json", lambda key, value, ttl_s=None: set_calls.append(value))
+        monkeypatch.setattr(
+            pipeline_mod,
+            "get_index_state",
+            lambda workspace_id: WorkspaceIndexState(
+                workspace_id=workspace_id, active_embedding_version="v1",
+                target_embedding_version=None, index_epoch=0, updated_at_s=0.0,
+            ),
+        )
+        monkeypatch.setattr(pipeline_mod.settings, "retrieval_budget_ms", 0)
+
+        pipeline = RetrievalPipeline(retrievers=[_StubRetriever()])
+        hits, _ = pipeline.run("ws1", "q", query_vec=[0.1], k=5, rerank_candidates=25)
+
+        assert hits == []
+        assert set_calls == [], "a run where the budget expired before any retriever ran must not be cached"
+
+    def test_full_on_budget_run_is_still_cached_normally(self, monkeypatch):
+        import app.retrieval.pipeline as pipeline_mod
+
+        monkeypatch.setattr(pipeline_mod.cache, "get_json", lambda key: None)
+        set_calls = []
+        monkeypatch.setattr(pipeline_mod.cache, "set_json", lambda key, value, ttl_s=None: set_calls.append(value))
+        monkeypatch.setattr(
+            pipeline_mod,
+            "get_index_state",
+            lambda workspace_id: WorkspaceIndexState(
+                workspace_id=workspace_id, active_embedding_version="v1",
+                target_embedding_version=None, index_epoch=0, updated_at_s=0.0,
+            ),
+        )
+        monkeypatch.setattr(pipeline_mod.settings, "retrieval_budget_ms", 5_000)
+
+        pipeline = RetrievalPipeline(retrievers=[_StubRetriever()])
+        hits, _ = pipeline.run("ws1", "q", query_vec=[0.1], k=5, rerank_candidates=25)
+
+        assert len(hits) == 1
+        assert len(set_calls) == 1, "a complete, on-budget run must still be cached exactly as before"

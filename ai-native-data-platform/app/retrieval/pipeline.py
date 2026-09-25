@@ -199,10 +199,21 @@ class RetrievalPipeline:
                 return [], 0
 
             budget = LatencyBudget.start(settings.retrieval_budget_ms)
+            # Tracks whether this run actually completed every stage/shard it
+            # was supposed to, or the latency budget cut something short.
+            # A degraded run must not be cached: the cache key doesn't
+            # encode "how much budget was left," so a transient blip (one
+            # slow shard, one busy moment) would otherwise get cached under
+            # the exact same key a full, on-budget run would use, and every
+            # request that hits it for the rest of cache_ttl_s (5 min
+            # default) gets the worse, incomplete result — turning a
+            # one-off latency hiccup into a sustained quality regression.
+            degraded = False
 
             # Fan-out to shards and merge per stage.
             for r in self.retrievers:
                 if budget.expired():
+                    degraded = True
                     break
                 merged: list[RetrievedChunk] = []
                 # If we only query a single shard (fanout==1) but have multiple
@@ -223,6 +234,7 @@ class RetrievalPipeline:
                 else:
                     for dsn in shard_dsns:
                         if budget.expired():
+                            degraded = True
                             break
                         merged.extend(r.retrieve(workspace_id, query, k=rerank_candidates, query_vec=query_vec, database_url=dsn, embedding_version=embedding_version))
                 # Keep best per id (dedupe across shards)
@@ -239,16 +251,19 @@ class RetrievalPipeline:
             if self.reranker and budget.allow(settings.reranker_timeout_ms):
                 out = self.reranker.rerank(query, query_vec, fused, k=k, workspace_id=workspace_id)
             else:
+                if self.reranker:
+                    degraded = True
                 out = out[:k]
 
             latency_ms = int((time.time() - t0) * 1000)
-            cache.set_json(
-                key,
-                {
-                    "hits": [d.model_dump() for d in out],
-                    "latency_ms": latency_ms,
-                },
-            )
+            if not degraded:
+                cache.set_json(
+                    key,
+                    {
+                        "hits": [d.model_dump() for d in out],
+                        "latency_ms": latency_ms,
+                    },
+                )
 
             persist_trace(
                 trace_type="retrieval",
@@ -268,6 +283,7 @@ class RetrievalPipeline:
                     "shard_epochs": routed.epochs,
                     "budget_ms": settings.retrieval_budget_ms,
                     "stages": [len(x) for x in stage_results],
+                    "degraded": degraded,
                     "hits": [d.model_dump() for d in out],
                 },
                 latency_ms=latency_ms,
