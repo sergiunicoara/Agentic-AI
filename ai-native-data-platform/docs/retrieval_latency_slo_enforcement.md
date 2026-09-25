@@ -15,7 +15,6 @@ Config (see `app/core/config.py`):
 - `retrieval_budget_ms`: total budget for retrieval work
 - `retriever_timeout_ms`: DB statement timeout for first-stage retrieval
 - `reranker_timeout_ms`: max time you're willing to spend reranking
-- `shard_hedge_after_ms`: hedging delay for tail protection
 
 ## How it's enforced
 
@@ -38,11 +37,11 @@ The pipeline will:
 - stop additional shard calls if the budget is exhausted
 - skip reranking if there isn't enough remaining budget
 
-### 3) Hedging for p95/p99
+### 3) Bounded-wait fan-out for p95/p99
 
-If you are routing to a single shard (fanout==1) but have multiple shards, the pipeline can hedge to a second shard after a short delay (`shard_hedge_after_ms`).
+If you are routing to a single shard (fanout==1) but have multiple shards, the pipeline queries the primary and a second shard concurrently — shards are disjoint partitions, not replicas, so both are genuinely needed rather than being a redundant backup of each other. Each shard's call is bounded by whatever remains of `retrieval_budget_ms`, so a slow or hung shard degrades to partial results instead of blocking the whole request.
 
-This reduces sensitivity to single-shard hiccups.
+This reduces sensitivity to single-shard hiccups without an unbounded wait.
 
 ## Why this matters
 

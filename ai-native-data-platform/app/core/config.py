@@ -80,10 +80,12 @@ class Settings(BaseSettings):
         default=0,
         description="When >0, query only this many shards (chosen by routing strategy) instead of all shards.",
     )
-    shard_hedge_after_ms: int = Field(
-        default=40,
-        description="If the first shard hasn't returned in this many ms, issue a hedged request to a second shard.",
-    )
+    # No separate stagger-delay knob for the fanout==1 hedge case (removed
+    # shard_hedge_after_ms): shards are disjoint partitions, not redundant
+    # replicas, so there's no data-complete reason to delay the second
+    # shard's start — both are needed either way. The hedge is bounded by
+    # retrieval_budget_ms (the same budget the rest of the retrieval stage
+    # runs under) instead. See app/retrieval/pipeline.py::_hedged_retrieve.
 
     # --- Retrieval latency budgets (online enforcement)
     retrieval_budget_ms: int = Field(

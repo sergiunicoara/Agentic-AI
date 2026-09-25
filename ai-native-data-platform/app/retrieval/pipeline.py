@@ -63,37 +63,53 @@ def _hedged_retrieve(
     query_vec: list[float],
     dsns: list[str | None],
     embedding_version: str,
+    budget: "LatencyBudget",
 ) -> list[RetrievedChunk]:
-    """Tail-latency mitigation via request hedging.
+    """Bounded-wait fan-out to the primary + hedge shard.
 
-    If shard fanout is 1 but multiple shards exist, we issue a second request
-    after a small delay and take the union. This is a simplified, dependency-
-    free hedging strategy for p95/p99 protection.
+    Shards here are logical *partitions* (disjoint document sets — see
+    docs/retrieval_sharding.md), not redundant replicas of the same data.
+    That rules out classic hedging (race two requests for the same data,
+    keep whichever answers first, throw the other away): skipping either
+    shard means skipping real, non-duplicate data, not a redundant copy.
+
+    What this *can* still do, and previously didn't: bound how long a slow
+    or hung shard can hold up the response. The earlier version started the
+    second shard's request only after an artificial delay
+    (shard_hedge_after_ms) and then unconditionally waited for both
+    threads to finish — strictly worse than querying both shards plainly,
+    since it added that delay on top of `max(both durations)` and provided
+    zero protection against exactly the "one shard is slow/down" case it
+    was written to guard against (a hung primary hung this function too).
+    Now both are started concurrently and each is bounded by the retrieval
+    stage's own remaining latency budget: a shard that doesn't answer in
+    time is dropped from the result (partial data, degrading gracefully),
+    not something the whole request blocks on indefinitely. The underlying
+    query itself is separately bounded by each retriever's own
+    `SET LOCAL statement_timeout` (settings.retriever_timeout_ms), so a
+    thread that times out here isn't a query left to run forever either.
     """
 
-    if len(dsns) <= 1 or int(settings.shard_hedge_after_ms or 0) <= 0:
+    if len(dsns) <= 1:
         return r.retrieve(workspace_id, query, k=k, query_vec=query_vec, database_url=dsns[0], embedding_version=embedding_version)
-
-    primary = dsns[0]
-    hedge = dsns[1]
-    delay_s = max(0.0, float(settings.shard_hedge_after_ms) / 1000.0)
 
     out: list[RetrievedChunk] = []
     lock = threading.Lock()
 
-    def _call(dsn: str | None, *, delay: float) -> None:
-        if delay:
-            time.sleep(delay)
+    def _call(dsn: str | None) -> None:
         res = r.retrieve(workspace_id, query, k=k, query_vec=query_vec, database_url=dsn, embedding_version=embedding_version)
         with lock:
             out.extend(res)
 
-    t1 = threading.Thread(target=_call, kwargs={"dsn": primary, "delay": 0.0})
-    t2 = threading.Thread(target=_call, kwargs={"dsn": hedge, "delay": delay_s})
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    threads = [threading.Thread(target=_call, kwargs={"dsn": dsn}) for dsn in dsns[:2]]
+    for t in threads:
+        t.start()
+    for t in threads:
+        # remaining_ms() shrinks as threads are joined in sequence, so a
+        # thread that's already finished returns immediately and a slow
+        # one gets whatever's left of the budget, not a fresh allowance
+        # each time.
+        t.join(timeout=max(0.0, budget.remaining_ms() / 1000.0))
     return out
 
 
@@ -201,6 +217,7 @@ class RetrievalPipeline:
                             query_vec=query_vec,
                             dsns=shard_dsns,
                             embedding_version=embedding_version,
+                            budget=budget,
                         )
                     )
                 else:

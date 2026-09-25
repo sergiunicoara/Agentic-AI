@@ -24,11 +24,11 @@ This is the baseline technique for scaling retrieval without fanning out to *eve
 
 If `shard_consistency_mode=strict`, the router checks `index_epoch` across shards before serving. If epochs diverge, retrieval fails closed rather than mixing inconsistent snapshots.
 
-### Hedged requests (tail-latency protection)
+### Bounded-wait fan-out (tail-latency protection)
 
-In `app/retrieval/pipeline.py`, if fanout is 1 and multiple shards are available, the pipeline can issue a *hedged* request to a second shard after `shard_hedge_after_ms`.
+In `app/retrieval/pipeline.py`, if fanout is 1 and multiple shards are available, the pipeline queries the primary and a second shard concurrently rather than routing to only one.
 
-This protects p95/p99 when a single shard is slow (GC, IO hiccup, noisy neighbor).
+Shards here are disjoint partitions, not redundant replicas — a query genuinely needs data from both, so this isn't classic "race two requests for the same data" hedging (skipping either shard would skip real, non-duplicate documents). What it does provide: each shard's request is bounded by the retrieval stage's remaining `retrieval_budget_ms`, so one slow shard (GC, IO hiccup, noisy neighbor) degrades to partial results from whichever shard answered in time instead of the whole request blocking on it. The underlying query is separately bounded server-side by each retriever's own `SET LOCAL statement_timeout` (`retriever_timeout_ms`).
 
 ## What “real load” adds (and how to extend)
 
