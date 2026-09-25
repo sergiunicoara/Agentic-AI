@@ -148,7 +148,14 @@ class Settings(BaseSettings):
     # --- Reliability SLOs
     # Online hard ceiling (per-request). Offline p95 constraints are enforced
     # via evaluation gates (see app/eval/experiments/*.yaml).
+    # This is the retrieval-only ceiling — deliberately tight, since
+    # retrieval never involves an LLM round trip.
     max_request_latency_ms: int = Field(default=800)
+    # Ceiling for the complete /ask request (retrieval + generation).
+    # Real LLM chat-completion calls routinely take 1-4s+, so this must be
+    # meaningfully larger than max_request_latency_ms or every real
+    # (non-mock) answer degrades to "unknown" purely on latency.
+    max_end_to_end_latency_ms: int = Field(default=6_000)
     max_empty_retrieval_rate: float = Field(default=0.05)
     min_groundedness_mean: float = Field(default=0.70)
 

@@ -44,25 +44,36 @@ _INTENT_SCHEMA = (
 )
 
 
+_NL_TO_INTENT_INSTRUCTIONS = f"""Extract a structured SQL query intent from a natural language question
+about a RAG data platform.
+
+Available tables and columns:
+{_SCHEMA_CONTEXT}
+
+Rules:
+- table must be one of: {_TABLES}
+- select_columns: list of column names; [] means all columns for that table.
+- filters: list of WHERE conditions; operator must be one of: {_FILTER_OPS}.
+- aggregation: COUNT | SUM | AVG | MIN | MAX | null.
+- aggregation_column: column to aggregate; omit (null) for COUNT(*).
+- group_by: columns for GROUP BY when using aggregation.
+- order_by: sort spec or null.
+- limit: integer 1-1000, default 100.
+- Only use columns listed above for the chosen table.
+- Return ONLY valid JSON - no markdown fences, no explanation.
+""".strip()
+
+
 class NLToIntent(dspy.Signature):
-    f"""Extract a structured SQL query intent from a natural language question
-    about a RAG data platform.
-
-    Available tables and columns:
-    {_SCHEMA_CONTEXT}
-
-    Rules:
-    - table must be one of: {_TABLES}
-    - select_columns: list of column names; [] means all columns for that table.
-    - filters: list of WHERE conditions; operator must be one of: {_FILTER_OPS}.
-    - aggregation: COUNT | SUM | AVG | MIN | MAX | null.
-    - aggregation_column: column to aggregate; omit (null) for COUNT(*).
-    - group_by: columns for GROUP BY when using aggregation.
-    - order_by: sort spec or null.
-    - limit: integer 1–1000, default 100.
-    - Only use columns listed above for the chosen table.
-    - Return ONLY valid JSON — no markdown fences, no explanation.
-    """
+    # NOTE: this can't be an f-string docstring — Python only treats a class
+    # body's *first statement* as `__doc__` when it's a literal string
+    # constant (a bare f-string is a JoinedStr expression, not a Constant,
+    # so the compiler drops it silently and `cls.__doc__` stays None).
+    # DSPy's SignatureMeta falls back to a generic
+    # "Given the fields ..., produce the fields ..." instruction whenever
+    # `__doc__` is None, so the interpolated schema/rules above never
+    # actually reached the model. Assigning `__doc__` explicitly below
+    # works because `Signature.instructions` reads `cls.__doc__` live.
 
     nl_query: str = dspy.InputField(
         desc="Natural language question about the data platform"
@@ -70,6 +81,9 @@ class NLToIntent(dspy.Signature):
     intent_json: str = dspy.OutputField(
         desc=f"JSON object matching schema: {_INTENT_SCHEMA}"
     )
+
+
+NLToIntent.__doc__ = _NL_TO_INTENT_INSTRUCTIONS
 
 
 # ---------------------------------------------------------------------------

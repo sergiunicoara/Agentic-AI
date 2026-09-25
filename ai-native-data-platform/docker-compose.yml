@@ -2,8 +2,14 @@ services:
   db:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
+      # This is the bootstrap superuser (schema owner), used only for
+      # `scripts/init_db.sql` and admin access. The API/worker never
+      # connect as this role — they use the non-superuser `app` role that
+      # init_db.sql creates, so Row Level Security (which Postgres bypasses
+      # for superusers and table owners, regardless of FORCE ROW LEVEL
+      # SECURITY) actually applies to online traffic.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app
     ports:
       - "5432:5432"

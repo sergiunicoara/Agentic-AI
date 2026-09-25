@@ -1,4 +1,9 @@
-name: loadtest-k6
+name: ai-native-data-platform / loadtest-k6
+
+# This lives at the repo root because GitHub only discovers workflows under
+# <repo-root>/.github/workflows — a copy nested under
+# ai-native-data-platform/.github/workflows/ (where it lived before) is
+# never picked up and never runs.
 
 on:
   workflow_dispatch:
@@ -18,7 +23,7 @@ on:
         required: false
         default: "2m"
       baseline:
-        description: "Baseline file (e.g. perf/baselines/retrieval.json)"
+        description: "Baseline file, relative to ai-native-data-platform/ (e.g. perf/baselines/retrieval.json)"
         required: false
         default: "perf/baselines/retrieval.json"
 
@@ -29,9 +34,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run k6 retrieval test (export summary)
+        # NOTE: `uses:` steps run against the repo root, not
+        # ai-native-data-platform/ — paths here are repo-root-relative.
         uses: grafana/k6-action@v0.3.1
         with:
-          filename: loadtest/k6/retrieval.js
+          filename: ai-native-data-platform/loadtest/k6/retrieval.js
         env:
           BASE_URL: ${{ github.event.inputs.base_url }}
           WORKSPACE_ID: ${{ github.event.inputs.workspace_id }}
@@ -41,9 +48,12 @@ jobs:
           K6_ARGS: "--summary-export=reports/k6_retrieval_summary.json"
 
       - name: Compare against baseline
+        working-directory: ai-native-data-platform
         run: |
+          # k6-action wrote its summary relative to the repo root above,
+          # but this step's cwd is ai-native-data-platform/.
           python3 scripts/perf/compare_k6_baseline.py \
-            --current reports/k6_retrieval_summary.json \
+            --current ../reports/k6_retrieval_summary.json \
             --baseline "${{ github.event.inputs.baseline }}"
 
       - name: Upload perf artifacts

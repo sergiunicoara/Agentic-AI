@@ -24,7 +24,11 @@ Production-grade RAG platform scaffold demonstrating the engineering patterns us
 docker compose up -d
 
 # Init Postgres schema + seed demo workspace
-docker compose exec -T db psql -U app -d app < scripts/init_db.sql
+# Runs as the bootstrap superuser (postgres) so the tables end up owned by
+# it, not by the app role — init_db.sql creates a non-superuser `app` login
+# role and grants it row-level DML; the API/worker connect as `app`, so Row
+# Level Security (bypassed for superusers/owners) actually applies.
+docker compose exec -T db psql -U postgres -d app < scripts/init_db.sql
 
 # Init OpenSearch index
 python scripts/opensearch_init.py --wait

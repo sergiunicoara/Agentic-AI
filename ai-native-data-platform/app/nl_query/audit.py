@@ -5,6 +5,7 @@ import uuid
 
 from sqlalchemy import text
 
+from app.core.observability import emit_event
 from app.data.db import workspace_session_scope
 
 
@@ -32,7 +33,7 @@ def write_audit_log(
                          row_count, latency_ms, error)
                     VALUES
                         (:id, :workspace_id, :nl_query, :generated_sql,
-                         :params::jsonb, :row_count, :latency_ms, :error)
+                         CAST(:params AS jsonb), :row_count, :latency_ms, :error)
                     """
                 ),
                 {
@@ -46,5 +47,8 @@ def write_audit_log(
                     "error": error,
                 },
             )
-    except Exception:
-        return
+    except Exception as e:
+        # Best-effort by design, but this is the compliance audit trail for
+        # every NL->SQL query — a silent swallow here previously hid a real
+        # bug (an invalid bind expression) for the life of this module.
+        emit_event("nl_query_audit_write_failed", {"workspace_id": workspace_id, "error": str(e)})

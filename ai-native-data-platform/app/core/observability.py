@@ -75,7 +75,7 @@ def persist_trace(*, trace_type: str, workspace_id: str, body: dict[str, Any], l
                 text(
                     """
                     INSERT INTO trace_log (id, trace_type, workspace_id, body, latency_ms)
-                    VALUES (:id, :t, :w, :b::jsonb, :ms)
+                    VALUES (:id, :t, :w, CAST(:b AS jsonb), :ms)
                     """
                 ),
                 {
@@ -86,5 +86,9 @@ def persist_trace(*, trace_type: str, workspace_id: str, body: dict[str, Any], l
                     "ms": int(latency_ms),
                 },
             )
-    except Exception:
-        return
+    except Exception as e:
+        # Best-effort by design (never fail the online path), but a bare
+        # swallow here previously hid a real bug for the life of this
+        # module (see emit_event() below, which is itself just a log call
+        # and safe to use from this except block).
+        emit_event("trace_persist_failed", {"trace_type": trace_type, "workspace_id": workspace_id, "error": str(e)})

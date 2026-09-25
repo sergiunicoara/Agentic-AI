@@ -310,8 +310,13 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
     latency_ms = int((time.time() - t0) * 1000)
     try:
         # The online contract applies to the complete user-visible path, not
-        # merely the retrieval stage.
-        enforce_latency(latency_ms, contract)
+        # merely the retrieval stage — but it uses its own, larger budget
+        # (max_end_to_end_latency_ms), not the retrieval-only ceiling
+        # already enforced above. Reusing the retrieval ceiling here would
+        # count real LLM generation time against a budget sized for
+        # retrieval alone, silently discarding every real (non-mock) answer
+        # that takes longer than that to generate.
+        enforce_latency(latency_ms, contract, threshold_ms=contract.max_end_to_end_latency_ms)
     except ReliabilityViolation:
         answer = "I don't know based on the indexed documents in this workspace."
         citations = []

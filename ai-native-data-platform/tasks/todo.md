@@ -1,59 +1,85 @@
-# Audit fix plan — 2026-09-04
+# Fix plan — 2026-09-25
 
-Source: 4-agent parallel audit (security, data integrity/concurrency, reliability/observability, test coverage).
+Source: follow-up audit (see conversation). Scope: Critical + High findings only
+(Medium/Low items deliberately deferred per user's "fix them" following that
+scoping question). Verified against a real Postgres 16 + pgvector instance,
+not the mocked test suite.
 
-## Batch A — SQL injection (Critical) — DONE
-- [x] Whitelist `intent.aggregation` in `validator.py` against {COUNT,SUM,AVG,MIN,MAX} — closes the f-string injection into SELECT via `sql_builder.py:20-25`
-- [x] Belt-and-suspenders: `sql_builder.py` raises if `aggregation` isn't one of the known set, regardless of validator
+## Critical
 
-## Batch B — Security hardening (High) — DONE
-- [x] Redact citation snippets before returning `/ask` response
-- [x] ~~Wire `is_safe_context()` into `generation/service.py`~~ — already wired at `generation/service.py:25`; security audit's claim was a false positive, verified by reading the file directly
-- [x] Add `/ingest/image` to the rate-limited route set in `api/main.py`
-- [x] Add a request size cap on `/ingest/image` uploads (streamed, bounded read — not buffer-then-check)
-- [x] Use `hmac.compare_digest` for the admin-token check in `api/main.py:203`
+- [x] C1 — `:b::jsonb` / `:params::jsonb` aren't valid SQLAlchemy bind syntax;
+      Postgres raises a syntax error and it's swallowed by a bare `except`.
+      `trace_log` and `nl_query_audit_log` never actually get written.
+      Fix: `CAST(:b AS jsonb)` in `observability.py` and `nl_query/audit.py`.
+- [x] C2 — `docker-compose.yml` makes `POSTGRES_USER=app` the bootstrap
+      superuser; RLS is bypassed for superusers/owners, so tenant isolation
+      is enforced only by the `WHERE workspace_id` predicates, not by RLS at
+      all. Fix: bootstrap as `postgres`, create a non-superuser `app` login
+      role with explicit grants (not ownership) on the tables, keep RLS.
+- [x] C3 — `enforce_latency(latency_ms, contract)` at the end of `/ask`
+      applies the 800ms ceiling to the *whole* request including the LLM
+      call, so with a real LLM every answer with a real (non-mock) call over
+      the ceiling silently degrades to "unknown". Split online contract into
+      a retrieval budget and a full-request ceiling that's realistic for a
+      real LLM roundtrip.
+- [x] C4 — CI workflows live at `ai-native-data-platform/.github/workflows`;
+      GitHub only discovers workflows at the repo root. Move them so they
+      actually run, and fix `eval-gates.yml` to seed a document before
+      running the eval harness (currently seeds only the empty demo
+      workspace, so pgvector eval has zero retrievable chunks).
+- [x] C5 — `id = ANY(:ids)` compares `uuid = text` and Postgres rejects it
+      (`app/indexing/pipeline.py`). Bulk reindex/backfill always fails.
+      Fix: `CAST(:ids AS uuid[])`.
+- [x] C6 — `NLToIntent`'s "docstring" is an f-string, so Python does not
+      treat it as `__doc__`; DSPy falls back to a generic instruction and
+      never sees the schema. Fix: use a real (still-interpolated) docstring
+      DSPy can read via `dspy.Signature.__doc__`.
 
-## Batch C — Remediation controller reversal (Medium-High) — DONE
-- [x] Wire `clear_override()` into the controller loop — auto-clear once `violated` returns to 0 after having tripped; seeds `override_applied` from the real DB row on leader acquisition (handles handoff mid-remediation)
-- [x] Remove dead/unused `start_remediation_loop()` in `remediation.py`
-- [x] Leader lock liveness: re-verify the held connection is alive on each renew tick (`SELECT 1`) instead of trusting local state unconditionally; also fixed leadership-loss branch to actually call `release(lock)` (it previously just flipped a local flag)
+## High
 
-## Batch D — Silent exception / observability gaps (Low-Medium) — DONE
-- [x] `core/cache.py` (3 spots) — emit_event on Redis failure instead of bare `except: pass`
-- [x] `retrieval/consistency.py` — distinguish probe failure from real epoch mismatch, emit_event
-- [x] `core/exp/router.py` — emit_event when the override-read query fails
-- [x] `indexing/index_state.py` — emit_event on swallowed exception
+- [ ] H1 — Bulk indexing path (`app/indexing/pipeline.py::run_manifest`)
+      writes a freshly generated `chunk_id` to OpenSearch even when the
+      Postgres insert hit `ON CONFLICT DO NOTHING` (row already existed) —
+      the two stores then reference different ids for the same chunk.
+      Fix: switch the flush to per-row insert with `RETURNING`, mirroring
+      the online ingestion path, and only dual-write inserted rows.
+- [ ] H2 — Online ingestion (`ingestion/pipeline.py`, `ingestion/multimodal.py`)
+      tags new chunks with `settings.embedding_version` (a process-level env
+      default) instead of the workspace's actual active embedding version,
+      so newly ingested documents can silently become invisible to
+      retrieval after a reindex cutover. Fix: read
+      `get_index_state(workspace_id).active_embedding_version`.
+- [ ] H3 — `/ingest/image` PDF handling has no page cap, runs the blocking
+      pdf2image conversion inline on the event loop, and the Dockerfile
+      never installs poppler (pdf2image's hard system dependency) — PDF
+      ingestion is currently broken in the shipped container image on top
+      of being a DoS vector. Fix: cap page count, offload to a thread, add
+      poppler-utils to the Dockerfile.
+- [ ] H4 — Per-workspace rate limiting runs in middleware *before*
+      authentication, keyed off the unauthenticated `X-Workspace-Id` header,
+      so anyone can exhaust another workspace's quota with a bad API key.
+      Fix: enforce the token bucket only after `require_workspace_key`
+      succeeds.
+- [ ] H5 — `/ask` only catches `ReliabilityViolation` around
+      `pipeline.run()`; a raw DB/OpenSearch exception (timeout, connection
+      error) propagates as an HTTP 500 instead of degrading to the safe
+      "unknown" fallback the rest of the endpoint is built around.
+- [ ] H6 — `k8s/networkpolicy.yaml`'s allow-internal policy selects
+      `app: ai-platform`, but the deployments are labelled
+      `ai-platform-api` / `ai-platform-worker`; only the default-deny
+      policy actually matches those pods, so applying these manifests as
+      written blocks the API/worker pods' egress (DNS, DB, Redis,
+      OpenSearch, OpenAI) entirely.
+- [ ] H7 — `/ingest/transcript` inserts the `document` row and enqueues the
+      `ingestion_job` row in two separate transactions; a failure between
+      them leaves a document that's permanently stuck (never queued, and
+      re-POSTing just returns `already_ingested`). Fix: enqueue the job in
+      the same transaction as the document insert.
 
-## Batch E — Reindex path critical bugs (Critical) — DONE
-- [x] `indexing/lifecycle.py::reindex_embeddings()` — mutating `os.environ` has no effect on already-constructed `settings`; pass `embedding_version` explicitly to `run_manifest` instead. Also fixed a knock-on bug this uncovered: `old_active_version` was reading `stats["embedding_version"]`, which now correctly echoes the *target* version, so it needed to be captured from `get_index_state()` before the reindex starts
-- [x] `indexing/pipeline.py` — fix `IndexingConfig` field name mismatch (`retry_backoff_ms` → `max_backoff_ms`, matching the call site and every external caller)
-- [x] `indexing/pipeline.py::run_manifest` — add OpenSearch dual-write (bulk path previously never wrote to OpenSearch at all)
-- [x] `indexing/pipeline.py` — call `bump_index_epoch()` after a successful `run_manifest` bulk backfill, not only at promote/cutover
-- [x] `scripts/run_bulk_index.py` — missing `Path`/`time` imports
+## Verification
 
-## Batch F — Ingestion pipeline correctness (High) — DONE
-- [x] `ingestion/pipeline.py::process_document` — moved `embed_batch()` outside the write transaction (was holding a DB connection during N sequential embedding-provider round trips)
-- [x] `ingestion/pipeline.py` — `chunk_hash` now used for real: `ON CONFLICT ... DO UPDATE ... WHERE chunk_hash IS DISTINCT FROM EXCLUDED.chunk_hash` — updates content in place on re-ingest with edited text, no-ops (as before) when unchanged, and keeps the row's stable id either way so OpenSearch never diverges
-- [x] `ingestion/pipeline.py` / `opensearch/ingest.py::bulk_upsert` — surface partial-batch failures via a new `opensearch_dual_write_partial_failure` event (both the online and bulk dual-write paths)
-
-## Batch H — Regression tests (closes the "fixed but untested" gap the audit found) — DONE
-- [x] `tests/test_retrieval_pipeline.py` — cache hit returns `latency_ms == 0` even when stored payload has a non-zero value; `_cache_key` differs by `index_epoch`
-- [x] `tests/test_index_state.py` — `bump_index_epoch` clears `_state_cache`/`_state_cache_expiry`; a `get_index_state` call after bump does not serve the stale epoch
-- [x] `tests/test_validator.py` — malicious/unknown `aggregation` value rejected by both `validate_intent` and `build_sql` (defense in depth)
-- [x] `tests/test_remediation_controller.py` — extracted the controller's hysteresis logic into a pure `evaluate_tick()` function (untestable before — it was inline in an infinite background-thread loop) and tested the hysteresis walkthrough, trip threshold, and auto-clear-on-recovery
-
-## Batch I — Environment / docs — DONE
-- [x] `dspy-ai` installs cleanly (`pip install dspy-ai`, v3.3.1) — `test_normalize.py` now collects; no `--ignore` needed
-- [x] Corrected the stale "189/190 tests" figure to 213 in `README.md` and `docs/demo-script.md` (S08 dot-mockup, V.O., and the FADE OUT summary table)
-
-## Verification — DONE
-- [x] Full suite: `213 passed, 2 skipped in 8.75s`, 0 failures (the 2 skips are legitimate: opensearch-py not installed, no live OPENSEARCH_URL)
-
-## Explicitly deferred (documented, not fixed — larger design decisions)
-- Multi-replica in-process `index_state` cache TTL staleness (~10s window) — accepted eventual consistency, same tradeoff the online path already accepts
-- Full Postgres↔OpenSearch reconciliation job for permanent dual-write divergence — flagged as a real gap, needs its own design, out of scope for this pass
-- `delete_by_document()` dead code — no document-deletion feature exists at all; implementing one is a new feature, not a fix, flagging for a follow-up
-- Hardcoded demo credentials in `docker-compose.yml` / `init_db.sql` seed — dev-only, intentional
-- `enforce_tenancy` unused settings flag, provider settings (`embeddings_model`/`llm_model`/`vision_provider`) shadowed by raw `os.getenv` reads — real maintainability traps, but wiring `Settings` as the actual source of truth is a refactor across 3 provider modules, not a bug fix; flagging only
-- `app/vectorstore/pgvector_scaling.py` — orphaned/uncalled; its f-string SQL identifier interpolation is only safe because nothing calls it with caller-supplied input today. Not wiring it up or deleting it without user direction on intent
-- `dead code`: `pgvector_scaling.py` module — leaving in place, flagged
+- [ ] Real Postgres 16 + pgvector instance (scratch, not part of the repo)
+      used to reproduce each bug before the fix and confirm after.
+- [ ] Existing mocked unit suite (`pytest tests/`) still green.
+- [ ] New/extended tests added where the existing mock-everything
+      `conftest.py` was the reason the bug shipped in the first place.

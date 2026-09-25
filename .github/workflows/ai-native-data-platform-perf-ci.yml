@@ -1,0 +1,101 @@
+name: ai-native-data-platform / perf-regression
+
+# This lives at the repo root because GitHub only discovers workflows under
+# <repo-root>/.github/workflows — a copy nested under
+# ai-native-data-platform/.github/workflows/ (where it lived before) is
+# never picked up and never runs. This repo hosts several independent
+# projects, so the pull_request trigger is scoped to changes under
+# ai-native-data-platform/.
+
+on:
+  pull_request:
+    paths: ["ai-native-data-platform/**"]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: ai-native-data-platform
+
+jobs:
+  retrieval-perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: ai-native-data-platform/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build and start stack
+        run: |
+          docker compose up -d --build
+
+      - name: Init DB schema
+        run: |
+          # Bootstrap superuser (docker-compose.yml: POSTGRES_USER=postgres).
+          # This is what creates the non-superuser `app` role and owns the
+          # tables, so Row Level Security actually applies to `app`
+          # connections at query time.
+          docker exec -i $(docker compose ps -q db) psql -U postgres -d app < scripts/init_db.sql
+          docker exec -i $(docker compose ps -q db) psql -U postgres -d app < ops/sql/001_workspace_index_state.sql
+
+      - name: Seed corpus
+        env:
+          DATABASE_URL: postgresql+psycopg2://app:app@localhost:5432/app
+        run: |
+          python3 scripts/seed_corpus.py --workspace demo --docs 400
+
+      - name: Bulk index (mock embeddings)
+        env:
+          DATABASE_URL: postgresql+psycopg2://app:app@localhost:5432/app
+          EMBED_PROVIDER: mock
+        run: |
+          python3 scripts/run_bulk_index.py --workspace demo
+
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 1
+          done
+          exit 1
+
+      - name: Run k6 retrieval test (export summary)
+        # NOTE: `uses:` steps (unlike `run:` steps) do not honor the job's
+        # `defaults.run.working-directory` — grafana/k6-action runs against
+        # the repo root, so paths here are repo-root-relative, not
+        # ai-native-data-platform-relative.
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: ai-native-data-platform/loadtest/k6/retrieval.js
+        env:
+          BASE_URL: http://localhost:8000
+          WORKSPACE_ID: demo
+          API_KEY: demo
+          RATE: "40"
+          DURATION: "60s"
+          K6_ARGS: "--summary-export=reports/k6_retrieval_summary.json"
+
+      - name: Compare against baseline
+        run: |
+          # This step's cwd is ai-native-data-platform/ (job default), but
+          # k6-action wrote its summary relative to the repo root above.
+          python3 scripts/perf/compare_k6_baseline.py --current ../reports/k6_retrieval_summary.json --baseline perf/baselines/retrieval.json
+
+      - name: Upload perf artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-reports
+          path: reports/
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

@@ -198,7 +198,7 @@ def run_manifest(
                     """
                     SELECT id::text AS id, text, source_name
                     FROM document
-                    WHERE workspace_id=:ws AND id = ANY(:ids)
+                    WHERE workspace_id=:ws AND id = ANY(CAST(:ids AS uuid[]))
                     """
                 ),
                 {"ws": workspace_id, "ids": batch},

@@ -29,7 +29,7 @@
       }
     ],
     "signature": {
-      "instructions": "Given the fields `nl_query`, produce the fields `intent_json`.",
+      "instructions": "Extract a structured SQL query intent from a natural language question\nabout a RAG data platform.\n\nAvailable tables and columns:\n  document(id, workspace_id, source_name, external_id, title, text, created_at)\n  document_chunk(id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding_version, created_at)\n  ingestion_run(id, document_id, workspace_id, status, embedding_version, error, created_at, finished_at)\n  trace_log(id, trace_type, workspace_id, latency_ms, created_at)\n\nRules:\n- table must be one of: document, document_chunk, ingestion_run, trace_log\n- select_columns: list of column names; [] means all columns for that table.\n- filters: list of WHERE conditions; operator must be one of: =, !=, >, <, >=, <=, LIKE, ILIKE, IN, IS NULL, IS NOT NULL.\n- aggregation: COUNT | SUM | AVG | MIN | MAX | null.\n- aggregation_column: column to aggregate; omit (null) for COUNT(*).\n- group_by: columns for GROUP BY when using aggregation.\n- order_by: sort spec or null.\n- limit: integer 1-1000, default 100.\n- Only use columns listed above for the chosen table.\n- Return ONLY valid JSON - no markdown fences, no explanation.",
       "fields": [
         {
           "prefix": "Nl Query:",

@@ -32,7 +32,7 @@ docker compose up -d
 
 > ↳ Init schema (first run only):
 > ```
-> Get-Content scripts/init_db.sql | docker exec -i ai-native-data-platform-db-1 psql -U app -d app
+> Get-Content scripts/init_db.sql | docker exec -i ai-native-data-platform-db-1 psql -U postgres -d app
 > ```
 
 ---

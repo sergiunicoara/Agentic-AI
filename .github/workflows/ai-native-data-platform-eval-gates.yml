@@ -1,0 +1,135 @@
+name: ai-native-data-platform / eval-gates
+
+# This lives at the repo root because GitHub only discovers workflows under
+# <repo-root>/.github/workflows — a copy nested under
+# ai-native-data-platform/.github/workflows/ (where it lived before) is
+# never picked up and never runs. This repo hosts several independent
+# projects, so the trigger is scoped to changes under
+# ai-native-data-platform/ to avoid running this project's CI on unrelated
+# work elsewhere in the repo.
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["ai-native-data-platform/**"]
+  pull_request:
+    paths: ["ai-native-data-platform/**"]
+
+defaults:
+  run:
+    working-directory: ai-native-data-platform
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Use localhost because the DB is exposed via docker-compose port mapping.
+      # This is the app's own runtime role (non-superuser; see scripts/init_db.sql).
+      DATABASE_URL: postgresql+psycopg2://app:app@localhost:5432/app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: ai-native-data-platform/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Run unit tests
+        run: |
+          # Fully mocked (tests/conftest.py stubs app.data.db) — no DB or
+          # OpenSearch needed. Runs before the Postgres-backed eval steps
+          # below so a broken build fails fast.
+          python -m pytest tests -q
+
+      - name: Start Postgres (pgvector)
+        run: |
+          docker compose up -d db
+
+      - name: Wait for DB
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          for i in {1..60}; do
+            # Bootstrap superuser (docker-compose.yml: POSTGRES_USER=postgres).
+            # The non-superuser `app` role doesn't exist until the schema
+            # init step below creates it, so readiness must be checked
+            # against the bootstrap role, not the runtime one.
+            if psql "postgresql://postgres:postgres@localhost:5432/app" -c "select 1" >/dev/null 2>&1; then
+              echo "DB is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "DB did not become ready in time" >&2
+          docker compose logs db || true
+          exit 1
+
+      - name: Initialize schema + create app role
+        run: |
+          # Must run as the bootstrap superuser: this is what creates the
+          # non-superuser `app` role and owns the tables, so Row Level
+          # Security actually applies to `app` connections at query time.
+          psql "postgresql://postgres:postgres@localhost:5432/app" -f scripts/init_db.sql
+
+      - name: Seed eval corpus
+        run: |
+          # The demo workspace starts empty. Without this, case 1 in
+          # app/eval/datasets/cases.jsonl has nothing to retrieve, the mock
+          # LLM's deterministic "onboarding" answer branch never fires, and
+          # pass_rate/rubric_pass_rate/groundedness_mean are meaningless
+          # zeros rather than a real (if small) regression signal. Case 2
+          # needs no seeding: app/eval/run.py only runs generation when
+          # expect_unknown is False, so it passes unconditionally.
+          python scripts/seed_eval_corpus.py --workspace demo
+
+      - name: Run evaluation + quality/latency gates
+        run: |
+          python -m app.eval.run \
+            --experiment app/eval/experiments/baseline.yaml \
+            --cases app/eval/datasets/cases.jsonl \
+            --json_out artifacts/eval_summary.json
+
+      - name: Render results snapshot (Markdown)
+        if: always()
+        run: |
+          python -m app.eval.render_results \
+            --in_json artifacts/eval_summary.json \
+            --out_md artifacts/results_snapshot.md
+
+      - name: Upload evaluation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-summary
+          path: ai-native-data-platform/artifacts/eval_summary.json
+
+      - name: Upload results snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-snapshot
+          path: ai-native-data-platform/artifacts/results_snapshot.md
+
+      - name: Show summary
+        if: always()
+        run: |
+          echo "--- artifacts/eval_summary.json ---"
+          cat artifacts/eval_summary.json || true
+          echo "--- artifacts/results_snapshot.md ---"
+          cat artifacts/results_snapshot.md || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v

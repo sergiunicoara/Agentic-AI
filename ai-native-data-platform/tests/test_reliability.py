@@ -22,6 +22,7 @@ from app.core.rate_limit import TokenBucket, WorkspaceRateLimiter
 
 CONTRACT = ReliabilityContract(
     max_request_latency_ms=800,
+    max_end_to_end_latency_ms=6_000,
     max_empty_retrieval_rate=0.05,
     min_groundedness_mean=0.70,
 )
@@ -42,6 +43,24 @@ class TestEnforceLatency:
     def test_high_latency_raises(self):
         with pytest.raises(ReliabilityViolation):
             enforce_latency(5000, CONTRACT)
+
+    def test_default_threshold_is_retrieval_ceiling_not_end_to_end(self):
+        # Regression: enforce_latency() with no explicit threshold_ms must
+        # use the tight retrieval-only ceiling, not silently fall back to
+        # the much larger end-to-end budget.
+        with pytest.raises(ReliabilityViolation):
+            enforce_latency(801, CONTRACT)
+
+    def test_explicit_end_to_end_threshold_allows_real_llm_latency(self):
+        # Regression for the /ask bug: a real (non-mock) LLM round trip
+        # (e.g. 2500ms) must not be measured against the 800ms
+        # retrieval-only ceiling when the caller passes the end-to-end
+        # threshold explicitly.
+        enforce_latency(2_500, CONTRACT, threshold_ms=CONTRACT.max_end_to_end_latency_ms)  # no exception
+
+    def test_end_to_end_threshold_still_has_a_ceiling(self):
+        with pytest.raises(ReliabilityViolation):
+            enforce_latency(6_001, CONTRACT, threshold_ms=CONTRACT.max_end_to_end_latency_ms)
 
 
 class TestEnforceNonEmpty:

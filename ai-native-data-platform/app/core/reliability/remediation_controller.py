@@ -82,7 +82,13 @@ def start_controller(
 
     force_experiment = force_experiment or settings.ab_default_experiment
     if max_request_latency_ms is None:
-        max_request_latency_ms = float(settings.max_request_latency_ms) * 1.25
+        # rolling_slo (app/api/main.py) observes total /ask latency
+        # (retrieval + generation), not retrieval alone, so this threshold
+        # must come from the end-to-end budget. Deriving it from the
+        # retrieval-only ceiling would trip the hysteresis loop on every
+        # real (non-mock) LLM round trip and force traffic to the safe
+        # experiment under completely normal load.
+        max_request_latency_ms = float(settings.max_end_to_end_latency_ms) * 1.25
 
     lock = LeaderLock(key=int(lock_key))
 

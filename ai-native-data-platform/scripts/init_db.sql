@@ -1,6 +1,24 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Non-superuser application role. This script must be run as a superuser
+-- (POSTGRES_USER=postgres in docker-compose.yml) so the tables below end up
+-- owned by that superuser, not by `app`. Row Level Security is bypassed for
+-- superusers *and* table owners regardless of FORCE ROW LEVEL SECURITY, so
+-- if the application connected as the owning role (the old
+-- POSTGRES_USER=app setup), every tenant_* policy below would be silently
+-- inert and workspace isolation would rest entirely on the WHERE
+-- workspace_id predicates in application code. `app` gets only the
+-- row-level DML grants it needs, via a plain login role with no special
+-- privileges, so RLS actually applies to it.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app') THEN
+    CREATE ROLE app LOGIN PASSWORD 'app' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS workspace (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL
@@ -255,3 +273,12 @@ CREATE TABLE IF NOT EXISTS ingestion_job_media (
   content BYTEA NOT NULL,
   UNIQUE (job_id, ordinal)
 );
+
+-- Grants for the non-superuser `app` role created above. Re-runnable: an
+-- idempotent GRANT is a no-op when already held. workspace_api_key is
+-- deliberately SELECT-only — the app reads it on every request (auth.py)
+-- but never writes it; key provisioning is an admin (postgres role) action.
+GRANT USAGE ON SCHEMA public TO app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app;
+REVOKE INSERT, UPDATE, DELETE ON workspace_api_key FROM app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app;
