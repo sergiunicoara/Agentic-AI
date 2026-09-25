@@ -10,6 +10,7 @@ from typing import Callable
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.observability import emit_event
 from app.data.db import write_session_scope
 
 
@@ -202,18 +203,29 @@ def claim_next() -> IngestionJob | None:
     )
 
 
-def mark_success(job_id: str) -> None:
+def mark_success(job: IngestionJob) -> None:
     with write_session_scope() as db:
-        db.execute(
+        result = db.execute(
             text(
                 """
                 UPDATE ingestion_job
                 SET status = 'succeeded', locked_at = NULL, locked_by = NULL, updated_at = now()
-                WHERE id = CAST(:job_id AS uuid)
+                WHERE id = CAST(:job_id AS uuid) AND attempts = :attempts
                 """
             ),
-            {"job_id": job_id},
+            {"job_id": job.id, "attempts": job.attempts},
         )
+        if result.rowcount == 0:
+            # This worker's lease had already expired and claim_next()'s
+            # reclaim logic (see there) handed the job to another worker
+            # (bumping attempts) before this call landed. An unconditional
+            # `WHERE id = :job_id` would have clobbered whatever the new
+            # owner has since done to the row — including a genuine
+            # success it already recorded — with this stale worker's
+            # (also-genuine, just late) result. Matching on `attempts` as
+            # a fencing token makes a late write from a worker that's no
+            # longer the current owner a no-op instead.
+            emit_event("ingestion_job_stale_completion", {"job_id": job.id, "attempts": job.attempts, "outcome": "success"})
 
 
 def mark_failure(job: IngestionJob, error: Exception) -> None:
@@ -221,7 +233,7 @@ def mark_failure(job: IngestionJob, error: Exception) -> None:
     delay_s = min(300, 2 ** max(0, job.attempts - 1))
     status = "queued" if retry else "failed"
     with write_session_scope() as db:
-        db.execute(
+        result = db.execute(
             text(
                 """
                 UPDATE ingestion_job
@@ -231,11 +243,17 @@ def mark_failure(job: IngestionJob, error: Exception) -> None:
                     locked_by = NULL,
                     last_error = :error,
                     updated_at = now()
-                WHERE id = CAST(:job_id AS uuid)
+                WHERE id = CAST(:job_id AS uuid) AND attempts = :attempts
                 """
             ),
-            {"job_id": job.id, "status": status, "delay_s": delay_s, "error": str(error)[:4000]},
+            {"job_id": job.id, "status": status, "delay_s": delay_s, "error": str(error)[:4000], "attempts": job.attempts},
         )
+        if result.rowcount == 0:
+            # Same fencing-token reasoning as mark_success: don't let a
+            # stale worker's late failure requeue (or terminally fail) a
+            # job another worker has since claimed and is actively — or
+            # already successfully — processing.
+            emit_event("ingestion_job_stale_completion", {"job_id": job.id, "attempts": job.attempts, "outcome": "failure"})
 
 
 def run_forever(handler: Callable[[IngestionJob], None]) -> None:
@@ -249,4 +267,4 @@ def run_forever(handler: Callable[[IngestionJob], None]) -> None:
         except Exception as exc:
             mark_failure(job, exc)
         else:
-            mark_success(job.id)
+            mark_success(job)
