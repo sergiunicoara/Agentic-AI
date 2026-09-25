@@ -17,13 +17,25 @@ class GuardResult:
 # ---------------------------------------------------------------------------
 _INJECTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Instruction override
-    (re.compile(r"ignore\s+(all\s+)?previous\s+instructions", re.I | re.S), "instruction_override"),
-    (re.compile(r"forget\s+(your\s+)?(previous\s+)?instructions", re.I | re.S), "instruction_override"),
-    (re.compile(r"disregard\s+(all\s+)?previous", re.I | re.S), "instruction_override"),
-    (re.compile(r"override\s+(your\s+)?instructions", re.I | re.S), "instruction_override"),
+    # `(?:\w+\s+){0,3}` absorbs common filler ("the", "all", "any", "prior
+    # to this,") between the verb and its object — the previous, exact
+    # phrasing (only an optional bare "all ") missed the everyday
+    # "ignore THE previous instructions" / "please forget THE previous
+    # instructions" variants entirely (verified: they returned safe=True).
+    # Bounded to 3 words, so this can't run away on long input.
+    (re.compile(r"ignore\s+(?:\w+\s+){0,3}(?:previous|prior)\s+instructions", re.I | re.S), "instruction_override"),
+    (re.compile(r"forget\s+(?:\w+\s+){0,3}instructions", re.I | re.S), "instruction_override"),
+    (re.compile(r"disregard\s+(?:\w+\s+){0,3}(?:previous|prior)", re.I | re.S), "instruction_override"),
+    (re.compile(r"override\s+(?:\w+\s+){0,3}instructions", re.I | re.S), "instruction_override"),
     # Role hijack
     (re.compile(r"you\s+are\s+now\s+\w+", re.I), "role_hijack"),
-    (re.compile(r"act\s+as\s+(if\s+you\s+are|a|an)\s+\w+", re.I), "role_hijack"),
+    # Deliberately narrower than "act as a/an X" (matched below via
+    # "if you are"): the bare form flagged completely ordinary requests
+    # like "act as a reviewer for this doc" or "act as a proofreader" —
+    # asking the assistant to take a professional lens on THIS task, not
+    # to discard its instructions. "act as IF you ARE X" is a much more
+    # specific "pretend to be a different, unconstrained entity" cue.
+    (re.compile(r"act\s+as\s+if\s+you\s+are\s+\w+", re.I), "role_hijack"),
     (re.compile(r"pretend\s+(you\s+are|to\s+be)", re.I), "role_hijack"),
     (re.compile(r"roleplay\s+as", re.I), "role_hijack"),
     (re.compile(r"from\s+now\s+on\s+(you\s+are|act)", re.I), "role_hijack"),
@@ -33,7 +45,12 @@ _INJECTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"do\s+anything\s+now", re.I), "jailbreak"),
     (re.compile(r"developer\s+mode", re.I), "jailbreak"),
     # System prompt extraction
-    (re.compile(r"system\s*prompt", re.I), "system_prompt_extraction"),
+    # Requires an actual extraction verb immediately before "your/the
+    # system prompt" — the previous bare `system\s*prompt` flagged any
+    # mention at all, including ordinary questions like "how do I
+    # configure the system prompt for our bot" or "what system prompt
+    # format does OpenAI use", neither of which is an extraction attempt.
+    (re.compile(r"(?:what\s+is|what's|show\s+me|reveal|tell\s+me|print|display|output|give\s+me|repeat)\s+(?:your|the)\s+system\s*prompt", re.I), "system_prompt_extraction"),
     (re.compile(r"reveal\s+your\s+(system\s+)?instructions", re.I), "system_prompt_extraction"),
     (re.compile(r"what\s+(are|were)\s+your\s+instructions", re.I), "system_prompt_extraction"),
     (re.compile(r"repeat\s+(everything|all)\s+(above|before)", re.I), "system_prompt_extraction"),
