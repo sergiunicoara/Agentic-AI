@@ -16,6 +16,7 @@ retrieval and evaluation wiring.
 """
 
 import math
+import threading
 
 from sqlalchemy import text
 
@@ -26,16 +27,24 @@ from app.schemas import RetrievedChunk
 
 _EMB_CACHE: dict[tuple[str, str], list[float]] = {}
 _EMB_CACHE_MAX = 5000
+# See app/retrieval/rerankers/mmr.py's identical cache for why this needs a
+# lock: FastAPI runs sync routes (including reranking) in a shared
+# threadpool, so this module-level dict is mutated from multiple OS threads
+# concurrently under real load — a plain dict's individual ops are
+# GIL-atomic, but the get-then-maybe-evict-then-set sequence isn't.
+_EMB_CACHE_LOCK = threading.Lock()
 
 
 def _cache_get(embedding_version: str, chunk_id: str) -> list[float] | None:
-    return _EMB_CACHE.get((embedding_version, chunk_id))
+    with _EMB_CACHE_LOCK:
+        return _EMB_CACHE.get((embedding_version, chunk_id))
 
 
 def _cache_set(embedding_version: str, chunk_id: str, vec: list[float]) -> None:
-    if len(_EMB_CACHE) >= _EMB_CACHE_MAX:
-        _EMB_CACHE.pop(next(iter(_EMB_CACHE)))
-    _EMB_CACHE[(embedding_version, chunk_id)] = vec
+    with _EMB_CACHE_LOCK:
+        if len(_EMB_CACHE) >= _EMB_CACHE_MAX:
+            _EMB_CACHE.pop(next(iter(_EMB_CACHE)))
+        _EMB_CACHE[(embedding_version, chunk_id)] = vec
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -71,7 +80,7 @@ def _fetch_embeddings(chunk_ids: list[str], *, embedding_version: str, workspace
             """
             SELECT id::text AS chunk_id, (embedding::real[]) AS emb
             FROM document_chunk
-            WHERE id::text = ANY(:ids)
+            WHERE id = ANY(CAST(:ids AS uuid[]))
               AND embedding_version = :embedding_version
             """
         )
