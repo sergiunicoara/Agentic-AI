@@ -1,5 +1,15 @@
 name: hybrid_rrf
+description: >
+  pgvector hybrid retrieval (dense + lexical) explicitly fused with RRF and
+  MMR-reranked. Previously left mode/fusion/rerank unset, so it silently
+  inherited whatever RETRIEVAL_MODE/FUSION_METHOD/RERANK_MODE happened to
+  be in the environment (the same defaults baseline.yaml also falls back
+  to) instead of declaring the configuration its name promises — an
+  experiment YAML that isn't self-contained isn't reproducible.
 retrieval:
+  mode: hybrid
+  fusion: rrf
+  rerank: mmr
   k: 10
   rerank_candidates: 50
 metrics:

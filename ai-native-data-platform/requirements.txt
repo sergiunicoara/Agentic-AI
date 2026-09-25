@@ -1,32 +1,42 @@
-fastapi
-uvicorn[standard]
-pydantic
-pydantic-settings
-python-dotenv
-SQLAlchemy
-psycopg2-binary
-tenacity
-structlog
-numpy
-httpx
-orjson
-prometheus-client
-watchdog
-PyYAML
+# Pinned to a verified-working set: `pip install -r requirements.txt` was
+# run clean in this exact form, the full test suite passed against it, and
+# the built Docker image booted and served real requests against a real
+# Postgres instance. Exact pins (not ranges) so a build today and a build
+# next year resolve to the same thing — an unpinned requirements.txt for an
+# application (as opposed to a library) means "whatever happens to be
+# newest on the day someone runs pip install," which is not reproducible
+# and not what CI or a deployment should be building from.
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.3
+SQLAlchemy==2.1.0
+psycopg2-binary==2.9.13
+tenacity==9.1.4
+structlog==26.1.0
+numpy==2.4.6
+httpx==0.28.1
+orjson==3.12.0
+prometheus-client==0.26.0
+watchdog==6.0.0
+PyYAML==6.0.3
 
-redis
-pydantic-ai[openai]
+redis==8.1.0
+# The `openai` extra doesn't exist on current pydantic-ai (pip warns and
+# ignores it) — OpenAI support is built into the base package now.
+pydantic-ai==2.50.0
 
 # Multimodal ingestion
-openai                  # GPT-4o Vision captioning
-google-generativeai     # Gemini Vision captioning
-Pillow                  # image handling
-pdf2image               # PDF page → image conversion (requires poppler system dep)
+openai==3.19.2                 # GPT-4o Vision captioning
+google-generativeai==0.8.6     # Gemini Vision captioning
+Pillow==12.3.0                 # image handling
+pdf2image==1.17.0              # PDF page → image conversion (requires poppler system dep)
 
 # Evaluation
-ragas                   # RAGAS metrics: faithfulness, answer_relevancy, context_precision, context_recall
-datasets                # required by ragas
+ragas==0.3.1                   # RAGAS metrics: faithfulness, answer_relevancy, context_precision, context_recall
+datasets==5.0.1                # required by ragas
 
 # NL→SQL prompt optimization
-dspy-ai                 # BootstrapFewShot optimizer for intent extractor (run scripts/optimize_nl_intent.py)
-opensearch-py==2.6.0    # OpenSearch Python client (kNN + BM25 + bulk indexing)
+dspy-ai==3.4.0                 # BootstrapFewShot optimizer for intent extractor (run scripts/optimize_nl_intent.py)
+opensearch-py==2.6.0           # OpenSearch Python client (kNN + BM25 + bulk indexing)

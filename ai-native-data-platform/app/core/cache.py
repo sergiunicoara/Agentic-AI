@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections import OrderedDict
 from typing import Any, Optional
@@ -15,28 +16,44 @@ except Exception:  # pragma: no cover
 
 
 class InMemoryLRU:
+    """Used only when REDIS_URL is unset/unreachable — i.e. exactly the
+    situation where multiple concurrent requests are most likely to hit
+    this cache at once instead of Redis. FastAPI runs sync routes (every
+    /ask call, via cache.get_json/set_json) in a shared threadpool, so
+    concurrent get()/set() calls from different OS threads are the normal
+    case, not an edge case. A plain dict's individual operations are
+    GIL-atomic, but a *sequence* of them (get -> pop-if-expired,
+    set -> move_to_end -> evict-while-over-capacity) is not — two
+    interleaved set() calls can evict something other than the genuine
+    least-recently-used entry. A lock around each method's critical
+    section makes every get()/set() call atomic as a whole.
+    """
+
     def __init__(self, max_items: int, ttl_s: int):
         self.max_items = max_items
         self.ttl_s = ttl_s
         self._data: "OrderedDict[str, tuple[float, Any]]" = OrderedDict()
+        self._lock = threading.Lock()
 
     def get(self, key: str) -> Optional[Any]:
-        item = self._data.get(key)
-        if item is None:
-            return None
-        expires_at, value = item
-        if expires_at < time.time():
-            self._data.pop(key, None)
-            return None
-        self._data.move_to_end(key)
-        return value
+        with self._lock:
+            item = self._data.get(key)
+            if item is None:
+                return None
+            expires_at, value = item
+            if expires_at < time.time():
+                self._data.pop(key, None)
+                return None
+            self._data.move_to_end(key)
+            return value
 
     def set(self, key: str, value: Any) -> None:
         expires_at = time.time() + self.ttl_s
-        self._data[key] = (expires_at, value)
-        self._data.move_to_end(key)
-        while len(self._data) > self.max_items:
-            self._data.popitem(last=False)
+        with self._lock:
+            self._data[key] = (expires_at, value)
+            self._data.move_to_end(key)
+            while len(self._data) > self.max_items:
+                self._data.popitem(last=False)
 
 
 class Cache:
