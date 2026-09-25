@@ -104,9 +104,16 @@ ALTER TABLE document_chunk DROP CONSTRAINT IF EXISTS document_chunk_workspace_id
 ALTER TABLE document_chunk ADD CONSTRAINT document_chunk_workspace_id_fkey
   FOREIGN KEY (workspace_id) REFERENCES workspace(id);
 
--- ANN index (pgvector) for dense retrieval.
+-- ANN index (pgvector) for dense retrieval. HNSW, not ivfflat: ivfflat's
+-- cluster centroids are computed from whatever rows exist at CREATE INDEX
+-- time — on this table, that's always zero (this script runs once at
+-- bootstrap, before any document is ingested), which is exactly the "low
+-- recall" case Postgres itself warns about, and pgvector never
+-- auto-rebuilds the centroids as data arrives; recall stays degraded until
+-- someone manually REINDEXes. HNSW builds incrementally as rows are
+-- inserted, so it has no such "must have data already" requirement.
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding
-ON document_chunk USING ivfflat (embedding vector_cosine_ops);
+ON document_chunk USING hnsw (embedding vector_cosine_ops);
 
 -- Full-text search index for hybrid retrieval.
 CREATE INDEX IF NOT EXISTS idx_chunks_fts
@@ -167,9 +174,10 @@ CREATE TABLE IF NOT EXISTS image_chunk (
 CREATE INDEX IF NOT EXISTS idx_image_chunk_workspace
 ON image_chunk (workspace_id);
 
--- ANN index for image caption embeddings — same cosine ops as document_chunk.
+-- ANN index for image caption embeddings — same cosine ops and same
+-- ivfflat-vs-hnsw reasoning as idx_chunks_embedding above.
 CREATE INDEX IF NOT EXISTS idx_image_chunk_embedding
-ON image_chunk USING ivfflat (embedding vector_cosine_ops);
+ON image_chunk USING hnsw (embedding vector_cosine_ops);
 
 -- Audit log for natural-language queries (NLP → SQL layer).
 -- Captures every query regardless of success/failure for compliance + debugging.
