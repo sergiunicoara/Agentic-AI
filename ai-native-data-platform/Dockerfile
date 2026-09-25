@@ -23,7 +23,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY scripts ./scripts
-COPY .env.example ./.env
+# NOTE: .env.example is intentionally not copied into the image as .env.
+# Real deployments pass configuration via actual environment variables
+# (docker-compose's `environment:`, k8s Secrets) — those always take
+# priority over an env_file's values in pydantic-settings, so this never
+# changed what a properly configured deployment ran with. But baking a
+# dotenv file into every build meant an image run with no environment
+# configured at all silently started on mock providers and demo
+# credentials instead of failing loudly, and permanently commits whatever
+# is in that file to the image's layers.
+
+# Run as a non-root user. bulk-indexing (scripts/run_bulk_index.py) writes
+# manifest files under ./data, so the app directory is chowned to this
+# user rather than just switching UID.
+RUN groupadd --system app && useradd --system --gid app --home-dir /app app \
+  && chown -R app:app /app
+USER app
 
 EXPOSE 8000
 
