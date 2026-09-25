@@ -1,0 +1,22 @@
+# Local tool caches / generated output — none of this belongs in version
+# control (graphify-out/ was previously committed: 2.5MB of a local
+# codebase-indexing tool's cache, including the original author's absolute
+# Windows filesystem paths).
+graphify-out/
+
+# Runtime-generated data
+artifacts/
+data/index_manifests/
+runs/
+reports/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Local environment
+.env
+.venv/
+venv/
