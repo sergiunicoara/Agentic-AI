@@ -21,7 +21,6 @@ from app.core.reliability.contracts import (
     enforce_latency,
     enforce_non_empty,
 )
-from app.core.rate_limit import rate_limiter
 from app.core.config import settings
 from app.core.exp.router import choose_experiment
 from app.core.reliability.slo_window import rolling_slo
@@ -60,15 +59,12 @@ def _startup():
 async def metrics_middleware(request, call_next):
     route = request.url.path
     method = request.method
-    # Backpressure: cap in-flight requests and shed load early.
+    # Backpressure: cap in-flight requests and shed load early. Per-workspace
+    # rate limiting happens later, inside require_workspace_key (app/auth.py)
+    # — it must run *after* credentials are validated. Enforcing it here,
+    # keyed off the unauthenticated X-Workspace-Id header, would let anyone
+    # drain a real workspace's quota with a forged header and no valid key.
     async with _semaphore:
-        # Rate-limit per workspace if header is present.
-        ws = request.headers.get("X-Workspace-Id", "")
-        if ws and route in ("/ask", "/ingest/transcript", "/query/natural-language", "/ingest/image"):
-            if not rate_limiter.allow(ws):
-                HTTP_REQUESTS.labels(route=route, method=method, status="429").inc()
-                return Response(content="Rate limit exceeded", status_code=429)
-
         with HTTP_LATENCY.labels(route=route, method=method).time():
             resp = await call_next(request)
     HTTP_REQUESTS.labels(route=route, method=method, status=str(resp.status_code)).inc()
@@ -229,8 +225,20 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
         )
         enforce_non_empty(len(hits), contract)
         enforce_latency(retrieval_ms, contract)
-    except ReliabilityViolation as e:
+    except ReliabilityViolation:
         # Reliability violations intentionally degrade to safe fallback behavior.
+        return AskOut(answer="I don’t know based on the indexed documents in this workspace.", citations=[], unknown=True)
+    except Exception as e:
+        # A raw infra failure (DB statement timeout, OpenSearch connection
+        # error, etc.) must degrade the same way a ReliabilityViolation
+        # does — this whole endpoint is built around "unknown" being the
+        # safe fallback, not an HTTP 500. Distinguished from the branch
+        # above via the emitted event so an actual outage doesn't read as
+        # a routine reliability-contract degradation in the logs.
+        emit_event(
+            "ask_retrieval_failed",
+            {"workspace_id": payload.workspace_id, "error": f"{type(e).__name__}: {e}"},
+        )
         return AskOut(answer="I don’t know based on the indexed documents in this workspace.", citations=[], unknown=True)
 
     # Simple confidence gate: scale-aware signal; swap for calibrated thresholds per workspace.
