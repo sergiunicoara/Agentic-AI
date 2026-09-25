@@ -45,8 +45,15 @@ spec:
             - name: VISION_PROVIDER
               value: "openai"
           readinessProbe:
+            # Checks Postgres connectivity (app/api/main.py's /health/ready)
+            # — a pod that can't reach the database should be pulled out
+            # of rotation. Deliberately a *different* path from
+            # livenessProbe below: restarting the pod fixes nothing when
+            # the problem is an unreachable database, and doing that on
+            # every replica during a real DB outage turns one dependency
+            # outage into a full restart storm.
             httpGet:
-              path: /health
+              path: /health/ready
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 5

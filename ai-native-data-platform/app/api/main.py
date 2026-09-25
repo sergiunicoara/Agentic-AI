@@ -10,7 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from app.auth import require_workspace_key
 from app.core.logging import configure_logging
@@ -79,7 +79,57 @@ def metrics():
 
 @app.get("/health")
 def health():
+    """Liveness: is this process alive and able to handle a request.
+
+    Deliberately checks nothing external. k8s/api-deployment.yaml's
+    livenessProbe restarts the pod on failure — that's the right response
+    to "this process is wedged," but restarting is useless (and actively
+    harmful) against "Postgres is down," since it fixes nothing and, done
+    across every replica during a real outage, turns one dependency outage
+    into a full restart storm. See /health/ready for the dependency check.
+    """
     return {"ok": True}
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Readiness: should this pod currently receive traffic.
+
+    Postgres is a hard dependency — essentially nothing on this API works
+    without it (auth, retrieval, generation tracing), so unreachable here
+    means not ready. Redis and OpenSearch are deliberately NOT checked the
+    same way: both are designed elsewhere in this app to degrade
+    gracefully when unavailable (cache.py falls back to an in-process LRU,
+    OpenSearch dual-write is best-effort) — reported for visibility, but
+    their being down doesn't pull the pod out of rotation.
+    """
+    checks: dict[str, str] = {}
+    ok = True
+
+    try:
+        with read_session_scope() as db:
+            db.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = f"unreachable: {type(e).__name__}: {e}"
+        ok = False
+
+    if settings.redis_url:
+        # local import to keep FastAPI startup light, matching /ask below
+        from app.core.cache import cache
+        try:
+            if cache._redis is None:
+                raise RuntimeError("not connected")
+            cache._redis.ping()
+            checks["redis"] = "ok"
+        except Exception as e:
+            checks["redis"] = f"unreachable (degrades to in-process cache): {type(e).__name__}: {e}"
+
+    if settings.opensearch_url:
+        from app.opensearch.client import is_available as opensearch_is_available
+        checks["opensearch"] = "ok" if opensearch_is_available() else "unreachable (dual-write degrades to Postgres-only)"
+
+    return JSONResponse({"ok": ok, "checks": checks}, status_code=200 if ok else 503)
 
 
 @app.post("/ingest/transcript")
@@ -263,6 +313,12 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
     # are in 0–1+. Gate on presence of hits rather than a fixed score threshold.
     low_confidence = (len(hits) == 0) or (distinct_docs < 1)
 
+    # Always defined (not just in the generation branch below) so the SLO
+    # observation further down doesn't need a locals()-sniffing fallback to
+    # tell "no generation attempted" apart from "generation attempted and
+    # succeeded" — both are simply gen_err is None.
+    gen_err: str | None = None
+
     if low_confidence:
         answer = "I don’t know based on the indexed documents in this workspace."
         citations: list[Citation] = []
@@ -357,7 +413,7 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
     # Rolling aggregate SLO telemetry (used for alerting in ops/prometheus).
     rolling_slo.observe(
         latency_ms,
-        is_error=bool(gen_err) if 'gen_err' in locals() else False,
+        is_error=bool(gen_err),
         is_unknown=bool(unknown),
     )
     snap = rolling_slo.snapshot()
