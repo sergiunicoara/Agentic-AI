@@ -70,9 +70,19 @@ results reference the same ids as the pgvector backend.
 **Trade-off:** Temporary inconsistency between Postgres and OpenSearch during
 OpenSearch downtime. The client re-probes a down cluster every 30s
 (`PROBE_COOLDOWN_S`), so dual-write self-heals after recovery; chunks missed
-during the outage are repaired by backfill (`bulk_upsert` over a Postgres scan),
-not by failing ingestion. This is the same pattern used by most dual-database
-write paths in production (write primary, async mirror).
+during the outage are repaired by `app/opensearch/reconcile.py`
+(`scripts/reconcile_opensearch.py`, run every 15 min by
+`k8s/cronjob-opensearch-reconcile.yaml`), which scans Postgres for each
+workspace's active-embedding_version chunks, `mget`s their deterministic
+OpenSearch `_id`s, and re-drives only the ones missing. This is the same
+pattern used by most dual-database write paths in production (write primary,
+async mirror + a repair loop).
+
+Deliberately one-directional: it only ever adds missing OpenSearch docs, never
+deletes. There is no document-delete feature in the app today (Postgres has no
+tombstone concept), so pruning OpenSearch-side orphans is out of scope until
+deletion exists as a real, tested feature — see the module docstring for the
+full reasoning.
 
 ### 4. Workspace scoping as a filter, not index-level isolation
 

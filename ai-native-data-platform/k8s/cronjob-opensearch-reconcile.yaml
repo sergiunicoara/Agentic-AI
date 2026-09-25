@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: opensearch-reconcile
+spec:
+  schedule: "*/15 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: opensearch-reconcile
+              image: ai-native-data-platform:latest
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-platform-secrets
+                      key: database_url
+                - name: OPENSEARCH_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-platform-secrets
+                      key: opensearch_url
+              command: ["python", "scripts/reconcile_opensearch.py"]

@@ -121,6 +121,14 @@ class RetrievalPipeline:
         rerank_candidates: int,
         embedding_version_override: str | None = None,
     ) -> tuple[list[RetrievedChunk], int]:
+        # Defense in depth: every online retrieval path must be scoped by
+        # workspace_id. This isn't the only thing preventing cross-tenant
+        # leakage (callers are expected to always pass a real workspace_id),
+        # but it turns an accidental empty/missing value into a hard failure
+        # here instead of a silently unscoped query downstream.
+        if settings.enforce_tenancy and not workspace_id:
+            raise ValueError("enforce_tenancy is set but workspace_id is empty")
+
         # Cache retrieval results (not generation) to improve p95 and reduce DB load.
         # Workspace-scoped active embedding version enables safe, zero-downtime reindexing.
         idx_state = get_index_state(workspace_id)

@@ -57,3 +57,28 @@ Source: 4-agent parallel audit (security, data integrity/concurrency, reliabilit
 - `enforce_tenancy` unused settings flag, provider settings (`embeddings_model`/`llm_model`/`vision_provider`) shadowed by raw `os.getenv` reads — real maintainability traps, but wiring `Settings` as the actual source of truth is a refactor across 3 provider modules, not a bug fix; flagging only
 - `app/vectorstore/pgvector_scaling.py` — orphaned/uncalled; its f-string SQL identifier interpolation is only safe because nothing calls it with caller-supplied input today. Not wiring it up or deleting it without user direction on intent
 - `dead code`: `pgvector_scaling.py` module — leaving in place, flagged
+
+## Batch J — Closed follow-up gaps from architecture review — DONE
+- [x] `app/vectorstore/pgvector_scaling.py` — deleted; confirmed zero references anywhere in the codebase (grep for `pgvector_scaling` returned nothing but the file itself)
+- [x] `app/core/config.py` — `embeddings_model`/`llm_model` were never-read dead fields (pydantic-settings would've looked for `EMBEDDINGS_MODEL`/`LLM_MODEL`, but the real env vars are `OPENAI_EMBED_MODEL`/`OPENAI_CHAT_MODEL`). Renamed to match the real env vars exactly (`openai_embed_model`, `openai_chat_model`) plus added `embed_provider`, `llm_provider`, `openai_api_key`, `request_timeout_s` — no `.env`/`docker-compose.yml` changes needed since the env var names were already correct, just never wired to `Settings`
+- [x] `app/providers/embeddings.py`, `app/providers/llm.py`, `app/providers/vision.py` — replaced raw `os.getenv(...)` module-level reads with `settings.*`, making `Settings` the actual single source of truth these three modules claimed to have
+- [x] `app/retrieval/pipeline.py::RetrievalPipeline.run()` — `enforce_tenancy` existed on `Settings` but nothing ever read it (workspace scoping only worked because every caller happened to always pass a real `workspace_id`). Added an explicit guard: raises `ValueError` if `enforce_tenancy` is true and `workspace_id` is empty, instead of silently running an unscoped query
+- [x] `tests/test_retrieval_pipeline.py` — added `TestEnforceTenancy` (raises when enforced + empty workspace_id; passes through when not enforced) — closes the "flag exists but nothing tests it" gap
+
+## Verification — DONE
+- [x] Full suite: `215 passed, 2 skipped` (213 prior + 2 new), 0 failures
+
+## Batch K — OpenSearch reconciliation job (closes "explicitly deferred" gap) — DONE
+- [x] `app/opensearch/reconcile.py` (new) — `reconcile_workspace()` / `reconcile_all_workspaces()`. Scans Postgres `document_chunk` for each workspace's *active* `embedding_version` (via `get_index_state`), `mget`s the deterministic OpenSearch `_id`s, and re-drives only chunks OpenSearch is missing via the existing `bulk_upsert()`. Deliberately one-directional — never deletes (no tombstone concept in Postgres, `delete_by_document()` is untested dead code, see below)
+- [x] `app/core/observability.py` — added `RECONCILE_RUNS` / `RECONCILE_CHUNKS_REPAIRED` Prometheus counters, same pattern as `INGEST_JOBS`
+- [x] `scripts/reconcile_opensearch.py` (new) — CLI wrapper, `--workspace` for a single tenant or all workspaces by default
+- [x] `k8s/cronjob-opensearch-reconcile.yaml` (new) — runs every 15 min, follows the existing `cronjob-drift.yaml` template and `worker-deployment.yaml`'s secret wiring
+- [x] `tests/test_opensearch_reconcile.py` (new, 7 tests) — skip branches (dual-write disabled / OS unavailable), repairs only the missing chunk, no-op when nothing missing, scopes strictly to active embedding_version (not target/stale versions), repair failure recorded not raised, and a structural assertion that the module never imports `delete_by_document`
+- [x] `docs/opensearch_design.md`, `README.md`, `docs/demo-script.md` — updated to describe the reconciliation job instead of "explicitly deferred", refreshed 213 → 222 test count
+
+### Explicitly still out of scope (documented in the module docstring, not silently dropped)
+- Pruning OpenSearch-side orphans (docs with no matching Postgres row) — requires a real, tested document-delete feature first; `delete_by_document()` has zero callers/tests today and reconciliation must not be its first caller
+- Content-drift detection (Postgres `chunk_hash` changed but OpenSearch copy is stale) — would need `chunk_hash` added to the OpenSearch `_source` schema; flagged as a follow-up, not silently absorbed into this job's scope
+
+## Verification — DONE
+- [x] Full suite: `222 passed, 2 skipped` (215 prior + 7 new), 0 failures

@@ -97,3 +97,44 @@ class TestCacheHitLatency:
 
         assert latency_ms == 0
         assert len(hits) == 2
+
+
+class TestEnforceTenancy:
+    """enforce_tenancy previously existed on Settings but nothing ever read
+    it, so a request with an empty workspace_id would sail straight into an
+    unscoped query. RetrievalPipeline.run() now checks it first.
+    """
+
+    def test_empty_workspace_id_raises_when_enforced(self, monkeypatch):
+        import app.retrieval.pipeline as pipeline_mod
+
+        monkeypatch.setattr(pipeline_mod.settings, "enforce_tenancy", True)
+
+        pipeline = RetrievalPipeline(retrievers=[])
+        try:
+            pipeline.run("", "q", query_vec=[0.1], k=2, rerank_candidates=25)
+            assert False, "expected ValueError for empty workspace_id"
+        except ValueError as exc:
+            assert "workspace_id" in str(exc)
+
+    def test_empty_workspace_id_allowed_when_not_enforced(self, monkeypatch):
+        import app.retrieval.pipeline as pipeline_mod
+
+        monkeypatch.setattr(pipeline_mod.settings, "enforce_tenancy", False)
+        monkeypatch.setattr(pipeline_mod.cache, "get_json", lambda key: {"hits": [], "latency_ms": 0})
+        monkeypatch.setattr(
+            pipeline_mod,
+            "get_index_state",
+            lambda workspace_id: WorkspaceIndexState(
+                workspace_id=workspace_id,
+                active_embedding_version="v1",
+                target_embedding_version=None,
+                index_epoch=0,
+                updated_at_s=0.0,
+            ),
+        )
+
+        pipeline = RetrievalPipeline(retrievers=[])
+        hits, latency_ms = pipeline.run("", "q", query_vec=[0.1], k=2, rerank_candidates=25)
+
+        assert hits == []

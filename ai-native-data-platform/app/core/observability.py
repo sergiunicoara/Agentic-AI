@@ -37,6 +37,16 @@ RELIABILITY_VIOLATIONS = Counter(
     ["type"],
 )
 
+RECONCILE_RUNS = Counter(
+    "opensearch_reconcile_runs_total",
+    "OpenSearch reconciliation runs, by outcome",
+    ["status"],
+)
+RECONCILE_CHUNKS_REPAIRED = Counter(
+    "opensearch_reconcile_chunks_repaired_total",
+    "Chunks re-written to OpenSearch because they were missing (dual-write drift)",
+)
+
 
 @contextmanager
 def timer(hist: Histogram, labels: dict | None = None):

@@ -18,11 +18,13 @@ try:
 except Exception:  # pragma: no cover
     redis = None
 
-PROVIDER = os.getenv("LLM_PROVIDER", "mock").lower()
-TIMEOUT = float(os.getenv("REQUEST_TIMEOUT_S", "20"))
+from app.core.config import settings
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
+PROVIDER = settings.llm_provider.lower()
+TIMEOUT = settings.request_timeout_s
+
+OPENAI_API_KEY = settings.openai_api_key
+OPENAI_CHAT_MODEL = settings.openai_chat_model
 
 
 class CircuitBreaker:

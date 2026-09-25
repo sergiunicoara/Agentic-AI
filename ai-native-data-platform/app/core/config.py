@@ -34,8 +34,12 @@ class Settings(BaseSettings):
     )
 
     # --- Providers
-    embeddings_model: str = Field(default="text-embedding-3-small")
-    llm_model: str = Field(default="gpt-4o-mini")
+    embed_provider: str = Field(default="mock", description="Embeddings backend: openai | mock.")
+    llm_provider: str = Field(default="mock", description="LLM backend: openai | mock.")
+    openai_api_key: str = Field(default="", description="API key for OpenAI-backed providers.")
+    openai_embed_model: str = Field(default="text-embedding-3-small")
+    openai_chat_model: str = Field(default="gpt-4.1-mini")
+    request_timeout_s: float = Field(default=20.0, description="HTTP timeout (seconds) for provider calls.")
     embedding_version: str = Field(
         default="v1",
         description="Tag persisted with chunks to support embedding lifecycle/versioning.",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 import hashlib
-import os
 import numpy as np
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -8,11 +7,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.core.config import settings
 
 EMBED_DIM = settings.embed_dim
-PROVIDER = os.getenv("EMBED_PROVIDER", "mock").lower()
-TIMEOUT = float(os.getenv("REQUEST_TIMEOUT_S", "20"))
+PROVIDER = settings.embed_provider.lower()
+TIMEOUT = settings.request_timeout_s
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_EMBED_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
+OPENAI_API_KEY = settings.openai_api_key
+OPENAI_EMBED_MODEL = settings.openai_embed_model
 
 def _hash_to_vec(s: str, dim: int) -> np.ndarray:
     # Python's built-in hash is randomized per process. A SHA-256-derived seed
