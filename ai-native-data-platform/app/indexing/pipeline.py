@@ -142,25 +142,39 @@ def run_manifest(
         if cfg.fault_injection_rate > 0.0 and random.random() < float(cfg.fault_injection_rate):
             raise RuntimeError("injected_flush_failure")
 
+        # A single multi-row VALUES(...) INSERT with a flat params dict (not
+        # a list-of-dicts executemany) — RETURNING against an executemany
+        # call doesn't reliably yield per-row results with psycopg2, but a
+        # single statement with multiple VALUES tuples does. This is what
+        # lets us tell which rows actually got a fresh id from ON CONFLICT
+        # DO NOTHING vs. which already existed under a different id.
+        values_sql: list[str] = []
+        params: dict = {}
+        for i, row in enumerate(chunk_rows):
+            values_sql.append(
+                f"(:id{i}, :document_id{i}, :workspace_id{i}, :chunk_index{i}, "
+                f":chunk_text{i}, :chunk_hash{i}, CAST(:embedding{i} AS vector), :embedding_version{i})"
+            )
+            for key, value in row.items():
+                params[f"{key}{i}"] = value
+
+        insert_sql = text(
+            f"""
+            INSERT INTO document_chunk (
+              id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding, embedding_version
+            )
+            VALUES {", ".join(values_sql)}
+            ON CONFLICT (document_id, chunk_index, embedding_version) DO NOTHING
+            RETURNING id::text AS id, document_id::text AS document_id, chunk_index
+            """
+        )
+
         attempt = 0
         while True:
             try:
                 with workspace_session_scope(workspace_id, write=True) as db:
                     db.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": int(cfg.statement_timeout_ms)})
-                    db.execute(
-                        text(
-                            """
-                            INSERT INTO document_chunk (
-                              id, document_id, workspace_id, chunk_index, chunk_text, chunk_hash, embedding, embedding_version
-                            )
-                            VALUES (
-                              :id, :document_id, :workspace_id, :chunk_index, :chunk_text, :chunk_hash, CAST(:embedding AS vector), :embedding_version
-                            )
-                            ON CONFLICT (document_id, chunk_index, embedding_version) DO NOTHING
-                            """
-                        ),
-                        chunk_rows,
-                    )
+                    inserted = db.execute(insert_sql, params).mappings().all()
                 break
             except Exception:
                 attempt += 1
@@ -170,13 +184,29 @@ def run_manifest(
                 backoff_ms = min(int(cfg.max_backoff_ms), int((2 ** (attempt - 1)) * 100))
                 time.sleep((backoff_ms / 1000.0) + random.random() * 0.05)
 
-        # Dual-write only after the Postgres transaction has committed — same
-        # ordering guarantee as the online ingestion path. bulk_upsert's _id
-        # is deterministic (document_id:chunk_index:embedding_version), so
-        # writing every row here regardless of whether the Postgres INSERT
-        # was a fresh row or hit ON CONFLICT DO NOTHING is safe and avoids
-        # needing RETURNING against a multi-row executemany insert.
-        _opensearch_dual_write_batch(os_rows)
+        # Only the rows RETURNING actually reported were fresh inserts. A
+        # row that hit ON CONFLICT DO NOTHING already exists under whatever
+        # id it was first inserted with — the pre-generated uuid4 in
+        # os_rows for that row is not that id, and would push a chunk_id
+        # into OpenSearch that no document_chunk row actually has (breaking
+        # the MMR reranker's embedding lookup and any other consumer that
+        # joins back to document_chunk by id). Filter to inserted rows only
+        # and patch in the real id, mirroring the online ingestion path
+        # (app/ingestion/pipeline.py), which skips the OpenSearch write
+        # under the same "row already existed, nothing changed" condition.
+        inserted_ids = {(r["document_id"], int(r["chunk_index"])): r["id"] for r in inserted}
+        real_os_rows = []
+        for os_row in os_rows:
+            key = (os_row["document_id"], int(os_row["chunk_index"]))
+            real_id = inserted_ids.get(key)
+            if real_id is None:
+                continue
+            os_row["chunk_id"] = real_id
+            real_os_rows.append(os_row)
+
+        # Dual-write only after the Postgres transaction has committed —
+        # same ordering guarantee as the online ingestion path.
+        _opensearch_dual_write_batch(real_os_rows)
         return len(chunk_rows)
 
 

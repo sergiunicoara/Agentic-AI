@@ -106,6 +106,16 @@ def process_document(document_id: str, workspace_id: str) -> None:
     - traceability via ingestion_run metadata
     """
 
+    # Tag new chunks with the workspace's *active* embedding version, not the
+    # process-level env default. After a reindex cutover (promote_target_to_active),
+    # a workspace's active_embedding_version can differ from settings.embedding_version;
+    # tagging with the stale env default would write chunks under a version
+    # retrieval no longer reads, making newly ingested documents silently
+    # invisible. Falls back to settings.embedding_version when the workspace
+    # has no index-state row yet (matches get_index_state()'s own default).
+    from app.indexing.index_state import get_index_state
+    embedding_version = get_index_state(workspace_id).active_embedding_version
+
     run_id = str(uuid.uuid4())
     with workspace_session_scope(workspace_id, write=True) as db:
         db.execute(
@@ -115,7 +125,7 @@ def process_document(document_id: str, workspace_id: str) -> None:
                 VALUES (:id, :doc, :workspace_id, 'running', :v)
                 """
             ),
-            {"id": run_id, "doc": document_id, "workspace_id": workspace_id, "v": settings.embedding_version},
+            {"id": run_id, "doc": document_id, "workspace_id": workspace_id, "v": embedding_version},
         )
 
     with timer(INGEST_LATENCY):
@@ -180,7 +190,7 @@ def process_document(document_id: str, workspace_id: str) -> None:
                             "chunk_text": ch,
                             "chunk_hash": chash,
                             "embedding": _vec_literal(v),
-                            "embedding_version": settings.embedding_version,
+                            "embedding_version": embedding_version,
                         },
                     ).first()
                     if inserted:
@@ -192,7 +202,7 @@ def process_document(document_id: str, workspace_id: str) -> None:
                             "content": ch,
                             "embedding": v,
                             "source": source,
-                            "embedding_version": settings.embedding_version,
+                            "embedding_version": embedding_version,
                         })
 
                 db.execute(

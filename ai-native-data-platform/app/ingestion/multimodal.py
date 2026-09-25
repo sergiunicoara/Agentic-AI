@@ -6,7 +6,6 @@ import uuid
 
 from sqlalchemy import text
 
-from app.core.config import settings
 from app.core.observability import INGEST_JOBS, emit_event
 from app.data.db import workspace_session_scope
 from app.providers.embeddings import embed
@@ -47,6 +46,11 @@ def process_images(
     external_id: str | None = None,
     document_id: str | None = None,
 ) -> None:
+    # See app/ingestion/pipeline.py::process_document for why this must be
+    # the workspace's active embedding version, not settings.embedding_version.
+    from app.indexing.index_state import get_index_state
+    embedding_version = get_index_state(workspace_id).active_embedding_version
+
     for page_number, (img_bytes, mime_type) in enumerate(images):
         image_hash = _hash_bytes(img_bytes)
 
@@ -88,7 +92,7 @@ def process_images(
                     "page_number": page_number,
                     "caption": caption,
                     "embedding": _vec_literal(embedding),
-                    "embedding_version": settings.embedding_version,
+                    "embedding_version": embedding_version,
                     "image_hash": image_hash,
                 },
             )
