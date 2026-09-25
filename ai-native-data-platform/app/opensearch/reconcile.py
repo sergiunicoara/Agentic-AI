@@ -141,7 +141,7 @@ def reconcile_workspace(workspace_id: str, *, batch_size: int = DEFAULT_SCAN_BAT
                     FROM document_chunk
                     WHERE workspace_id = :ws
                       AND embedding_version = :ev
-                      AND (:after::uuid IS NULL OR id > CAST(:after AS uuid))
+                      AND (CAST(:after AS uuid) IS NULL OR id > CAST(:after AS uuid))
                     ORDER BY id
                     LIMIT :lim
                     """
