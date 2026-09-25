@@ -88,6 +88,13 @@ def ingest_transcript(payload: TranscriptIn, workspace_id: str = Depends(require
 
     doc_id = str(uuid.uuid4())
     try:
+        # The document insert and its ingestion_job enqueue share this one
+        # transaction (both use `db`) so they commit or roll back together.
+        # Doing them as two separate transactions left a real gap: if the
+        # process died (or the enqueue insert itself failed) between them,
+        # the document existed but was never queued for processing — and
+        # re-POSTing the same transcript just returned "already_ingested"
+        # forever, since the document row was already there.
         with workspace_session_scope(payload.workspace_id, write=True) as db:
             db.execute(
                 text(
@@ -105,6 +112,7 @@ def ingest_transcript(payload: TranscriptIn, workspace_id: str = Depends(require
                     "x": payload.text,
                 },
             )
+            enqueue(doc_id, payload.workspace_id, db=db)
     except IntegrityError:
         with workspace_session_scope(payload.workspace_id) as db:
             row = db.execute(
@@ -118,7 +126,6 @@ def ingest_transcript(payload: TranscriptIn, workspace_id: str = Depends(require
             ).mappings().first()
         return {"status": "already_ingested", "document_id": row["id"] if row else None}
 
-    enqueue(doc_id, payload.workspace_id)
     emit_event("ingest_enqueued", {"document_id": doc_id, "workspace_id": payload.workspace_id})
     return {"status": "queued", "document_id": doc_id}
 

@@ -27,13 +27,14 @@ class IngestionJob:
 _WORKER_ID = f"{os.getenv('HOSTNAME', 'worker')}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
 
 
-def enqueue_document(document_id: str, workspace_id: str) -> str:
+def enqueue_document(document_id: str, workspace_id: str, *, db=None) -> str:
     return _insert_job(
         job_type="document",
         workspace_id=workspace_id,
         document_id=document_id,
         payload={},
         media=[],
+        db=db,
     )
 
 
@@ -44,6 +45,7 @@ def enqueue_images(
     *,
     external_id: str | None = None,
     document_id: str | None = None,
+    db=None,
 ) -> str:
     return _insert_job(
         job_type="image",
@@ -51,12 +53,21 @@ def enqueue_images(
         document_id=document_id,
         payload={"source_name": source_name, "external_id": external_id},
         media=images,
+        db=db,
     )
 
 
-def _insert_job(*, job_type: str, workspace_id: str, document_id: str | None, payload: dict, media: list[tuple[bytes, str]]) -> str:
-    job_id = str(uuid.uuid4())
-    with write_session_scope() as db:
+def _insert_job(
+    *,
+    job_type: str,
+    workspace_id: str,
+    document_id: str | None,
+    payload: dict,
+    media: list[tuple[bytes, str]],
+    db=None,
+) -> str:
+    def _do(db) -> str:
+        job_id = str(uuid.uuid4())
         db.execute(
             text(
                 """
@@ -88,7 +99,19 @@ def _insert_job(*, job_type: str, workspace_id: str, document_id: str | None, pa
                     "content": content,
                 },
             )
-    return job_id
+        return job_id
+
+    # A caller with an open write transaction (e.g. the /ingest/transcript
+    # handler, which must insert `document` and enqueue its ingestion_job
+    # atomically — a document committed without a queued job never gets
+    # processed, and re-POSTing just returns "already_ingested") passes its
+    # own session so both inserts commit or roll back together. Callers
+    # with no transaction of their own (durable-worker retries, scripts)
+    # get one opened here, as before.
+    if db is not None:
+        return _do(db)
+    with write_session_scope() as db:
+        return _do(db)
 
 
 def claim_next() -> IngestionJob | None:

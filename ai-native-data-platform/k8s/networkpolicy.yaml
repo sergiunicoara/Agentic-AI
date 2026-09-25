@@ -14,9 +14,21 @@ kind: NetworkPolicy
 metadata:
   name: ai-platform-allow-internal
 spec:
+  # k8s/api-deployment.yaml and k8s/worker-deployment.yaml label their pods
+  # `app: ai-platform-api` / `app: ai-platform-worker` respectively (matching
+  # their own Deployment selector and, for the API, its Service selector) —
+  # neither pod actually carries `app: ai-platform`. A matchLabels selector
+  # on that value matched nothing, so only the default-deny policy applied
+  # to these pods and their egress (DNS, Postgres, Redis, OpenSearch,
+  # OpenAI) was blocked entirely. matchExpressions selects both real values
+  # without changing either deployment's own selector-critical label.
   podSelector:
-    matchLabels:
-      app: ai-platform
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - ai-platform-api
+          - ai-platform-worker
   ingress:
     - from:
         - namespaceSelector: {}

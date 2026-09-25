@@ -50,9 +50,9 @@ def _opensearch_dual_write_batch(chunk_payloads: list[dict]) -> None:
 _started = False
 
 
-def enqueue(document_id: str, workspace_id: str) -> None:
+def enqueue(document_id: str, workspace_id: str, *, db=None) -> None:
     from app.ingestion.jobs import enqueue_document
-    enqueue_document(document_id, workspace_id)
+    enqueue_document(document_id, workspace_id, db=db)
 
 
 def start_worker() -> None:
