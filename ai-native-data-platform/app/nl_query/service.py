@@ -58,11 +58,24 @@ def run_nl_query(nl_query: str, workspace_id: str) -> dict:
         # 4. Execute
         results = execute_query(sql, params, workspace_id)
 
-    except NLQueryError:
+    except NLQueryError as e:
+        # Previously left `error` (and therefore the audit log's `error`
+        # column) as None for this entire branch — a validation rejection
+        # (the case most worth auditing, e.g. a filter value tripping the
+        # injection-keyword guard) was logged identically to a clean,
+        # successful query.
+        error = e.message
         raise
     except Exception as exc:
+        # Full detail goes into the audit log and the event log — both
+        # internal, operator-facing records — but never straight to the
+        # client. The previous f"Query execution failed: {exc}" put the
+        # raw exception text (which can carry table/column names, SQL
+        # fragments, or provider error details) directly into the 500
+        # response's body.
         error = str(exc)
-        raise NLQueryError(f"Query execution failed: {error}", status_code=500)
+        emit_event("nl_query_execution_failed", {"workspace_id": workspace_id, "error": error})
+        raise NLQueryError("Query execution failed. This has been logged for review.", status_code=500)
     finally:
         latency_ms = int((time.time() - t0) * 1000)
         write_audit_log(
