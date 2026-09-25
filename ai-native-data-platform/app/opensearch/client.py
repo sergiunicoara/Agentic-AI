@@ -15,6 +15,7 @@ disabled for the life of the process.
 import threading
 import time
 from typing import Optional
+from urllib.parse import urlsplit
 
 from app.core.config import settings
 from app.core.observability import emit_event
@@ -34,18 +35,31 @@ def _make_client():
     except ImportError:
         raise RuntimeError("opensearch-py not installed. Run: pip install opensearch-py==2.6.0")
 
-    url = settings.opensearch_url.rstrip("/")
-    # Parse host/port from URL (supports http://host:port)
-    url_clean = url.replace("http://", "").replace("https://", "")
-    use_ssl = url.startswith("https://")
-    host, _, port_str = url_clean.partition(":")
-    port = int(port_str) if port_str else (443 if use_ssl else 9200)
+    # urlsplit (stdlib) instead of the previous hand-rolled
+    # .replace("http://", "").replace("https://", "") + partition(":") —
+    # that approach broke on embedded basic-auth credentials
+    # (https://user:pass@host:port, the same convention DATABASE_URL/
+    # REDIS_URL already use in this codebase), IPv6 hosts, and any path
+    # component (e.g. a reverse proxy prefix), and had no way to extract
+    # credentials at all even if it had parsed the host/port correctly.
+    parsed = urlsplit(settings.opensearch_url.rstrip("/"))
+    use_ssl = parsed.scheme == "https"
+    host = parsed.hostname or "localhost"
+    port = parsed.port or (443 if use_ssl else 9200)
+    http_auth = (parsed.username, parsed.password) if parsed.username else None
 
     return OpenSearch(
         hosts=[{"host": host, "port": port}],
+        http_auth=http_auth,
         http_compress=True,
         use_ssl=use_ssl,
-        verify_certs=False,
+        # Secure by default: a real https:// endpoint (e.g. a managed
+        # OpenSearch service) gets real certificate validation, not a
+        # blanket "trust any certificate" that also silently accepts a
+        # MITM'd connection. opensearch_verify_certs exists as an explicit,
+        # opt-in escape hatch for a self-signed cert in local/test setups —
+        # never the unconditional default.
+        verify_certs=settings.opensearch_verify_certs if use_ssl else False,
         timeout=int(settings.opensearch_timeout_s),
         max_retries=3,
         retry_on_timeout=True,

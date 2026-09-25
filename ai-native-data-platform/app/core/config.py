@@ -211,6 +211,15 @@ class Settings(BaseSettings):
         default=5.0,
         description="Per-request timeout for OpenSearch queries (seconds).",
     )
+    opensearch_verify_certs: bool = Field(
+        default=True,
+        description=(
+            "Verify TLS certificates for https:// OPENSEARCH_URL endpoints. Only set to "
+            "false for a local/test cluster with a self-signed certificate — this is not "
+            "meant to be the default for anything reachable over a real network, since it "
+            "makes the connection accept any certificate, including a MITM's."
+        ),
+    )
     opensearch_rrf_k: int = Field(
         default=60,
         description="RRF k constant for fusing BM25 and vector results inside OpenSearch hybrid retriever.",

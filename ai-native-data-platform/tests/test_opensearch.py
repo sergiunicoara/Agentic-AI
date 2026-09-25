@@ -86,6 +86,75 @@ class TestOpenSearchClient:
         os_client_mod.reset()
 
 
+class TestMakeClientURLParsing:
+    """_make_client() previously hand-parsed OPENSEARCH_URL with
+    .replace("http://", "").replace("https://", "") + partition(":") — no
+    support for embedded basic-auth credentials, and it outright crashed
+    (ValueError) on a URL with a path component. It also always passed
+    verify_certs=False, so a real https:// endpoint (e.g. a managed
+    OpenSearch service) never got real certificate validation. Now uses
+    urllib3.parse.urlsplit and defaults verify_certs to True for https.
+    """
+
+    _skip = pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("opensearchpy"),
+        reason="opensearch-py not installed",
+    )
+
+    def _conn(self, client):
+        return client.transport.connection_pool.connections[0]
+
+    @_skip
+    def test_https_defaults_to_verified_certs(self, monkeypatch):
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "https://opensearch.example.com:9200")
+        monkeypatch.setattr("app.core.config.settings.opensearch_verify_certs", True)
+        from app.opensearch import client as os_client_mod
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            client = os_client_mod._make_client()
+        assert not any("insecure" in str(w.message).lower() for w in caught)
+        assert self._conn(client).host == "https://opensearch.example.com:9200"
+
+    @_skip
+    def test_explicit_verify_certs_false_is_still_honored(self, monkeypatch):
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "https://opensearch.example.com:9200")
+        monkeypatch.setattr("app.core.config.settings.opensearch_verify_certs", False)
+        from app.opensearch import client as os_client_mod
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            os_client_mod._make_client()
+        assert any("insecure" in str(w.message).lower() for w in caught)
+
+    @_skip
+    def test_embedded_basic_auth_credentials_are_applied(self, monkeypatch):
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "https://myuser:mypass@opensearch.example.com:9200")
+        monkeypatch.setattr("app.core.config.settings.opensearch_verify_certs", True)
+        from app.opensearch import client as os_client_mod
+        client = os_client_mod._make_client()
+        headers = self._conn(client).headers or {}
+        assert any(k.lower() == "authorization" for k in headers)
+
+    @_skip
+    def test_url_with_path_component_no_longer_crashes(self, monkeypatch):
+        # The old .partition(":") parser read "9243/os-proxy" as the port
+        # string and int() raised ValueError — a URL with any path segment
+        # (e.g. behind a reverse proxy) made OpenSearch entirely unusable.
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "https://opensearch.internal:9243/os-proxy")
+        monkeypatch.setattr("app.core.config.settings.opensearch_verify_certs", True)
+        from app.opensearch import client as os_client_mod
+        client = os_client_mod._make_client()
+        assert self._conn(client).host == "https://opensearch.internal:9243"
+
+    @_skip
+    def test_plain_http_unaffected(self, monkeypatch):
+        monkeypatch.setattr("app.core.config.settings.opensearch_url", "http://localhost:9200")
+        from app.opensearch import client as os_client_mod
+        client = os_client_mod._make_client()
+        assert self._conn(client).host == "http://localhost:9200"
+
+
 # ── Index management tests ───────────────────────────────────────────────────
 
 class TestIndexManagement:
