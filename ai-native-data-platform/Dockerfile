@@ -5,10 +5,16 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# System dependencies for building and running common Python packages (e.g. psycopg2)
+# System dependencies for building and running common Python packages (e.g.
+# psycopg2), plus poppler-utils: pdf2image (app/ingestion/multimodal.py's
+# PDF -> image conversion for /ingest/image) shells out to poppler's
+# pdftoppm/pdfinfo binaries and raises PDFInfoNotInstalledError without it —
+# PDF ingestion was silently broken in this image despite requirements.txt
+# documenting the dependency.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

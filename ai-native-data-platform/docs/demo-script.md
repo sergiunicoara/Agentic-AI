@@ -227,18 +227,18 @@ pytest tests/ -q
 ```
 ................................ [ 14%]
 ................................ [ 29%]
-................................ [ 44%]
-................................ [ 59%]
-................................ [ 74%]
-................................ [ 89%]
-.....................ss          [100%]
+................................ [ 43%]
+................................ [ 57%]
+................................ [ 72%]
+................................ [ 87%]
+.....................s          [100%]
 
-213 passed, 2 skipped in 8.75s
+222 passed, 1 skipped in 1.2s
 ```
 
-**PAUSE ON** "213 passed" — hold 2 seconds before cutting.
+**PAUSE ON** "222 passed" — hold 2 seconds before cutting.
 
-**V.O.:** *"213 tests. No live database or OpenSearch required — mocks injected at import time. Coverage: OpenSearch idempotency, prompt injection in five taxonomies, PII redaction, DSPy normalization edge cases, SQL builder for every filter operator, reliability contracts, rolling SLO, token bucket, chaos degradation when providers fail, remediation hysteresis, and the retrieval cache's index-epoch invalidation."*
+**V.O.:** *"222 tests. No live database or OpenSearch required — mocks injected at import time. Coverage: OpenSearch idempotency, prompt injection in five taxonomies, PII redaction, DSPy normalization edge cases, SQL builder for every filter operator, reliability contracts, rolling SLO, token bucket, chaos degradation when providers fail, remediation hysteresis, and the retrieval cache's index-epoch invalidation."*
 
 ---
 

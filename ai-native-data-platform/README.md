@@ -236,7 +236,7 @@ Prometheus scrapes `/metrics` every 10 seconds. Alertmanager rules are in `ops/p
 pytest tests/ -v
 ```
 
-213 tests covering:
+222 tests covering:
 - **OpenSearch**: client singleton + availability re-probe, index management, idempotent ingest (deterministic doc ids), BM25/vector/hybrid retrievers, RRF fusion, post-commit batched dual-write
 - **Safety**: prompt injection (5 taxonomies), PII redaction (6 types), toxicity filtering
 - **NL normalization**: table aliases, column aliases, operator aliases, SELECT * expansion, COUNT(*), idempotency

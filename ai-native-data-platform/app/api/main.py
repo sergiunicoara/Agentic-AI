@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 
 from app.auth import require_workspace_key
@@ -35,7 +36,7 @@ from app.retrieval.factory import build_pipeline
 from app.schemas import AskIn, AskOut, Citation, ImageIngestOut, NLQueryIn, NLQueryOut, TranscriptIn
 from app.nl_query.service import NLQueryError, run_nl_query
 from app.ingestion.pipeline import enqueue
-from app.ingestion.multimodal import enqueue_images, pdf_to_images
+from app.ingestion.multimodal import PdfTooManyPagesError, enqueue_images, pdf_to_images
 from app.core.safety.prompt_guard import check_query
 from app.core.safety.output_moderation import moderate_output
 
@@ -161,7 +162,14 @@ async def ingest_image(
     mime = file.content_type or "image/png"
 
     if mime == "application/pdf" or (file.filename or "").lower().endswith(".pdf"):
-        images = pdf_to_images(content)
+        # pdf2image shells out to poppler and rasterizes every page — real
+        # CPU work, not I/O. Running it inline on this async handler would
+        # block the event loop (and therefore every other concurrent
+        # request this process is serving) for however long that takes.
+        try:
+            images = await run_in_threadpool(pdf_to_images, content)
+        except PdfTooManyPagesError as e:
+            raise HTTPException(413, str(e))
     else:
         images = [(content, mime)]
 

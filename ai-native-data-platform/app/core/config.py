@@ -173,6 +173,16 @@ class Settings(BaseSettings):
         default=20_000_000,
         description="Max accepted size (bytes) for a single /ingest/image upload — guards against memory exhaustion from oversized files or PDF page-bomb expansion.",
     )
+    max_pdf_pages: int = Field(
+        default=50,
+        description=(
+            "Max pages accepted from a single PDF in /ingest/image. A PDF's "
+            "page count is not bounded by its byte size (a few KB of PDF "
+            "source can declare thousands of pages), so max_image_upload_bytes "
+            "alone doesn't cap the CPU/vision-API/pgvector-row cost of "
+            "rasterizing and ingesting one upload — this does."
+        ),
+    )
 
     # --- OpenSearch (alternative retrieval backend)
     opensearch_url: str = Field(

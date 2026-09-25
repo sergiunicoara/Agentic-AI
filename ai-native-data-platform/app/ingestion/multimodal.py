@@ -6,6 +6,7 @@ import uuid
 
 from sqlalchemy import text
 
+from app.core.config import settings
 from app.core.observability import INGEST_JOBS, emit_event
 from app.data.db import workspace_session_scope
 from app.providers.embeddings import embed
@@ -104,11 +105,36 @@ def process_images(
         )
 
 
-def pdf_to_images(pdf_bytes: bytes) -> list[tuple[bytes, str]]:
-    """Convert each PDF page to a PNG image for visual ingestion."""
-    from pdf2image import convert_from_bytes
+class PdfTooManyPagesError(ValueError):
+    """Raised when an uploaded PDF exceeds settings.max_pdf_pages."""
 
-    pages = convert_from_bytes(pdf_bytes, dpi=150, fmt="PNG")
+    def __init__(self, page_count: int, limit: int):
+        self.page_count = page_count
+        self.limit = limit
+        super().__init__(f"PDF has {page_count} pages, exceeding the limit of {limit}")
+
+
+def pdf_to_images(pdf_bytes: bytes) -> list[tuple[bytes, str]]:
+    """Convert each PDF page to a PNG image for visual ingestion.
+
+    Each page is a full rasterization (dpi=150) done by shelling out to
+    poppler — a small page cap protects the API process from a "page bomb"
+    (a tiny PDF file declaring thousands of pages) turning one upload into
+    an unbounded amount of CPU/memory work and, per page, its own vision
+    API call and pgvector row downstream.
+    """
+    from pdf2image import convert_from_bytes, pdfinfo_from_bytes
+
+    # pdfinfo is a cheap metadata read (no rasterization) — check the page
+    # count before doing any conversion work at all.
+    info = pdfinfo_from_bytes(pdf_bytes)
+    page_count = int(info.get("Pages") or 0)
+    if page_count > settings.max_pdf_pages:
+        raise PdfTooManyPagesError(page_count, settings.max_pdf_pages)
+
+    # last_page is defense in depth in case pdfinfo and the actual
+    # conversion ever disagree on page count (e.g. a malformed PDF).
+    pages = convert_from_bytes(pdf_bytes, dpi=150, fmt="PNG", last_page=settings.max_pdf_pages)
     result = []
     for page in pages:
         buf = io.BytesIO()
