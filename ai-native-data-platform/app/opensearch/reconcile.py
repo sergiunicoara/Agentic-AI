@@ -125,9 +125,14 @@ def reconcile_workspace(workspace_id: str, *, batch_size: int = DEFAULT_SCAN_BAT
     from app.opensearch.client import get_client
     client = get_client()
 
-    last_id = ""
+    last_id: str | None = None
     while True:
         with workspace_session_scope(workspace_id) as db:
+            # Cursor compares native `id` (uuid) rather than `id::text`, so
+            # this can use the primary-key index instead of re-sorting the
+            # whole workspace on every batch — matters once document_chunk
+            # is past demo scale. `:after` is a nullable uuid so the first
+            # page (last_id is None) doesn't need a sentinel value.
             rows = db.execute(
                 text(
                     """
@@ -136,8 +141,8 @@ def reconcile_workspace(workspace_id: str, *, batch_size: int = DEFAULT_SCAN_BAT
                     FROM document_chunk
                     WHERE workspace_id = :ws
                       AND embedding_version = :ev
-                      AND id::text > :after
-                    ORDER BY id::text
+                      AND (:after::uuid IS NULL OR id > CAST(:after AS uuid))
+                    ORDER BY id
                     LIMIT :lim
                     """
                 ),
