@@ -246,10 +246,25 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
         emit_event("prompt_injection_blocked", {"workspace_id": workspace_id, "reason": guard.reason})
         raise HTTPException(400, f"Query rejected: {guard.reason}")
 
+    # Admin-only overrides (canary embedding version, forced experiment) share
+    # one token check. Without gating X-Experiment specifically: any caller
+    # could pick their own retrieval pipeline directly — including opting
+    # back into an experiment the remediation controller has just forced
+    # traffic away from over an SLO violation, defeating the point of that
+    # automated safety override — and each distinct header value would also
+    # occupy a slot in build_pipeline's lru_cache(maxsize=32), a cheap way to
+    # evict legitimately-cached pipelines under churn.
+    is_admin = bool(
+        settings.admin_token
+        and hmac.compare_digest(request.headers.get("X-Admin-Token", ""), settings.admin_token)
+    )
+
     # A/B retrieval experiment routing.
-    # - X-Experiment allows explicit selection (debugging/analysis)
+    # - X-Experiment force-selects a pipeline (debugging/analysis) when
+    #   allow_experiment_override is on and the caller is an admin.
     # - otherwise stable percentage rollout chooses treatment
-    assignment = choose_experiment(payload.workspace_id, requested=request.headers.get("X-Experiment"))
+    requested_experiment = request.headers.get("X-Experiment") if (settings.allow_experiment_override and is_admin) else None
+    assignment = choose_experiment(payload.workspace_id, requested=requested_experiment)
     pipeline = build_pipeline(assignment.name)
     emit_event(
         "experiment_assigned",
@@ -272,12 +287,7 @@ def ask(payload: AskIn, request: Request, workspace_id: str = Depends(require_wo
         cache.set_json(qkey, query_vec, ttl_s=600)
 
     # Optional canary: force retrieval to use a specific embedding_version for this request.
-    # Guarded by an admin token to avoid abuse.
-    embedding_override = None
-    if settings.allow_embedding_override:
-        req_token = request.headers.get("X-Admin-Token", "")
-        if settings.admin_token and hmac.compare_digest(req_token, settings.admin_token):
-            embedding_override = request.headers.get("X-Embedding-Version-Override")
+    embedding_override = request.headers.get("X-Embedding-Version-Override") if (settings.allow_embedding_override and is_admin) else None
 
     try:
         hits, retrieval_ms = pipeline.run(

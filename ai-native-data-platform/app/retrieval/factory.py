@@ -29,10 +29,19 @@ def _os_hybrid():
 
 
 def _load_experiment_config(experiment: str) -> dict[str, Any]:
-    # Accept explicit file path, otherwise look in app/eval/experiments.
-    path = experiment
-    if not (os.path.isfile(path) and path.endswith((".yml", ".yaml"))):
-        path = os.path.join("app", "eval", "experiments", f"{experiment}.yaml")
+    # Strictly a name resolved against app/eval/experiments/ — never a
+    # caller-supplied path. `experiment` can originate from choose_experiment's
+    # X-Experiment header (app/core/exp/router.py, app/api/main.py), which is
+    # client-controlled input on a normal API request; the previous "accept
+    # an explicit file path" fallback meant a request could read any .yml/
+    # .yaml file the process can see (e.g. `X-Experiment: ../../k8s/secrets`
+    # style traversal). os.path.basename strips any path components, and
+    # comparing against the original rejects the input outright instead of
+    # silently reinterpreting a traversal attempt as some other filename.
+    safe_name = os.path.basename(experiment)
+    if safe_name != experiment:
+        return {}
+    path = os.path.join("app", "eval", "experiments", f"{safe_name}.yaml")
     if not os.path.isfile(path):
         return {}
 

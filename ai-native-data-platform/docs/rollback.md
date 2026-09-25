@@ -10,7 +10,14 @@ The workflow in `.github/workflows/eval-gates.yml` runs `python -m app.eval.run`
 
 Online retrieval is parameterized by experiment configs (`app/eval/experiments/*.yaml`). Requests can select an experiment via:
 
-- Header: `X-Experiment: <experiment-name>`
+- Header: `X-Experiment: <experiment-name>` — admin-only (same gating as the
+  embedding-version canary override below): set `ALLOW_EXPERIMENT_OVERRIDE=true`
+  and `ADMIN_TOKEN=<secret>`, then send `X-Admin-Token: <secret>` alongside
+  `X-Experiment`. Without a valid token the header is ignored and normal
+  rollout logic applies. This isn't optional hardening — an unauthenticated
+  per-request pipeline override would let any caller opt back into an
+  experiment the SLO-triggered rollback below just forced traffic away from,
+  defeating the mechanism entirely.
 - Percentage rollout: `AB_ROLLOUT_PERCENT` with stable hashing by workspace_id
 
 A typical rollback is simply: set `AB_ROLLOUT_PERCENT=0` (or route all traffic back to `baseline`). This is configuration-only and does not require code rollback.

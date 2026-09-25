@@ -105,15 +105,22 @@ curl -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H
 
 ## S04 — INT. TERMINAL — SWITCH RETRIEVAL BACKEND LIVE `1:35 – 1:55`
 
-Same request body. One extra header. Different engine. Result is identical.
+Same request body. Two extra headers. Different engine. Result is identical.
+
+`X-Experiment` is admin-gated (see docs/rollback.md) — an unauthenticated
+per-request pipeline override would let any caller opt back into an
+experiment an SLO-triggered rollback just forced traffic away from. Set
+`ALLOW_EXPERIMENT_OVERRIDE=true` and `ADMIN_TOKEN=demo-admin-token` on the
+`api` service for this demo, then pass `X-Admin-Token` alongside
+`X-Experiment`.
 
 **PowerShell:**
 ```
-curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
+curl.exe --% -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -H "X-Admin-Token: demo-admin-token" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
 ```
 **cmd / bash:**
 ```
-curl -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
+curl -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Workspace-Id: demo" -H "X-API-Key: demo" -H "X-Experiment: opensearch_hybrid" -H "X-Admin-Token: demo-admin-token" -d "{\"workspace_id\":\"demo\",\"query\":\"How many days do customers have to request a refund?\"}"
 ```
 
 ```json

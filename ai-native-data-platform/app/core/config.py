@@ -217,5 +217,16 @@ class Settings(BaseSettings):
     # --- Admin / ops
     admin_token: str = Field(default="", description="Shared secret for privileged operational endpoints.")
     allow_embedding_override: bool = Field(default=False, description="If true, allow admin canary reads with an explicit embedding_version override.")
+    allow_experiment_override: bool = Field(
+        default=False,
+        description=(
+            "If true, allow X-Experiment to force a specific retrieval pipeline for a "
+            "request (debugging/analysis), gated by X-Admin-Token like the embedding "
+            "override above. Without a token requirement, any caller could pick their own "
+            "pipeline directly — including opting back into an experiment the remediation "
+            "controller has forced traffic away from, defeating the whole point of the "
+            "automated SLO-driven safety override."
+        ),
+    )
 
 settings = Settings()
