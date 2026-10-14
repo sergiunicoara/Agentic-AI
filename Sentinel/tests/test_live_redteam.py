@@ -67,10 +67,8 @@ def test_discover_fails_safe_on_worker_error_dict():
     to unpack" deep in the caller instead of the real import failure.
     _discover_callable_targets must fail safe to [] instead.
     """
-    fake_proc = MagicMock()
-    fake_proc.stdout = '{"status": "worker_error", "error": "No module named \'eval\'"}\n'
-    fake_proc.stderr = ""
-    with patch("subprocess.run", return_value=fake_proc):
+    worker_output = ('{"status": "worker_error", "error": "No module named \'eval\'"}\n', "")
+    with patch("sentinel.redteam.live_runner._run_worker", return_value=worker_output):
         result = _discover_callable_targets(Path(T1_PATH) / "agent.py")
     assert result == []
 

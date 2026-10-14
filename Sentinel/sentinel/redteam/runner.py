@@ -9,10 +9,17 @@ This is static red-teaming — we analyze the attack surface
 rather than executing live injections (which would require
 a running target agent).
 """
+import re
 import uuid
-from pathlib import Path
 from sentinel.redteam.corpus import get_all_payloads
 from sentinel.models.schemas import Evidence
+from sentinel.mcp.evidence_server import _validate_target
+
+# open()/read_text() whose path argument is NOT a plain string literal — a
+# file read the caller can steer. `open("config.json")` is not a surface.
+_DYNAMIC_FILE_READ = re.compile(
+    r"""(?<![\w.])open\(\s*(?!["'])[^)\s]|\.read_text\(|\bfile_read\b"""
+)
 
 
 def _detect_vulnerable_surfaces(target_path: str) -> dict:
@@ -28,7 +35,7 @@ def _detect_vulnerable_surfaces(target_path: str) -> dict:
         "tool_output": [],
     }
 
-    target = Path(target_path)
+    target = _validate_target(target_path)
     for py_file in target.rglob("*.py"):
         try:
             code = py_file.read_text(encoding="utf-8", errors="ignore")
@@ -43,7 +50,7 @@ def _detect_vulnerable_surfaces(target_path: str) -> dict:
                 if "subprocess" in line and "shell=True" in line:
                     surfaces["subprocess_surface"].append(locator)
 
-                if any(x in line for x in ["open(", "read_text(", "file_read"]):
+                if _DYNAMIC_FILE_READ.search(line):
                     surfaces["file_read_surface"].append(locator)
 
                 if any(x in line for x in ["user_input", "input(", "request.data"]):
@@ -64,7 +71,8 @@ def run_red_team(target_path: str) -> dict:
     Returns results with trajectory evidence.
 
     Args:
-        target_path: Path to the target agent
+        target_path: Path to the target agent (validated against SCAN_ROOT
+            before any file is read; raises InvalidTargetPath otherwise)
 
     Returns:
         dict with results, trajectory evidence, and summary stats

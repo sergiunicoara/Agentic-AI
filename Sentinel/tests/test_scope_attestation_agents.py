@@ -23,16 +23,15 @@ def test_profile_target_selects_skills():
 
 
 def test_produce_attestation_runs_the_gate():
-    """produce_attestation must run the adjudicator and return a signed verdict."""
+    """produce_attestation must run the adjudicator against a server-side scan."""
     evidence = collect_evidence("targets/t1_injection")
     candidates = audit_for_injection(evidence)
-    evidence_json = json.dumps([e.model_dump() for e in evidence])
 
-    result = produce_attestation(json.dumps(candidates), evidence_json, "targets/t1_injection")
+    result = produce_attestation(json.dumps(candidates), "targets/t1_injection")
 
     assert result["verdict"] == "fail"
     assert result["findings_count"] > 0
-    assert result["signature"].startswith("sentinel-")
+    assert result["signature"] == "unsigned" or result["signature"].startswith("hmac-sha256:")
     assert result["audit_ref"].startswith("audit-")
 
 
@@ -43,13 +42,13 @@ def test_produce_attestation_drops_unsupported_finding():
         "confidence": 0.9, "title": "made up", "rationale": "no evidence",
         "evidence_ids": ["ev_does_not_exist"],
     }]
-    result = produce_attestation(json.dumps(fake_candidate), "[]", "targets/c1_clean")
+    result = produce_attestation(json.dumps(fake_candidate), "targets/c1_clean")
     assert result["findings_count"] == 0
     assert result["verdict"] == "pass"
 
 
 def test_produce_attestation_handles_bad_json():
-    result = produce_attestation("not valid json", "[]", "x")
+    result = produce_attestation("not valid json", "x")
     assert "error" in result
 
 

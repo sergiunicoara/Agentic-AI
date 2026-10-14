@@ -8,30 +8,47 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from google.adk.agents import Agent
 from sentinel.agents.adjudicator import adjudicate
+from sentinel.agents.evidence_agent import collect_evidence_with_status
+from sentinel.mcp.evidence_server import _validate_target, InvalidTargetPath, SCAN_ROOT
 import json
 
 
 def produce_attestation(
     candidate_findings_json: str,
-    evidence_store_json: str,
     target_path: str,
 ) -> dict:
     """
-    Run the Adjudicator trust gate and produce a signed attestation.
+    Run the Adjudicator trust gate and produce an attestation.
     Drops any finding without deterministic evidence.
+
+    The evidence store is NEVER taken from the caller: this tool re-runs the
+    deterministic scan of target_path server-side and adjudicates against
+    that. Evidence ids are content-addressed, so ids from an earlier scan of
+    the same, unchanged target still resolve; fabricated ids never do.
 
     Args:
         candidate_findings_json: JSON string of candidate findings from auditors
-        evidence_store_json: JSON string of evidence items from EvidenceAgent
-        target_path: Path to the scanned target
+        target_path: Path to the scanned target (inside the scan root)
     """
     try:
         candidates = json.loads(candidate_findings_json)
-        evidence = json.loads(evidence_store_json)
     except json.JSONDecodeError as e:
         return {"error": f"Invalid JSON input: {e}"}
+    if not isinstance(candidates, list):
+        return {"error": "candidate_findings_json must be a JSON array"}
 
-    attestation = adjudicate(candidates, evidence, target_path)
+    try:
+        resolved = _validate_target(target_path)
+    except InvalidTargetPath as e:
+        attestation = adjudicate(candidates, [], str(target_path),
+                                 inconclusive_reasons=[f"invalid target: {e}"])
+    else:
+        evidence, tool_status = collect_evidence_with_status(str(resolved))
+        display_target = resolved.relative_to(SCAN_ROOT).as_posix() if resolved != SCAN_ROOT else "."
+        attestation = adjudicate(
+            candidates, [e.model_dump() for e in evidence], display_target,
+            tool_status=tool_status,
+        )
 
     return {
         "target": attestation.target,
@@ -47,6 +64,7 @@ def produce_attestation(
             }
             for f in attestation.findings
         ],
+        "inconclusive_reasons": attestation.inconclusive_reasons,
         "signature": attestation.signature,
         "audit_ref": attestation.audit_ref,
     }
@@ -58,19 +76,26 @@ attestation_agent = Agent(
     instruction="""You are the Attestation Agent — the final stage of
 Sentinel's security review pipeline.
 
-You receive candidate findings from specialist auditors and evidence
-from the EvidenceAgent. Your job is to:
+You receive candidate findings from specialist auditors. Your job is to:
 
-1. Call produce_attestation with the candidates and evidence
-2. The Adjudicator trust gate will DROP any finding without evidence
+1. Call produce_attestation with the candidates and the target path.
+   Sentinel re-runs the deterministic scan itself — you cannot supply
+   evidence, only candidate findings that cite evidence ids.
+2. The Adjudicator trust gate will DROP any finding that cites no
+   evidence, cites any id the scan didn't produce, or cites evidence
+   that doesn't match the finding
 3. Interpret the surviving findings and the verdict
 4. Explain what the attestation means for the target
 
 Always state clearly:
-- The verdict (pass / pass_with_findings / fail)
+- The verdict (pass / pass_with_findings / fail / inconclusive).
+  "inconclusive" means a scanner did not run or the target was invalid —
+  it is NOT a pass; list the inconclusive_reasons
 - How many findings were dropped vs survived
 - What the audit_ref is for traceability
-- That the attestation is signed and immutable
+- The signature status: an "hmac-sha256:..." signature can be verified
+  with the deployment's SENTINEL_SIGNING_KEY; "unsigned" means no key was
+  configured and the attestation is not tamper-evident
 
 You are the trust anchor of the pipeline. Be precise.""",
     tools=[produce_attestation],

@@ -6,12 +6,14 @@ semgrep's project-authored rules (sentinel/mcp/semgrep_rules/agent_security.yaml
 catch them. If these tests fail, the "semgrep raises the ceiling" claim in
 the README is no longer backed by anything.
 """
+import json
 from pathlib import Path
 from unittest.mock import patch
 
 import sentinel.mcp.evidence_server as evidence_server
 from sentinel.mcp.evidence_server import security_scan, semgrep_scan
 from sentinel.pipeline import run_sentinel
+from conftest import requires_semgrep
 
 T6_PATH = str(Path(__file__).parent.parent / "targets" / "t6_ssrf")
 
@@ -36,6 +38,7 @@ def test_bandit_finds_nothing_relevant_on_t6():
     )
 
 
+@requires_semgrep
 def test_semgrep_catches_ssrf_on_t6():
     """The custom sentinel-ssrf-unvalidated-url rule must fire on T6."""
     result = semgrep_scan(T6_PATH)
@@ -43,6 +46,7 @@ def test_semgrep_catches_ssrf_on_t6():
     assert any("ssrf" in c.lower() for c in check_ids)
 
 
+@requires_semgrep
 def test_semgrep_catches_llm_key_by_value_format_on_t6():
     """The custom sentinel-llm-api-key-hardcoded rule must fire on T6."""
     result = semgrep_scan(T6_PATH)
@@ -50,6 +54,7 @@ def test_semgrep_catches_llm_key_by_value_format_on_t6():
     assert any("llm-api-key" in c.lower() for c in check_ids)
 
 
+@requires_semgrep
 def test_local_rules_survive_a_failed_registry_pack(monkeypatch):
     """
     The local-rules config group runs as its own semgrep invocation
@@ -80,12 +85,7 @@ def test_local_rules_survive_a_failed_registry_pack(monkeypatch):
     )
 
 
-def test_failed_registry_pack_is_not_retried_for_each_scan(monkeypatch):
-    """A registry outage must not add a 120-second timeout to every target."""
-    local_group = [str(evidence_server._SEMGREP_RULES_DIR)]
-    registry_group = ["p/python", "p/gitleaks"]
-    calls = []
-
+def _fake_semgrep(calls, registry_group, registry_ok=lambda: False):
     def fake_run(command, **_kwargs):
         configs = [
             command[index + 1]
@@ -93,22 +93,76 @@ def test_failed_registry_pack_is_not_retried_for_each_scan(monkeypatch):
             if value == "--config"
         ]
         calls.append(configs)
-        if configs == registry_group:
-            return {"returncode": -1, "stdout": "", "stderr": "registry unavailable"}
-        return {"returncode": 0, "stdout": '{"results": [], "errors": []}', "stderr": ""}
+        if configs == registry_group and not registry_ok():
+            return {"status": "ran", "returncode": 2, "stdout": "", "stderr": "registry unavailable"}
+        return {"status": "ran", "returncode": 0,
+                "stdout": '{"results": [], "errors": []}', "stderr": ""}
+    return fake_run
+
+
+def test_failed_registry_pack_backs_off_then_retries(monkeypatch):
+    """
+    A registry outage must not add a 120-second timeout to every target in
+    a batch — but it must not be sticky for the life of the process either:
+    after the back-off window the registry group is retried.
+    """
+    local_group = [str(evidence_server._SEMGREP_RULES_DIR)]
+    registry_group = ["p/python", "p/gitleaks"]
+    calls = []
+    clock = {"now": 1000.0}
 
     monkeypatch.setattr(evidence_server, "SEMGREP_CONFIG_GROUPS", [local_group, registry_group])
     monkeypatch.setattr(evidence_server, "_REGISTRY_CONFIG_GROUP", registry_group)
-    monkeypatch.setattr(evidence_server, "_registry_packs_unavailable", False)
-    monkeypatch.setattr(evidence_server, "_run", fake_run)
+    monkeypatch.setattr(evidence_server, "_registry_failed_at", None)
+    monkeypatch.setattr(evidence_server, "REGISTRY_RETRY_SECONDS", 300)
+    monkeypatch.setattr(evidence_server, "_now", lambda: clock["now"])
+    monkeypatch.setattr(evidence_server, "_run", _fake_semgrep(calls, registry_group))
 
-    semgrep_scan(T6_PATH)
-    semgrep_scan(T6_PATH)
-
+    first = semgrep_scan(T6_PATH)
+    second = semgrep_scan(T6_PATH)
     assert calls.count(registry_group) == 1
     assert calls.count(local_group) == 2
+    # A registry failure is a warning, not a scan failure: local rules ran.
+    assert first["status"] == "ok" and second["status"] == "ok"
+    assert any("registry" in w for w in second["warnings"])
+
+    clock["now"] += 301
+    semgrep_scan(T6_PATH)
+    assert calls.count(registry_group) == 2
 
 
+def test_semgrep_parse_errors_do_not_discard_results(monkeypatch):
+    """One unparseable file must not throw away the whole group's results."""
+    payload = json.dumps({
+        "results": [{"check_id": "sentinel-ssrf-unvalidated-url", "path": "a.py",
+                     "start": {"line": 3}, "extra": {"message": "m"}}],
+        "errors": [{"message": "Syntax error in b.py"}],
+    })
+    monkeypatch.setattr(evidence_server, "_run", lambda *_a, **_k: {
+        "status": "ran", "returncode": 2, "stdout": payload, "stderr": ""})
+    result = semgrep_scan(T6_PATH)
+    assert result["status"] == "ok"
+    assert len(result["findings"]) == 1
+    assert any("Syntax error" in w for w in result["warnings"])
+
+
+def test_semgrep_missing_is_reported_not_silently_empty(monkeypatch):
+    monkeypatch.setattr(evidence_server, "resolve_scanner", lambda _name: None)
+    result = semgrep_scan(T6_PATH)
+    assert result["status"] == "missing"
+    assert result["findings"] == []
+
+
+def test_semgrep_runs_with_nosem_disabled(monkeypatch):
+    """A target must not be able to silence rules with `# nosemgrep`."""
+    seen = []
+    monkeypatch.setattr(evidence_server, "_run", lambda cmd, **_k: seen.append(cmd) or {
+        "status": "ran", "returncode": 0, "stdout": '{"results": [], "errors": []}', "stderr": ""})
+    semgrep_scan(T6_PATH)
+    assert seen and all("--disable-nosem" in cmd for cmd in seen)
+
+
+@requires_semgrep
 def test_full_pipeline_catches_t6_via_semgrep_only():
     """
     The end-to-end pipeline must FAIL on T6, and every surviving finding

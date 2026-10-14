@@ -7,7 +7,8 @@ to it is what turns Sentinel from a demo into something a team can wire
 into a pipeline: `sentinel-review --sarif report.sarif.json`.
 """
 import json
-from sentinel.models.schemas import Attestation, PILLARS
+from pathlib import Path
+from sentinel.models.schemas import Attestation, Evidence, PILLARS
 
 SARIF_SEVERITY_TO_LEVEL = {
     "low": "note",
@@ -15,6 +16,45 @@ SARIF_SEVERITY_TO_LEVEL = {
     "high": "error",
     "critical": "error",
 }
+
+
+def _scan_root() -> Path:
+    from sentinel.mcp.evidence_server import SCAN_ROOT
+    return SCAN_ROOT
+
+
+def _physical_location(ev: Evidence | None, attestation: Attestation) -> dict:
+    """
+    SARIF physicalLocation for one piece of evidence: the real file (relative
+    to SRCROOT = the scan root when inside it) and start line. pip-audit
+    evidence locates a package, so it points at the target's requirements.txt.
+    Falls back to the target directory when the evidence isn't available.
+    """
+    target_uri = attestation.target.rstrip("/") or "."
+    if ev is None:
+        return {"artifactLocation": {"uri": target_uri, "uriBaseId": "SRCROOT"}}
+    if ev.source == "pip_audit":
+        return {"artifactLocation": {"uri": f"{target_uri}/requirements.txt",
+                                     "uriBaseId": "SRCROOT"}}
+
+    path, sep, tail = ev.locator.rpartition(":")
+    line = int(tail) if sep and tail.isdigit() else None
+    file_part = path if line is not None or (sep and ev.source == "redteam_trajectory") else ev.locator
+    p = Path(file_part)
+    location: dict
+    if p.is_absolute():
+        try:
+            location = {"uri": p.resolve().relative_to(_scan_root()).as_posix(),
+                        "uriBaseId": "SRCROOT"}
+        except ValueError:
+            location = {"uri": p.as_uri()}
+    else:
+        location = {"uri": p.as_posix(), "uriBaseId": "SRCROOT"}
+
+    physical = {"artifactLocation": location}
+    if line and line > 0:
+        physical["region"] = {"startLine": line}
+    return physical
 
 
 def attestation_to_sarif(attestation: Attestation) -> dict:
@@ -25,6 +65,7 @@ def attestation_to_sarif(attestation: Attestation) -> dict:
     """
     rules = {}
     results = []
+    evidence_by_id = {ev.evidence_id: ev for ev in attestation.evidence}
 
     for finding in attestation.findings:
         rule_id = f"sentinel/pillar-{finding.pillar}"
@@ -47,9 +88,7 @@ def attestation_to_sarif(attestation: Attestation) -> dict:
         locations = []
         for evidence_id in finding.evidence_ids:
             locations.append({
-                "physicalLocation": {
-                    "artifactLocation": {"uri": evidence_id},
-                },
+                "physicalLocation": _physical_location(evidence_by_id.get(evidence_id), attestation),
                 "logicalLocations": [{"name": evidence_id, "kind": "evidence"}],
             })
 
@@ -58,7 +97,7 @@ def attestation_to_sarif(attestation: Attestation) -> dict:
             "level": SARIF_SEVERITY_TO_LEVEL.get(finding.severity, "warning"),
             "message": {"text": f"{finding.title}\n\n{finding.rationale}"},
             "locations": locations or [{
-                "physicalLocation": {"artifactLocation": {"uri": attestation.target}}
+                "physicalLocation": _physical_location(None, attestation)
             }],
             "properties": {
                 "sentinel_finding_id": finding.finding_id,
@@ -80,11 +119,13 @@ def attestation_to_sarif(attestation: Attestation) -> dict:
                 }
             },
             "originalUriBaseIds": {
-                "SRCROOT": {"uri": f"file:///{attestation.target}/"}
+                "SRCROOT": {"uri": _scan_root().as_uri() + "/"}
             },
             "results": results,
             "properties": {
                 "verdict": attestation.verdict,
+                "inconclusive_reasons": attestation.inconclusive_reasons,
+                "tool_status": attestation.tool_status,
                 "audit_ref": attestation.audit_ref,
                 "signature": attestation.signature,
             },

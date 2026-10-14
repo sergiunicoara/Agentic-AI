@@ -19,6 +19,14 @@ Two modes, both print exactly one JSON line to stdout:
   <module_file> <func_name> <param_kind> <payload_file>
       Call module.func_name(payload) — payload read from payload_file,
       decoded as str or bytes per param_kind — and report the outcome.
+
+Injection is confirmed by an OBSERVED EFFECT, not by the call merely
+completing: before the call, dangerous sinks (eval, exec, compile,
+os.system, os.popen, subprocess.Popen, pickle/marshal loads) are wrapped.
+If the attacker-controlled payload reaches one of them, the sink name is
+recorded in "sinks_hit" and the call is REFUSED (a SinkBlocked exception),
+so the payload never actually executes. Calls with untainted arguments
+pass through unchanged.
 """
 import importlib.util
 import inspect
@@ -63,6 +71,58 @@ def _lock_down():
         pass  # Windows has no `resource` module
 
 
+class SinkBlocked(Exception):
+    """Raised in place of executing a sink that received the payload."""
+
+
+def _tainted(value, needles: tuple) -> bool:
+    if isinstance(value, (list, tuple)):
+        return any(_tainted(v, needles) for v in value)
+    if isinstance(value, (bytes, bytearray)):
+        return any(isinstance(n, bytes) and n and n in value for n in needles)
+    if isinstance(value, str):
+        return any(isinstance(n, str) and n and n in value for n in needles)
+    return False
+
+
+def _install_sink_guards(payload_text: str) -> list[str]:
+    """
+    Wrap dangerous sinks so a payload reaching them is recorded and refused.
+    Returns the (live) list that sink names are appended to.
+    """
+    import builtins
+    import marshal
+    import os
+    import pickle
+    import subprocess
+
+    needles = (payload_text, payload_text.encode("utf-8"))
+    hits: list[str] = []
+
+    def guard(name, real, frame_globals=False):
+        def wrapper(*args, **kwargs):
+            if _tainted(list(args) + list(kwargs.values()), needles):
+                hits.append(name)
+                raise SinkBlocked(f"payload reached {name}; blocked by Sentinel sink guard")
+            if frame_globals and len(args) == 1 and not kwargs:
+                # eval/exec called with only a source string use the CALLER's
+                # namespace — preserve that for untainted pass-through calls.
+                caller = sys._getframe(1)
+                return real(args[0], caller.f_globals, caller.f_locals)
+            return real(*args, **kwargs)
+        return wrapper
+
+    builtins.eval = guard("eval", builtins.eval, frame_globals=True)
+    builtins.exec = guard("exec", builtins.exec, frame_globals=True)
+    builtins.compile = guard("compile", builtins.compile)
+    os.system = guard("os.system", os.system)
+    os.popen = guard("os.popen", os.popen)
+    subprocess.Popen = guard("subprocess.Popen", subprocess.Popen)
+    pickle.loads = guard("pickle.loads", pickle.loads)
+    marshal.loads = guard("marshal.loads", marshal.loads)
+    return hits
+
+
 def _load_module(module_file: str):
     spec = importlib.util.spec_from_file_location(
         f"_sentinel_live_{uuid.uuid4().hex}", module_file
@@ -103,18 +163,25 @@ def _invoke(module_file: str, func_name: str, param_kind: str, payload_file: str
 
     module = _load_module(module_file)
     fn = getattr(module, func_name)
+    # Guards go in AFTER import, so the target's own import-time code is
+    # unaffected; only the payload-carrying call is observed.
+    sinks_hit = _install_sink_guards(payload_text)
 
     real_stdout = sys.stdout
     try:
         sys.stdout = io.StringIO()  # don't let target prints corrupt our JSON line
         result = fn(arg)
-        return {"status": "completed", "return_repr": repr(result)[:200]}
+        return {"status": "completed", "return_repr": repr(result)[:200],
+                "sinks_hit": sorted(set(sinks_hit)),
+                "reflected": _tainted(result, (payload_text, payload_text.encode("utf-8")))}
     except Exception as e:
         return {
             "status": "raised_exception",
             "exception_type": type(e).__name__,
             "exception_msg": str(e)[:400],
             "network_blocked": "blocked by Sentinel red-team sandbox" in str(e),
+            "sinks_hit": sorted(set(sinks_hit)),
+            "reflected": False,
         }
     finally:
         sys.stdout = real_stdout

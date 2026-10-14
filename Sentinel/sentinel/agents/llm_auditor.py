@@ -18,7 +18,6 @@ than raising — the rest of the pipeline must not depend on this auditor.
 """
 import json
 import os
-from pathlib import Path
 
 from sentinel.models.schemas import Evidence, PILLARS
 
@@ -29,28 +28,34 @@ SYSTEM_PROMPT = """You are a security auditor reviewing a software agent's sourc
 You will be given:
 1. The target's source code
 2. A list of deterministic evidence items already collected by static
-   analysis tools (bandit, ruff, pip-audit), each with a unique evidence_id
+   analysis tools (bandit, ruff, pip-audit, semgrep), each with a unique evidence_id
 
 Propose security findings for risks you see in the source code. Every
 finding you propose MUST cite at least one evidence_id from the provided
 list that supports it — do not invent evidence_ids, and do not propose a
 finding with no supporting evidence_id. If you believe there is a real
 risk but no evidence item supports it, do not report it; say nothing
-rather than report it without an evidence_id.
+rather than report it without an evidence_id. A finding that cites even
+one evidence_id not in the list, or evidence from a different file than
+the one it names, is discarded entirely.
 
 Respond with ONLY a JSON array (no markdown fences, no prose) of objects
 with exactly these fields:
   finding_id (string, unique), pillar (int 1-7), severity (one of
   "low","med","high","critical"), confidence (float 0-1), title (string),
   rationale (string), evidence_ids (array of strings — must be from the
-  provided list), remediation (string).
+  provided list), remediation (string), file (string — the source file
+  the finding is about, as shown in the cited evidence locator).
 
 If there is nothing to report, respond with an empty JSON array: []
 """
 
 
 def _build_prompt(target_path: str, evidence_list: list[Evidence]) -> str:
-    target = Path(target_path)
+    # Validate before reading any source: same SCAN_ROOT allow-list (and
+    # SCAN_ROOT-relative resolution) as the scanners.
+    from sentinel.mcp.evidence_server import _validate_target
+    target = _validate_target(target_path)
     code_chunks = []
     for py_file in sorted(target.rglob("*.py")):
         try:

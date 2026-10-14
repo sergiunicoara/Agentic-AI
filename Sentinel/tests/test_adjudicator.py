@@ -122,5 +122,5 @@ def test_clean_target_gets_pass_verdict():
     attestation = adjudicate([], [], "targets/c1_clean")
     assert attestation.verdict == "pass"
     assert len(attestation.findings) == 0
-    assert attestation.signature.startswith("sentinel-")
+    assert attestation.signature == "unsigned" or attestation.signature.startswith("hmac-sha256:")
     assert attestation.audit_ref.startswith("audit-")

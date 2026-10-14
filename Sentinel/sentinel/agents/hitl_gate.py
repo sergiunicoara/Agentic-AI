@@ -67,17 +67,22 @@ class HITLGate:
 
         approved = []
         rejected = []
+        pending = []
 
-        # Auto-approve low severity if configured
-        if self.auto_approve_low and low_severity:
+        # Auto-approve low severity if configured; otherwise low/med go
+        # through the same explicit review as high/critical (never left
+        # without a recorded decision).
+        if self.auto_approve_low:
             for f in low_severity:
                 print(f"  ✓ AUTO-APPROVED [LOW/MED]: {f.title}")
                 approved.append(f)
                 self._log_decision(f, "auto_approved", target_path)
+            needs_review = high_severity
+        else:
+            needs_review = high_severity + low_severity
 
-        # High/critical always require explicit approval
-        for f in high_severity:
-            print("\n  ⚠️  HIGH/CRITICAL FINDING:")
+        for f in needs_review:
+            print(f"\n  ⚠️  {f.severity.upper()} FINDING:")
             print(f"     Title:    {f.title}")
             print(f"     Severity: {f.severity.upper()}")
             print(f"     Pillar:   {f.pillar}")
@@ -97,17 +102,19 @@ class HITLGate:
                     print(f"  ✗ REJECTED: {f.title}")
             else:
                 # Non-interactive: return pending for external approval
+                pending.append(f)
                 self._log_decision(f, "pending", target_path)
                 print(f"  ⏸  PENDING APPROVAL: {f.title}")
 
         print()
-        print(f"  Approved: {len(approved)} | Rejected: {len(rejected)}")
+        print(f"  Approved: {len(approved)} | Rejected: {len(rejected)} | Pending: {len(pending)}")
         print("="*60 + "\n")
 
         return {
             "approved": approved,
             "rejected": rejected,
-            "status": "completed" if interactive else "pending",
+            "pending": pending,
+            "status": "pending" if pending else "completed",
             "approval_log": self.approval_log,
         }
 

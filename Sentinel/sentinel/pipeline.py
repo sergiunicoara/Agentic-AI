@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sentinel.agents.evidence_agent import collect_evidence
+from sentinel.agents.evidence_agent import collect_evidence_with_status
 from sentinel.agents.injection_auditor import audit_for_injection
 from sentinel.agents.privilege_auditor import audit_for_privilege
 from sentinel.agents.supply_chain_auditor import audit_for_supply_chain
@@ -14,6 +14,7 @@ from sentinel.agents.llm_auditor import audit_with_llm
 from sentinel.agents.adjudicator import adjudicate
 from sentinel.skills.skill_loader import select_skills_for_target, load_skill_frontmatter
 from sentinel.models.schemas import Attestation
+from sentinel.mcp.evidence_server import _validate_target, InvalidTargetPath, SCAN_ROOT
 # Note: utf-8 stdout/stderr reconfiguration for console report glyphs is
 # done centrally in sentinel/__init__.py so it applies to every entry point.
 
@@ -49,12 +50,35 @@ def run_sentinel(
             deterministic eval/test suite never depends on live API access.
         sarif_output: If set, write the attestation as a SARIF 2.1.0 log
             to this path — for CI security-gate integration.
+
+    The target is validated exactly once, up front (inside SCAN_ROOT, a
+    directory, within size limits; relative paths resolve against
+    SCAN_ROOT) — before ANY component reads a file. Every stage then gets
+    the resolved path. An invalid target yields an "inconclusive"
+    attestation, never a pass.
     """
     if verbose:
         print("\n" + "="*60)
         print("SENTINEL — Agent Security Review")
         print("="*60)
         print(f"Target: {target_path}")
+
+    try:
+        resolved_target = _validate_target(target_path)
+    except InvalidTargetPath as e:
+        if verbose:
+            print(f"\n[Sentinel] Target rejected: {e}")
+        attestation = adjudicate([], [], str(target_path), on_progress=on_progress,
+                                 inconclusive_reasons=[f"invalid target: {e}"])
+        if sarif_output:
+            from sentinel.eval.sarif import write_sarif
+            write_sarif(attestation, sarif_output)
+        return (attestation, None) if return_red_team else attestation
+
+    scan_path = str(resolved_target)
+    # Stable, machine-independent target name for the (signed) attestation.
+    display_target = (resolved_target.relative_to(SCAN_ROOT).as_posix()
+                      if resolved_target != SCAN_ROOT else ".")
 
     # Stage 1: Profile target and select skills
     if verbose:
@@ -65,7 +89,7 @@ def run_sentinel(
             "stage": "profiling",
             "message": "Profiling the target, selecting which security skills apply.",
         })
-    selected_skills = select_skills_for_target(target_path)
+    selected_skills = select_skills_for_target(scan_path)
     if verbose:
         for skill_name in selected_skills:
             fm = load_skill_frontmatter(skill_name)
@@ -82,9 +106,10 @@ def run_sentinel(
             "stage": "evidence",
             "message": "Four real tools running - bandit, ruff, pip-audit, semgrep. No LLM in this path.",
         })
-    evidence_list = collect_evidence(target_path)
+    evidence_list, tool_status = collect_evidence_with_status(scan_path)
     if on_progress:
-        on_progress({"type": "evidence_done", "count": len(evidence_list)})
+        on_progress({"type": "evidence_done", "count": len(evidence_list),
+                     "tool_status": tool_status})
 
     # Stage 2b: Red team (optional — static surface match, and/or live execution)
     red_team_summary = None
@@ -95,7 +120,7 @@ def run_sentinel(
         if verbose:
             print("\n[Stage 2b] Running red team assessment...")
         from sentinel.redteam.runner import run_red_team
-        red_team_summary = run_red_team(target_path)
+        red_team_summary = run_red_team(scan_path)
         for ev_dict in red_team_summary.get("trajectory_evidence", []):
             evidence_list.append(Evidence(**ev_dict))
 
@@ -103,7 +128,7 @@ def run_sentinel(
         if verbose:
             print("\n[Stage 2c] Running LIVE red team assessment (sandboxed execution)...")
         from sentinel.redteam.live_runner import run_live_red_team
-        live_red_team_summary = run_live_red_team(target_path)
+        live_red_team_summary = run_live_red_team(scan_path)
         for ev_dict in live_red_team_summary.get("trajectory_evidence", []):
             evidence_list.append(Evidence(**ev_dict))
 
@@ -114,28 +139,20 @@ def run_sentinel(
         on_progress({"type": "stage", "stage": "auditors", "message": "Running specialist auditors..."})
     all_candidates = []
 
-    if "prompt-injection-defense" in selected_skills:
-        candidates = audit_for_injection(evidence_list)
+    # Every deterministic auditor always runs: each is a pure lookup over
+    # evidence that already exists, so skipping one because a skill trigger
+    # word didn't match would silently discard real evidence. Skills only
+    # describe the target's profile.
+    for name, auditor in (
+        ("InjectionAuditor", audit_for_injection),
+        ("PrivilegeAuditor", audit_for_privilege),
+        ("SupplyChainAuditor", audit_for_supply_chain),
+    ):
+        candidates = auditor(evidence_list)
         if verbose:
-            print(f"  → InjectionAuditor: {len(candidates)} candidates")
+            print(f"  → {name}: {len(candidates)} candidates")
         if on_progress:
-            on_progress({"type": "auditor", "name": "InjectionAuditor", "candidates": len(candidates)})
-        all_candidates.extend(candidates)
-
-    if "confused-deputy-iam" in selected_skills:
-        candidates = audit_for_privilege(evidence_list)
-        if verbose:
-            print(f"  → PrivilegeAuditor: {len(candidates)} candidates")
-        if on_progress:
-            on_progress({"type": "auditor", "name": "PrivilegeAuditor", "candidates": len(candidates)})
-        all_candidates.extend(candidates)
-
-    if "supply-chain-integrity" in selected_skills:
-        candidates = audit_for_supply_chain(evidence_list)
-        if verbose:
-            print(f"  → SupplyChainAuditor: {len(candidates)} candidates")
-        if on_progress:
-            on_progress({"type": "auditor", "name": "SupplyChainAuditor", "candidates": len(candidates)})
+            on_progress({"type": "auditor", "name": name, "candidates": len(candidates)})
         all_candidates.extend(candidates)
 
     if include_red_team or include_live_red_team:
@@ -147,7 +164,7 @@ def run_sentinel(
         all_candidates.extend(candidates)
 
     if include_llm_auditor:
-        candidates = audit_with_llm(evidence_list, target_path)
+        candidates = audit_with_llm(evidence_list, scan_path)
         if verbose:
             print(f"  → LLMAuditor: {len(candidates)} candidates")
         if on_progress:
@@ -164,7 +181,8 @@ def run_sentinel(
             "message": "Now the trust gate.",
         })
     evidence_dicts = [ev.model_dump() for ev in evidence_list]
-    attestation = adjudicate(all_candidates, evidence_dicts, target_path, on_progress=on_progress)
+    attestation = adjudicate(all_candidates, evidence_dicts, display_target,
+                             on_progress=on_progress, tool_status=tool_status)
 
     if sarif_output:
         from sentinel.eval.sarif import write_sarif
@@ -178,6 +196,8 @@ def run_sentinel(
         print(f"  Verdict:  {attestation.verdict.upper()}")
         print(f"  Findings: {len(attestation.findings)}")
         print(f"  Ref:      {attestation.audit_ref}")
+        for reason in attestation.inconclusive_reasons:
+            print(f"  Incomplete: {reason}")
         if red_team_summary:
             rate = red_team_summary["injection_success_rate"]
             print(f"  Red Team: {rate:.0%} injection success rate")
@@ -209,7 +229,9 @@ if __name__ == "__main__":
                          help="Write a SARIF 2.1.0 report to PATH")
     parser.add_argument("--fail-on", choices=["fail", "pass_with_findings"],
                          default="fail",
-                         help="Exit non-zero if the verdict is at least this severe")
+                         help="Exit 1 if the verdict is at least this severe. An "
+                              "inconclusive verdict (invalid target, or a scanner "
+                              "that did not run cleanly) always exits 2.")
     args = parser.parse_args()
 
     result = run_sentinel(
@@ -221,6 +243,8 @@ if __name__ == "__main__":
         sarif_output=args.sarif,
     )
 
+    if result.verdict == "inconclusive":
+        sys.exit(2)
     severity_rank = {"pass": 0, "pass_with_findings": 1, "fail": 2}
     if severity_rank[result.verdict] >= severity_rank[args.fail_on]:
         sys.exit(1)

@@ -29,6 +29,10 @@ class Finding(BaseModel):
     rationale: str
     evidence_ids: list[str]
     remediation: str | None = None
+    # Optional: the source file this finding is about. When set, every cited
+    # evidence item that has a file locator must point at this same file
+    # (enforced by the Adjudicator gate).
+    file: str | None = None
 
     @field_validator("evidence_ids")
     @classmethod
@@ -44,12 +48,26 @@ class Finding(BaseModel):
             raise ValueError("Pillar must be 1-7")
         return v
 
+# Fail-closed verdict: "inconclusive" means the target was invalid or a
+# required deterministic scanner did not run cleanly (missing / timeout /
+# error), so the absence of findings proves nothing. Never reported as pass.
+Verdict = Literal["pass", "pass_with_findings", "fail", "inconclusive"]
+
+
 class Attestation(BaseModel):
     target: str
-    verdict: Literal["pass", "pass_with_findings", "fail"]
+    verdict: Verdict
     findings: list[Finding]
     signature: str
     audit_ref: str
+    # Per-tool outcome of the deterministic scan, e.g.
+    # {"bandit": {"status": "ok", "detail": ""}, "semgrep": {"status": "missing", ...}}
+    tool_status: dict[str, dict] = {}
+    # Why the verdict is "inconclusive" (empty otherwise).
+    inconclusive_reasons: list[str] = []
+    # The evidence items cited by surviving findings, so the attestation is
+    # self-contained (SARIF locations, signature coverage).
+    evidence: list[Evidence] = []
 
 class ScanRequest(BaseModel):
     target_path: str

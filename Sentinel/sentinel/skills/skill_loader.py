@@ -12,13 +12,15 @@ SKILLS_DIR = Path(__file__).parent
 def _contains_any_token(code: str, tokens: list[str]) -> bool:
     """
     Word-boundary match for trigger tokens, so e.g. "token" doesn't
-    match inside "tokenizer" or "AUTH" inside "AUTHOR".
+    match inside "tokenizer" or "AUTH" inside "AUTHOR". Underscores count
+    as boundaries too, so "api_key" in "PROVIDER_API_KEY" or "token" in
+    "auth_token" still match.
     Tokens containing non-word characters (like "shell=True") fall back
     to a plain substring check since \\b doesn't apply to them.
     """
     for t in tokens:
         if re.search(r"\w", t) and re.fullmatch(r"[\w]+", t):
-            if re.search(rf"\b{re.escape(t)}\b", code, re.IGNORECASE):
+            if re.search(rf"(?<![A-Za-z0-9]){re.escape(t)}(?![A-Za-z0-9])", code, re.IGNORECASE):
                 return True
         elif t in code:
             return True
@@ -69,8 +71,14 @@ def select_skills_for_target(target_path: str) -> list[str]:
     Profile a target and return relevant skill names.
     Checks for triggers: eval/exec → injection skill,
     requirements.txt → supply chain skill, etc.
+
+    Skills describe the target's profile (and can inform the LLM auditor);
+    they do NOT gate the deterministic auditors, which always all run.
+    The target is validated against SCAN_ROOT before any file is read.
+    Raises InvalidTargetPath for a target outside the allowed root.
     """
-    target = Path(target_path)
+    from sentinel.mcp.evidence_server import _validate_target
+    target = _validate_target(target_path)
     selected = []
     
     # Read all Python files in target
@@ -83,7 +91,7 @@ def select_skills_for_target(target_path: str) -> list[str]:
 
     # Check for injection triggers
     injection_triggers = ["eval(", "exec(", "subprocess", "shell=True",
-                         "web_fetch", "requests.get", "urllib"]
+                         "os.system", "pickle", "web_fetch", "requests.get", "urllib"]
     if _contains_any_token(code, injection_triggers):
         selected.append("prompt-injection-defense")
 

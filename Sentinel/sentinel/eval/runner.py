@@ -5,7 +5,7 @@ Runs the full eval corpus and produces the results table.
 This is the quantified proof that Sentinel works.
 
 Metrics:
-- Target detection rate: vulnerable targets caught (verdict != pass) /
+- Target detection rate: vulnerable targets caught (fail / pass_with_findings) /
   total vulnerable targets. This is target-level, not per-seeded-vuln:
   a target counts as detected if ANY of its seeded vulns is caught.
 - Hallucinated-finding rate: findings on clean controls / clean controls
@@ -103,14 +103,17 @@ def run_eval() -> dict:
             attestation = run_sentinel(target, verbose=False)
             actual_verdict = attestation.verdict
             findings_count = len(attestation.findings)
+            # "inconclusive" (a scanner didn't run) is neither a detection
+            # nor a clean pass — it is always counted as incorrect.
+            detected = actual_verdict in ("fail", "pass_with_findings")
             correct = (
                 (is_clean and actual_verdict == "pass") or
-                (not is_clean and actual_verdict != "pass")
+                (not is_clean and detected)
             )
 
             if not is_clean:
                 total_vulnerable_targets += 1
-                if actual_verdict != "pass":
+                if detected:
                     detected_targets += 1
 
             if is_clean and findings_count > 0:

@@ -36,6 +36,7 @@ def review_target(target_path: str) -> dict:
             }
             for f in attestation.findings
         ],
+        "inconclusive_reasons": attestation.inconclusive_reasons,
         "audit_ref": attestation.audit_ref,
         "signature": attestation.signature,
     }
@@ -89,8 +90,13 @@ def request_remediation_approval(target_path: str) -> dict:
 
     if not attestation.findings:
         return {
-            "verdict": "pass",
-            "message": "No findings — no remediation needed.",
+            "verdict": attestation.verdict,
+            "inconclusive_reasons": attestation.inconclusive_reasons,
+            "message": (
+                "Scan incomplete — no remediation can be planned until every "
+                "scanner runs." if attestation.verdict == "inconclusive"
+                else "No findings — no remediation needed."
+            ),
             "approval_required": False,
         }
 
@@ -122,8 +128,9 @@ def review_with_live_red_team(target_path: str) -> dict:
     """
     Run security review with LIVE red team execution: adversarial corpus
     payloads are actually fired at the target's real functions inside a
-    sandboxed subprocess (disposable temp cwd, scrubbed env, blocked
-    network, hard timeout, POSIX resource limits — see
+    hardened subprocess (disposable temp cwd, scrubbed env, blocked
+    network, guarded exec sinks, process-tree kill on timeout, POSIX
+    resource limits — see
     sentinel/redteam/live_runner.py for the full safety model), instead
     of only checking for static surfaces.
 
@@ -152,9 +159,10 @@ def review_with_live_red_team(target_path: str) -> dict:
         "audit_ref": attestation.audit_ref,
         "note": (
             "This review actually executed red team payloads against the "
-            "target's real functions in a sandboxed subprocess. Findings "
-            "titled LIVE-CONFIRMED are empirically proven code execution, "
-            "not pattern matches."
+            "target's real functions in a hardened (not containerized) "
+            "subprocess. Findings titled LIVE-CONFIRMED mean the payload was "
+            "observed reaching a code-execution/deserialization sink — not a "
+            "pattern match."
         ),
     }
 
@@ -228,17 +236,25 @@ Per-stage tools (for inspecting or driving individual pipeline stages):
    security Skills apply and why (run this first to explain what a review
    will focus on before running it)
 7. produce_attestation — the Attestation stage: run the Adjudicator trust
-   gate over candidate findings + evidence and return the signed verdict,
-   showing exactly which findings were dropped for lack of evidence
+   gate over candidate findings and return the verdict. Sentinel re-runs
+   the deterministic scan itself; you supply only candidates, never
+   evidence. Shows exactly which findings were dropped for lack of
+   matching evidence
 
 8. get_agent_capabilities — return your A2A agent card
 
 When reviewing targets:
-- Always explain the verdict clearly
+- Always explain the verdict clearly. "inconclusive" means the target was
+  invalid or a scanner did not run cleanly — never present it as a pass;
+  list its inconclusive_reasons
+- The signature is an HMAC over the attestation when the deployment sets
+  SENTINEL_SIGNING_KEY; "unsigned" means it is not tamper-evident. Don't
+  claim more than that
 - For each finding, cite the evidence ID that backs it
 - Mention that findings without evidence are automatically dropped
-- For live red team findings, mention they're empirically confirmed via
-  sandboxed execution, not a static pattern match
+- For live red team findings, mention the payload was observed reaching a
+  dangerous sink during hardened (not containerized) execution, not a
+  static pattern match
 - For HITL results, explain which findings need human approval
 
 When asked about your capabilities or how you work,
