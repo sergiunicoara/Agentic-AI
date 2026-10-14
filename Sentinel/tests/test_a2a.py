@@ -39,7 +39,7 @@ def test_agent_card_security_review_skill_exists():
 def test_agent_card_has_provider():
     """Agent card must identify the provider."""
     assert "provider" in AGENT_CARD
-    assert "name" in AGENT_CARD["provider"]
+    assert "organization" in AGENT_CARD["provider"]
 
 
 def test_agent_card_streaming_capability_declared():
@@ -67,12 +67,24 @@ def test_agent_card_url_reflects_public_url_env(monkeypatch):
     assert card["url"] == "https://sentinel.example.com/a2a"
 
 
-def test_agent_card_published_timestamp_is_fresh():
-    """Regression test: the old AGENT_CARD dict computed `published` once at
-    import time, so a long-lived process served a stale timestamp forever."""
-    first = build_agent_card()["published"]
-    second = build_agent_card()["published"]
-    assert first <= second
+def test_agent_card_is_deterministic():
+    """No per-request fields, so clients can cache the card."""
+    assert build_agent_card() == build_agent_card()
+
+
+def test_agent_card_modes_are_mime_types_matching_server_output():
+    card = build_agent_card()
+    assert card["defaultOutputModes"] == ["application/json"]
+    for skill in card["skills"]:
+        assert skill["inputModes"] == ["text/plain"]
+        assert skill["outputModes"] == ["application/json"]
+
+
+def test_agent_card_red_team_skill_documents_how_to_trigger_it():
+    red_team = next(s for s in build_agent_card()["skills"] if s["id"] == "red-team")
+    assert "include_red_team" in red_team["description"]
+    # Live execution is not reachable over A2A, so the card must not advertise it.
+    assert "live" not in red_team["description"].lower()
 
 
 @pytest.fixture
@@ -89,7 +101,27 @@ def test_both_discovery_paths_serve_identical_content(server_module):
     alias = client.get("/.well-known/agent.json")
     assert canonical.status_code == 200
     assert alias.status_code == 200
-    canonical_body, alias_body = canonical.json(), alias.json()
-    canonical_body.pop("published", None)
-    alias_body.pop("published", None)
-    assert canonical_body == alias_body
+    assert canonical.json() == alias.json()
+
+
+def test_deployment_check_refuses_public_url_without_token(server_module, monkeypatch):
+    monkeypatch.setenv("SENTINEL_PUBLIC_URL", "https://sentinel.example.com")
+    monkeypatch.delenv("SENTINEL_A2A_TOKEN", raising=False)
+    monkeypatch.delenv("SENTINEL_A2A_ALLOW_UNAUTHENTICATED", raising=False)
+    with pytest.raises(SystemExit):
+        server_module.check_deployment_config()
+
+
+def test_deployment_check_allows_token_or_explicit_opt_out(server_module, monkeypatch):
+    monkeypatch.setenv("SENTINEL_PUBLIC_URL", "https://sentinel.example.com")
+    monkeypatch.setenv("SENTINEL_A2A_TOKEN", "secret123")
+    server_module.check_deployment_config()
+    monkeypatch.delenv("SENTINEL_A2A_TOKEN")
+    monkeypatch.setenv("SENTINEL_A2A_ALLOW_UNAUTHENTICATED", "1")
+    server_module.check_deployment_config()
+
+
+def test_deployment_check_allows_local_default(server_module, monkeypatch):
+    monkeypatch.delenv("SENTINEL_PUBLIC_URL", raising=False)
+    monkeypatch.delenv("SENTINEL_A2A_TOKEN", raising=False)
+    server_module.check_deployment_config()

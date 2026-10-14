@@ -84,8 +84,10 @@ def stream_message(
     token: str | None = None,
     timeout: int = 300,
 ):
-    """Submit a task via `message/stream` and yield each SSE event dict as
-    it arrives, ending after the event with final=True."""
+    """Submit a task via `message/stream` and yield each A2A event (the
+    `result` of each SSE frame's JSON-RPC response: a Task, then
+    status-update / artifact-update events) as it arrives, ending after the
+    status-update with final=True. A JSON-RPC error frame raises."""
     params = {
         "message": {"role": "user", "parts": [{"kind": "text", "text": target_path}]},
         "metadata": {"include_red_team": include_red_team},
@@ -103,7 +105,13 @@ def stream_message(
         for line in response.iter_lines():
             if not line or not line.startswith("data:"):
                 continue
-            yield json.loads(line[len("data:"):].strip())
+            envelope = json.loads(line[len("data:"):].strip())
+            if "error" in envelope:
+                raise RuntimeError(f"A2A error {envelope['error']['code']}: {envelope['error']['message']}")
+            event = envelope["result"]
+            yield event
+            if event.get("final"):
+                return
 
 
 def call_remote_sentinel(

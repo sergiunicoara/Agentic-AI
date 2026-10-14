@@ -124,7 +124,15 @@ export default function App() {
     setScanning(true)
 
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${location.host}/ws/scan`)
+    // When the server requires SENTINEL_A2A_TOKEN, open the dashboard once as
+    // /ui/?token=<token>; it is remembered for this browser session only.
+    let token = new URLSearchParams(location.search).get('token')
+    try {
+      if (token) sessionStorage.setItem('sentinel_token', token)
+      else token = sessionStorage.getItem('sentinel_token')
+    } catch { /* storage unavailable — fall back to the URL token only */ }
+    const query = token ? `?token=${encodeURIComponent(token)}` : ''
+    const ws = new WebSocket(`${proto}://${location.host}/ws/scan${query}`)
     wsRef.current = ws
 
     ws.onopen = () => ws.send(JSON.stringify({ target_path: target, include_red_team: redTeam, include_llm_auditor: llmAuditor }))
