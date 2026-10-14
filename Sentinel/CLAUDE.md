@@ -1,3 +1,13 @@
+## Project commands
+
+- Install: `pip install -r requirements.txt -r requirements-dev.txt` (into `venv/`)
+- Tests (bash, repo root): `PATH="$PWD/venv/Scripts:$PATH" venv/Scripts/python -m pytest -q`
+  — the venv's `Scripts/` must be on PATH or resolvable, otherwise scanners are
+  missing and reviews come back `inconclusive`. semgrep doesn't run on native
+  Windows; its tests skip there.
+- A2A server: `python -m sentinel.a2a.server` (port 8080)
+- Deploy: `deploy/deploy.sh` (needs Secret Manager secrets `sentinel-a2a-token`, `sentinel-signing-key`)
+
 ## Workflow Orchestration
 
 ### 1. Plan Mode Default

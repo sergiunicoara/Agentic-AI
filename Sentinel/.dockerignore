@@ -20,9 +20,21 @@ venv/
 **/.adk/
 *.db
 
-# Tests and docs (not needed at runtime)
+# Tests, docs and dev-only files (not needed at runtime). The image root is
+# also the default SENTINEL_SCAN_ROOT, so anything left here is scannable.
 tests/
 README.md
+docs/
+tasks/
+requirements-dev.txt
+*.png
+
+# Agent/tooling state — never ship
+.claude/
+.agents/
+.codex/
+graphify-out/
+**/graphify-out/
 
 # Dashboard build artifacts (built inside Docker, not from host)
 sentinel/dashboard/node_modules/

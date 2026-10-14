@@ -51,7 +51,7 @@ A multi-agent ADK system: three real ADK agents sit at the boundaries, plus one 
 
 - **SentinelOrchestrator** (ADK Agent, Gemini 2.5 Flash) — the agent the user or an A2A peer talks to. Routes intent across 8 tools: five end-to-end review modes (standard, +red-team, +live red-team, +LLM auditor, +HITL remediation) plus per-stage tools and capability discovery.
 - **ScopeAgent** (ADK Agent) — wraps `profile_target()`, profiling a target's code and selecting which security Skills apply, and explaining why.
-- **AttestationAgent** (ADK Agent) — wraps `produce_attestation()`, which runs the Adjudicator and returns the signed, risk-stratified verdict. It can *explain* the gate's decision; it cannot override it.
+- **AttestationAgent** (ADK Agent) — wraps `produce_attestation()`, which runs the Adjudicator and returns the risk-stratified verdict (HMAC-signed when a signing key is configured). It can *explain* the gate's decision; it cannot override it.
 - **LLM Auditor** (Gemini-backed, opt-in, *not* an ADK agent — a direct `google.genai` API call used as a one-shot batch classifier) — the one auditor that reasons freely about source code, discussed above.
 
 Between Scope and Attestation, the pipeline is plain functions: an **Evidence Agent** calls four tools through a real in-process MCP server (`security_scan`/bandit, `lint_scan`/ruff, `dependency_scan`/pip-audit, `semgrep_scan`); four deterministic **Auditors** map evidence to candidate findings; a **Red Team** stage fires 8 adversarial payloads, either as a static textual-surface check or — opt-in — by *actually executing* them against the target's real functions inside a sandboxed subprocess (disposable temp directory, scrubbed environment, network sockets patched to fail closed, hard timeout, POSIX resource limits, and a hard rule that adversarial strings are never passed into a parameter that looks like a filesystem path); and the **Adjudicator** is the gate described above. A **HITL Gate** pauses before any high-severity auto-remediation for human approval. Output is a signed `Attestation` — exportable as a SARIF 2.1.0 report for CI gate integration, and streamed live to a React/WebSocket dashboard that shows each gate decision (SURVIVED / DROPPED) as it happens.
@@ -82,7 +82,7 @@ The insight is that a security tool needs both: agents to reason (route, scope, 
 - **LLM-auditor evidence survival rate (measured live):** 83% (15/18 candidates; the 3 dropped were schema violations, not hallucinated evidence)
 - **Hallucinated-finding rate on clean controls:** 0%
 - **False positives on clean controls:** 0
-- **Tests passing:** 75
+- **Tests passing:** 141 (4 semgrep tests skip on native Windows)
 
 The numbers that matter most aren't the 100% — a small bundled corpus making that easy is expected — but the 0% false-positive rate on clean controls and the *measured* (not assumed) 83% survival rate on the one auditor that can fail. Those are the numbers a security team adopting this tool would actually care about: does it cry wolf, and when it's wrong, does something catch it.
 

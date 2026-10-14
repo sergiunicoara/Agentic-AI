@@ -1,0 +1,4 @@
+# Test-only dependencies. Install with:
+#   pip install -r requirements.txt -r requirements-dev.txt
+pytest==9.1.1
+fakeredis==2.38.0

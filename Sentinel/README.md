@@ -28,7 +28,7 @@ Finding with fake evidence_ids → DROPPED
 Finding with real evidence_ids → SURVIVES
 ```
 
-This eliminates hallucinated security findings structurally — not by asking the model nicely, but by making it architecturally impossible to emit an unsupported finding.
+This eliminates hallucinated security findings structurally — not by asking the model nicely, but by making an unsupported finding fail the gate: every cited evidence id must exist in the server-side evidence store for that scan, and the cited evidence must match the finding. Callers (including the orchestrator's `produce_attestation` tool) can never supply their own evidence.
 
 **Note on the auditors:** the four deterministic specialists (Injection, Privilege, Supply Chain, RedTeam) are lookup tables over tool output — they never *can* hallucinate, so the gate is defense-in-depth for them. The **LLM Auditor** (`sentinel/agents/llm_auditor.py`, opt-in via `--llm-auditor` / `review_with_llm_auditor`) is different: it reads the raw source and reasons freely, which means it *can* propose a finding with a fabricated `evidence_id`. That's the auditor whose output the gate actually has to defend against.
 
@@ -57,7 +57,7 @@ The 3 drops weren't fabricated evidence — Gemini cited real evidence all three
 | LLM-auditor evidence survival rate (live, measured) | **83%** (15/18 candidates; the 3 dropped were schema violations, not hallucinated evidence) |
 | Hallucinated-finding rate on clean controls | **0%** |
 | False positives on clean controls | **0** (C1 and C2 both pass with zero findings) |
-| Tests passing | **75** |
+| Tests passing | **141** (4 semgrep tests skip on native Windows) |
 | Course concepts demonstrated | **5** (3 required minimum) |
 
 ---
@@ -89,7 +89,7 @@ SentinelOrchestrator (ADK Agent, Gemini 2.5 Flash) ── routes user intent to 
     │     └─ live    (sentinel/redteam/live_runner.py)  — sandboxed real execution, opt-in
     ├─ 5. Adjudicator    ← THE TRUST GATE: drop findings without evidence  (adjudicate, pure fn)
     ├─ 6. HITL Gate      Pause before high-severity auto-remediation       (HITLGate)
-    └─ 7. Attestation    Risk-stratified verdict + signed audit trail      (Attestation model)
+    └─ 7. Attestation    Risk-stratified verdict + HMAC-signed audit trail (when `SENTINEL_SIGNING_KEY` is set)      (Attestation model)
 │
 └─ AttestationAgent  (ADK Agent) ──tool──► produce_attestation()   → runs adjudicate(), signs verdict
 ```
@@ -135,7 +135,7 @@ The rubric requires demonstrating **at least 3** of these. Sentinel demonstrates
 
 | Concept | Status | Where |
 |---|---|---|
-| Agent / multi-agent system (ADK) | ✅ Code | Three ADK agents: orchestrator (`orchestrator/agent.py`), Scope (`agents/scope_agent.py`), Attestation (`agents/attestation_agent.py`) — Scope/Attestation wired as orchestrator tools, tested to confirm they're actually invoked. (The opt-in LLM auditor in `agents/llm_auditor.py` is Gemini-backed but is a direct API call, not an ADK agent.) |
+| Agent / multi-agent system (ADK) | ✅ Code | Three ADK agents: orchestrator (`orchestrator/agent.py`), Scope (`agents/scope_agent.py`), Attestation (`agents/attestation_agent.py`) — Scope/Attestation wired as orchestrator tools (tests confirm they are registered and that `produce_attestation` runs the gate). (The opt-in LLM auditor in `agents/llm_auditor.py` is Gemini-backed but is a direct API call, not an ADK agent.) |
 | MCP Server | ✅ Code | `sentinel/mcp/evidence_server.py` (4 tools, called over real MCP transport) |
 | Agent Skills | ✅ Code | `sentinel/skills/` (3 composable `SKILL.md` modules + loader) |
 | Security features | ✅ Code | The whole project — `adjudicator.py` evidence gate, `redteam/` sandboxed live execution |
@@ -241,7 +241,7 @@ python -m sentinel.eval.llm_gate_report --mode live   # force live Vertex AI usa
 pytest tests/ -v
 ```
 
-The suite takes several minutes (observed 5–11 min depending on machine/network) — most pipeline-level tests now run the full evidence collection (bandit + ruff + pip-audit + semgrep) per target, and semgrep's own startup/rule-fetch cost dominates and varies with network conditions. This is a deliberate thoroughness-over-speed tradeoff for a security tool's test suite, not an oversight.
+The suite takes about 30–60 seconds on a machine with the scanners installed (semgrep-dependent tests skip where semgrep can't run, e.g. native Windows). Scanners are resolved from the running interpreter's `Scripts/`/`bin` directory first, then `PATH`; if one is missing, reviews come back `inconclusive` rather than `pass`.
 
 ### Run from the CLI (CI-friendly)
 
@@ -338,7 +338,7 @@ Emits one `data:` frame per state transition and pipeline-stage progress event, 
 
 ### Authentication
 
-Set `SENTINEL_A2A_TOKEN` to require `Authorization: Bearer <token>` on `/a2a` (JSON-RPC + SSE) and the legacy `/a2a/review*` routes. Unset (the default) leaves them open, for local/demo use. Discovery, `/health`, and `/ws/scan` are always open. The comparison is constant-time (`hmac.compare_digest`).
+Set `SENTINEL_A2A_TOKEN` to require `Authorization: Bearer <token>` on `/a2a` (JSON-RPC + SSE) and the legacy `/a2a/review*` routes. Unset (the default) leaves them open, for local/demo use. Discovery and `/health` are always open. `/ws/scan` applies the same token (`Authorization` header, `?token=` query parameter or `bearer.<token>` subprotocol) plus an Origin check; the dashboard reads the token from `/ui/?token=<token>`. The server refuses to start on Cloud Run (`K_SERVICE`) or with a non-default `SENTINEL_PUBLIC_URL` unless a token is set (or `SENTINEL_A2A_ALLOW_UNAUTHENTICATED=1`). The comparison is constant-time (`hmac.compare_digest`).
 
 ### Redis-backed persistence
 
@@ -356,6 +356,28 @@ This implementation covers the core task lifecycle (submit/get/cancel), SSE stre
 
 ---
 
+### Configuration
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `SENTINEL_A2A_TOKEN` | Bearer token required on A2A and `/ws/scan` | unset (open, local use only) |
+| `SENTINEL_A2A_ALLOW_UNAUTHENTICATED` | `1` to run a public deployment without a token | unset |
+| `SENTINEL_PUBLIC_URL` | URL advertised in the agent card | `http://localhost:8080` |
+| `SENTINEL_SIGNING_KEY` | HMAC key for attestation signatures; unset => signature is `unsigned` | unset |
+| `SENTINEL_SCAN_ROOT` | Targets must resolve inside this directory | repo root |
+| `SENTINEL_MAX_SCAN_FILES` / `SENTINEL_MAX_SCAN_BYTES` | Target size limits | 5000 / 200 MiB |
+| `SENTINEL_MAX_CONCURRENT_SCANS` | Pipeline runs at once (A2A + WebSocket) | 2 |
+| `SENTINEL_MAX_ACTIVE_TASKS` | Non-terminal tasks accepted per process | 20 |
+| `SENTINEL_MAX_BODY_BYTES` | Max HTTP request body | 1 MiB |
+| `SENTINEL_STREAM_MAX_SECONDS` | Max lifetime of one event stream | 1800 |
+| `SENTINEL_REDIS_URL` | Durable task store (else in-memory) | unset |
+| `SENTINEL_LLM_AUDITOR_MODEL` | Model for the opt-in LLM auditor | `gemini-2.5-flash` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Enables OpenTelemetry export | unset |
+
+### Verdicts
+
+`pass`, `pass_with_findings`, `fail`, and `inconclusive`. A review is `inconclusive` — never `pass` — when the target is rejected or a required scanner is missing, times out or errors (the attestation lists which). A dependency scan with no `requirements.txt` is recorded as skipped, not as a failure.
+
 ## Project Structure
 
 ```
@@ -372,7 +394,7 @@ Sentinel/
 │   ├── dashboard/          # React/Vite live dashboard — WebSocket feed of gate decisions
 │   └── eval/               # Eval runner + metrics + SARIF export + LLM gate report
 ├── targets/                # Planted-bug corpus (T1–T6, C1, C2 — T6 is bandit's blind spot)
-├── tests/                  # 108 tests across all components
+├── tests/                  # 141 tests across all components
 ├── deploy/                 # Multi-stage Dockerfile (Node → Python) + Cloud Run deploy script
 ├── requirements.txt
 ├── pyproject.toml
